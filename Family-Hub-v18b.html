@@ -575,15 +575,16 @@ function syncOnDocs(c,docs){
 window.syncAfterSave=function(){if(sync.on&&!sync.applying)syncSchedule(400);};
 function syncStop(){sync.unsubs.forEach(function(u){try{if(typeof u==="function")u();}catch(e){}});sync.unsubs=[];sync.ready={};}
 function syncSubscribe(){
-  syncStop();syncSetState("connecting");
+  syncStop();sync.stage="(signed in, waiting for the database)";syncSetState("connecting");
+  clearTimeout(sync.dbT);sync.dbT=setTimeout(function(){if(sync.state==="connecting"){sync.stage="(no answer from the database after 15 seconds; check rules are published and Firestore exists)";syncSetState("connecting");if(typeof syncRefreshAdmin==="function")syncRefreshAdmin();}},15000);
   SYNC_COLLS.forEach(function(c){
-    sync.unsubs.push(sync.adapter.subscribe(c,function(docs){syncOnDocs(c,docs);},function(e){syncSetState("error",e);}));
+    sync.unsubs.push(sync.adapter.subscribe(c,function(docs){syncOnDocs(c,docs);},function(e){syncSetState("error",e);if(typeof syncRefreshAdmin==="function")syncRefreshAdmin();}));
   });
 }
 function syncFirebaseAdapter(){
   var fb=window.firebase;if(!fb.apps.length)fb.initializeApp(FH_CLOUD_CONFIG);
-  var auth=fb.auth(),db=fb.firestore();try{db.settings({experimentalAutoDetectLongPolling:true,merge:true});}catch(e){}
-  try{db.enablePersistence({synchronizeTabs:true}).catch(function(){});}catch(e){}
+  var auth=fb.auth(),db=fb.firestore();try{db.settings({experimentalForceLongPolling:true,merge:true});}catch(e){}
+  
   function col(c){return db.collection("households").doc("family").collection(c);}
   return {
     name:"firebase",
@@ -638,7 +639,7 @@ function syncBoxInner(){
   if(!sync.on){
     return "<p>Share the calendar and calendar suggestions between your phones, the iPad and the wall tablet. Chores and points stay on each device for now.</p><button class='btn' data-a='nxsyncon'>Turn on family sync</button>";
   }
-  var msg={connecting:"Connecting…",ok:"Synced"+(sync.last?" at "+sync.last:""),sending:"Sending changes…",offline:"Offline. Changes are kept here and will send when the connection returns.",signedout:"Not signed in.",nosdk:"Could not load the sync library. Check the Wi-Fi.",paused:"Paused for review.",error:"Problem: "+esc(sync.detail||"unknown"),off:""}[sync.state]||"";
+  var msg={connecting:"Connecting… "+(sync.stage||""),ok:"Synced"+(sync.last?" at "+sync.last:""),sending:"Sending changes…",offline:"Offline. Changes are kept here and will send when the connection returns.",signedout:"Not signed in.",nosdk:"Could not load the sync library. Check the Wi-Fi.",paused:"Paused for review.",error:"Problem: "+esc(sync.detail||"unknown"),off:""}[sync.state]||"";
   h+="<p><b>Status:</b> "+msg+(sync.user?" · Signed in as "+esc(sync.user):"")+"</p>";
   if(sync.guard)h+="<div class='card' style='border-left:6px solid #d9822b'><b>Check before continuing.</b><p>"+esc(sync.guardInfo)+" This can happen after restoring a backup. If that is what you meant, allow it. Otherwise turn sync off and ask for help.</p><button class='btn r' data-a='nxsyncallow'>Yes, delete them for everyone</button></div>";
   if(!sync.user){
