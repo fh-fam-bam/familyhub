@@ -17,7 +17,7 @@ nav button{margin-left:8px;background:transparent;color:var(--barink);border:2px
 nav button.on{background:var(--card);color:var(--ink)}
 #themebtn{min-width:52px;min-height:48px;font-size:22px;line-height:1}
 main{padding:16px;max-width:1100px;margin:0 auto}
-h1{font-size:30px;margin:4px 0 2px}h2{font-size:22px;margin:18px 0 8px}
+h1{font-size:30px;margin:4px 0 2px}.secbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}.secbar input{flex:1 1 200px;margin:0}.secbar .btn{margin:0}.secjump{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 14px}.secjump .chip{font:inherit;font-size:14px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer}.secbadge{display:inline-block;background:#b9390b;color:#fff;border-radius:999px;padding:1px 8px;font-size:13px;margin-left:4px}.sec{margin:0 0 10px}.sech{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;font-size:19px;font-weight:700;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:14px 16px;cursor:pointer;min-height:48px}.sech .sect{flex:1}.secchev{transition:transform .15s}.sec.open .secchev{transform:rotate(90deg)}.sec.open .sech{border-bottom-left-radius:0;border-bottom-right-radius:0}.secb{padding-top:10px}.secb>.card:first-child{margin-top:0}.sr{position:absolute;left:-9999px}.pfgrid{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}.pfth{position:relative;width:96px;height:96px}.pfth img{width:100%;height:100%;object-fit:cover;border-radius:10px;display:block}.pfth .btn{position:absolute;top:2px;right:2px;margin:0;padding:2px 8px;font-size:14px}.pfin{position:absolute;left:-9999px}.pfmsg{color:#2b8a3e;font-weight:700}html.lite .secchev{transition:none}h2{font-size:22px;margin:18px 0 8px}
 .sub{color:var(--mute);margin:0 0 14px}
 .grid{display:flex;flex-wrap:wrap;margin:-6px}
 .tile{flex:1 1 220px;margin:6px;border-radius:20px;padding:18px;color:#fff;text-align:left;border:0;font:inherit;min-height:150px}
@@ -515,7 +515,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v27";
+var FH_BUILD="v28";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -2091,7 +2091,71 @@ function saveTaskMinutes(p,id,raw){
   task.m=minutes;
   return true;
 }
-function parent(){if(devRole()!=="parent")return limitedParentHtml();if(!unlocked)return pinLockScreen();
+/* ===== v28: collapsible Parent area + photo frame feedback ===== */
+var secOpen={},secInit=false,secFilter="";
+(function(){try{var r=JSON.parse(localStorage.getItem("familyhub-secopen")||"null");if(r&&typeof r==="object")secOpen=r;}catch(e){}})();
+function secStore(){try{localStorage.setItem("familyhub-secopen",JSON.stringify(secOpen));}catch(e){}}
+function secKey(t){return String(t).replace(/<[^>]*>/g,"").toLowerCase().replace(/&amp;/g,"and").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"")||"section";}
+function secCount(key,body){
+  var re={"waiting-for-approval":/data-a='appr'/g,"reward-requests":/data-a='rok'/g,"calendar-change-requests":/data-a='nxevapprove'/g,"updates-between-parents":/data-a='nxnoteack'/g}[key];
+  if(!re)return 0;var m=body.match(re);return m?m.length:0;
+}
+function parentSections(html){
+  var parts=html.split(/(?=<h2[ >])/),head=parts.shift(),items=[],used={};
+  parts.forEach(function(p){
+    var m=/^<h2[^>]*>([\s\S]*?)<\/h2>([\s\S]*)$/.exec(p);
+    if(!m){head+=p;return;}
+    var key=secKey(m[1]);if(used[key]){var n=2;while(used[key+"-"+n])n++;key=key+"-"+n;}used[key]=1;
+    items.push({key:key,title:m[1],body:m[2],count:secCount(key,m[2])});
+  });
+  if(items.length<3)return html;
+  var firstRun=!Object.keys(secOpen).length&&!secInit;secInit=true;
+  items.forEach(function(it){if(it.count>0&&secOpen[it.key]===undefined)secOpen[it.key]=true;});
+  var f=secFilter.toLowerCase(),out=head+"<div class='secbar'><label for='secq' class='sr'>Find a setting</label><input id='secq' type='search' placeholder='Find a setting…' value='"+esc(secFilter)+"' autocomplete='off'>"+
+    "<button class='btn g' data-a='secall'>Open all</button><button class='btn' data-a='secnone'>Close all</button></div><div class='secjump' role='navigation' aria-label='Jump to a section'>";
+  items.forEach(function(it){out+="<button class='chip' data-a='secjump' data-k='"+it.key+"'>"+it.title.replace(/<[^>]*>/g,"")+(it.count?" <b class='secbadge'>"+it.count+"</b>":"")+"</button>";});
+  out+="</div>";
+  items.forEach(function(it){
+    var plain=it.title.replace(/<[^>]*>/g,""),show=!f||plain.toLowerCase().indexOf(f)>=0||it.body.replace(/<[^>]*>/g," ").toLowerCase().indexOf(f)>=0;
+    var open=!!secOpen[it.key]||(!!f&&show);
+    out+="<section class='sec"+(open?" open":"")+"' id='sec-"+it.key+"'"+(show?"":" hidden")+"><button class='sech' data-a='sectog' data-k='"+it.key+"' aria-expanded='"+(open?"true":"false")+"' aria-controls='secb-"+it.key+"'><span class='sect'>"+plain+"</span>"+(it.count?"<b class='secbadge'>"+it.count+" waiting</b>":"")+"<span class='secchev' aria-hidden='true'>▸</span></button><div class='secb' id='secb-"+it.key+"'"+(open?"":" hidden")+">"+it.body+"</div></section>";
+  });
+  return out;
+}
+function secSet(key,open){
+  secOpen[key]=!!open;secStore();
+  var s=document.getElementById("sec-"+key),b=document.getElementById("secb-"+key);if(!s||!b)return;
+  s.className="sec"+(open?" open":"");b.hidden=!open;var h=s.querySelector(".sech");if(h)h.setAttribute("aria-expanded",open?"true":"false");
+}
+function secAction(a,b){
+  var k=b.getAttribute("data-k");
+  if(a==="sectog"){secSet(k,!secOpen[k]);return true;}
+  if(a==="secjump"){secSet(k,true);var s=document.getElementById("sec-"+k);if(s){s.hidden=false;try{s.scrollIntoView({behavior:"smooth",block:"start"});}catch(e){s.scrollIntoView();}var h=s.querySelector(".sech");if(h&&h.focus)try{h.focus({preventScroll:true});}catch(e){}}return true;}
+  if(a==="secall"||a==="secnone"){var o=a==="secall";Array.prototype.forEach.call(document.querySelectorAll(".sec"),function(s){secSet(s.id.slice(4),o);});return true;}
+  return false;
+}
+document.addEventListener("input",function(e){
+  if(!e.target||e.target.id!=="secq")return;
+  secFilter=e.target.value||"";var f=secFilter.toLowerCase();
+  Array.prototype.forEach.call(document.querySelectorAll(".sec"),function(s){
+    var t=(s.textContent||"").toLowerCase(),show=!f||t.indexOf(f)>=0;s.hidden=!show;
+    if(f&&show){s.className="sec open";var bd=s.querySelector(".secb");if(bd)bd.hidden=false;var h=s.querySelector(".sech");if(h)h.setAttribute("aria-expanded","true");}
+    else if(!f){var k=s.id.slice(4),op=!!secOpen[k];s.className="sec"+(op?" open":"");var bd2=s.querySelector(".secb");if(bd2)bd2.hidden=!op;var h2=s.querySelector(".sech");if(h2)h2.setAttribute("aria-expanded",op?"true":"false");}
+  });
+});
+/* photo frame: add with visible feedback, thumbnails, remove one */
+var pfMsg="";
+function photoFrameBody(){
+  var ph=photos(),h="<p class='note'>Photos show when the screen is idle and stay on this device. <b>"+ph.length+" of 30 saved.</b></p>";
+  if(pfMsg)h+="<p class='pfmsg' role='status'>"+esc(pfMsg)+"</p>";
+  if(ph.length){h+="<div class='pfgrid'>";ph.forEach(function(u,i){h+="<div class='pfth'><img src='"+u+"' alt='Saved photo "+(i+1)+"'><button class='btn r' data-a='pfdel' data-i='"+i+"' aria-label='Remove photo "+(i+1)+"'>✕</button></div>";});h+="</div>";}
+  else h+="<p class='note'>No photos yet.</p>";
+  h+="<label class='btn' for='pf'>＋ Add photos</label><input type='file' id='pf' class='pfin' aria-label='Choose photos for the photo frame' accept='image/*' multiple>";
+  h+="<div class='row' style='display:flex;flex-wrap:wrap;gap:6px;align-items:center'>Start after <input id='ii' type='number' aria-label='Minutes of no activity before the photo frame starts' value='"+S.idle+"' style='width:80px'> minutes <button class='btn' data-a='setidle'>Save</button><button class='btn g' data-a='pfnow'>Preview now</button>"+(ph.length?"<button class='btn r' data-a='clrph'>Remove all photos</button>":"")+"</div>";
+  return h;
+}
+function parent(){if(devRole()!=="parent")return limitedParentHtml();if(!unlocked)return pinLockScreen();return parentSections(parentRaw());}
+function parentRaw(){
 var h="<h1>Parent area</h1>"+membersHtml()+"<h2>Waiting for approval</h2><div class='card'>",n=0;
 Object.keys(S.done).forEach(function(k){if(S.done[k]!=="p")return;var a=k.split("|"),p=person(a[1]),t=(S.tasks[a[1]]||[]).filter(function(x){return x.id===a[2]})[0]||petClaimTask(k);if(!p||!t)return;t=JSON.parse(JSON.stringify(t));if((S.submissions||{})[k])t.t=S.submissions[k].title;n++;
 h+=approvalRow(k,p,t,a[0]);});
@@ -2109,6 +2173,8 @@ if(a.indexOf('nx')===0){nxAction(a,b);return;}
 if(['addr','delr','delt','goalset','goalclr','setpin','rno','setidle','clrph','savemin','savealltasks'].indexOf(a)>=0&&!unlocked)return;
 if(a==="delt"){archiveTask(d("p"),d("t"));return;}
 if(a==="fgreset"){pinForgot();return;}
+if(a==="sectog"||a==="secjump"||a==="secall"||a==="secnone"){secAction(a,b);return;}
+if(a==="pfdel"){if(!unlocked)return;var pl=photos(),pi=+d("i");if(pi>=0&&pi<pl.length){pl.splice(pi,1);try{localStorage.setItem(KEY2,JSON.stringify(pl))}catch(x){}pfMsg="Photo removed.";render();}return;}
 if(a==="partyclose"){closeParty();return;}
 if(wheelBusy&&(a==="addo"||a==="delo"))return;
 if(wheelBusy&&a!=="dospin")cancelWheel();
@@ -2146,7 +2212,7 @@ else if(a==="addr"){if(!v("rn")||!validRewardCost(v("rc"))){alert("Enter a rewar
 else if(a==="delr"){S.rewards=S.rewards.filter(function(x){return x.id!==d("r")})}
 else if(a==="setidle"){S.idle=Math.max(1,+v("ii")||5)}
 else if(a==="pfnow"){showIdle()}
-else if(a==="clrph"){try{localStorage.removeItem(KEY2)}catch(x){}}
+else if(a==="clrph"){try{localStorage.removeItem(KEY2)}catch(x){}pfMsg="All photos removed.";}
 else if(a==="wake"){document.getElementById("idle").style.display="none"}
 else if(a==="dospin"){doSpin();return}
 else if(a==="rstart"){pid=d("p");rt={p:d("p"),g:d("g"),i:0,end:0};adv();view="routine"}
@@ -2192,9 +2258,13 @@ else if(a==="setpin"){if(v("np").length>=4){S.pin=v("np");alert("PIN changed.")}
 if(JSON.stringify(S)!==beforeState&&!save())rollbackTo(beforeState);render()});
 function reqHtml(){var h="<h2>Reward requests</h2><div class='card'>";S.req.forEach(function(q,i){var r=S.rewards.filter(function(x){return x.id===q.r})[0],p=person(q.p);if(!r)return;h+="<div class='row'><span class='dot' style='background:"+p.c+"'></span><span class='t'>"+esc(p.n)+" wants: "+esc(r.n)+" <span class='note'>"+r.c+" ⭐</span></span><button class='btn g' data-a='rok' data-i='"+i+"'>Approve</button><button class='btn r' data-a='rno' data-i='"+i+"'>Decline</button></div>"});if(!S.req.length)h+="<span class='note'>No requests.</span>";return h+"</div>"}
 function setHtml(){var h=goalSet()+"<h2>Rewards</h2><div class='card'>";S.rewards.forEach(function(r){h+="<div class='row'><span class='t'>"+esc(r.e)+" "+esc(r.n)+" <span class='note'>"+r.c+" ⭐</span></span><button class='btn n' data-a='delr' data-r='"+r.id+"'>Remove</button></div>"});
-h+="<input id='rn' placeholder='New reward'><input id='rc' type='number' placeholder='Points' style='width:100px'><button class='btn' data-a='addr'>Add reward</button></div><h2>Photo frame</h2><div class='card'><p class='note'>Photos show when the screen is idle and stay on this device. "+photos().length+" saved.</p><input type='file' id='pf' aria-label='Choose photos for the photo frame' accept='image/*' multiple><br>Start after <input id='ii' type='number' aria-label='Minutes of no activity before the photo frame starts' value='"+S.idle+"' style='width:80px'> minutes <button class='btn' data-a='setidle'>Save</button><button class='btn g' data-a='pfnow'>Preview now</button><button class='btn r' data-a='clrph'>Remove photos</button></div>";return h}
+h+="<input id='rn' placeholder='New reward'><input id='rc' type='number' placeholder='Points' style='width:100px'><button class='btn' data-a='addr'>Add reward</button></div><h2>Photo frame</h2><div class='card'>"+photoFrameBody()+"</div>";return h}
 function photos(){try{return JSON.parse(localStorage.getItem(KEY2))||[]}catch(x){return[]}}
-document.addEventListener("change",function(e){if(e.target.id!=="pf")return;var fs=[].slice.call(e.target.files),ph=photos(),n=fs.length;if(ph.length+fs.length>30){alert('You can keep up to 30 photos so chores always have room to save. Remove some photos first.');return}fs.forEach(function(f){var r=new FileReader();r.onload=function(){var im=new Image();im.onload=function(){var k=Math.min(1,1100/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=im.width*k;c.height=im.height*k;c.getContext("2d").drawImage(im,0,0,c.width,c.height);ph.push(c.toDataURL("image/jpeg",0.7));try{localStorage.setItem(KEY2,JSON.stringify(ph))}catch(x){alert("Photo storage is full. Remove some photos.")}if(--n===0)render()};im.src=r.result};r.readAsDataURL(f)})});
+document.addEventListener("change",function(e){if(e.target.id!=="pf")return;var fs=[].slice.call(e.target.files||[]),ph=photos(),n=fs.length,added=0,failed=0;if(!n)return;if(ph.length+n>30){alert('You can keep up to 30 photos so chores always have room to save. Remove some photos first.');e.target.value="";return}
+pfMsg="Adding "+n+" photo"+(n===1?"":"s")+"…";var m0=document.querySelector(".pfmsg");if(m0)m0.textContent=pfMsg;
+function done(){if(added+failed<n)return;var full=false;if(added){try{localStorage.setItem(KEY2,JSON.stringify(ph))}catch(x){full=true;ph.length=ph.length-added;}}
+pfMsg=full?"Photo storage is full. Remove some photos and try again.":("✓ Added "+added+" photo"+(added===1?"":"s")+(failed?" ("+failed+" could not be read)":"")+".");render();}
+fs.forEach(function(f){var r=new FileReader();r.onerror=function(){failed++;done()};r.onload=function(){var im=new Image();im.onerror=function(){failed++;done()};im.onload=function(){try{var k=Math.min(1,1100/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=Math.max(1,Math.round(im.width*k));c.height=Math.max(1,Math.round(im.height*k));c.getContext("2d").drawImage(im,0,0,c.width,c.height);ph.push(c.toDataURL("image/jpeg",0.7));added++;}catch(x){failed++}done()};im.src=r.result};r.readAsDataURL(f)})});
 var hhFilter="all",hhEdit="",hhFormType="leftover";
 var HH_TYPES=[['leftover','🥡','Use soon'],['contact','☎','Handy numbers'],['countdown','⏳','Countdowns'],['bill','💳','Bills'],['medicine','💊','Medicine'],['pet','🐾','Pets']];
 function hhItems(){return S.household||[];}
