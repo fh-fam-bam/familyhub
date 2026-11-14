@@ -515,7 +515,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v26";
+var FH_BUILD="v27";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -598,10 +598,45 @@ function pinUnlock(){
   try{localStorage.setItem("familyhub-pinlock",JSON.stringify(li));}catch(e){}
   alert(msg);
 }
+var forgotOpen=false;
+function pinForgotHtml(){
+  if(devRole()!=="parent")return "";
+  if(!forgotOpen)return "<p><button class='btn' data-a='fgshow'>Forgot your PIN?</button></p>";
+  var ad=pinAdults();
+  return "<hr><p><b>Reset a forgotten PIN</b></p><p class='note'>Enter the family sync email and password (the parents’ sign-in, not the kids’ one). Then choose a new PIN.</p>"+
+   (ad.length>1?"<label for='fgwho'>Reset the PIN for</label><select id='fgwho'>"+ad.map(function(p){return "<option value='"+esc(p.id)+"'>"+esc(p.n)+"</option>";}).join("")+"</select>":"")+
+   "<label for='fgem'>Family sync email</label><input id='fgem' type='email' autocomplete='username' value='"+esc(sync.email||"")+"'>"+
+   "<label for='fgpw'>Family sync password</label><input id='fgpw' type='password' autocomplete='current-password'>"+
+   "<label for='fgp1'>New PIN (4 to 8 digits)</label><input id='fgp1' type='password' inputmode='numeric' autocomplete='off'>"+
+   "<label for='fgp2'>New PIN again</label><input id='fgp2' type='password' inputmode='numeric' autocomplete='off'>"+
+   "<button class='btn' data-a='fgreset'>Reset PIN and unlock</button> <button class='btn' data-a='fghide'>Cancel</button><p class='note' id='fgmsg' role='status'></p>";
+}
+function pinForgot(){
+  var g=function(i){return (document.getElementById(i)||{}).value||"";},msg=document.getElementById("fgmsg");
+  function say(t){var m=document.getElementById("fgmsg");if(m)m.textContent=t;}
+  var ad=pinAdults(),who=g("fgwho")||(ad[0]&&ad[0].id)||"",em=g("fgem").trim(),pw=g("fgpw"),p1=g("fgp1"),p2=g("fgp2");
+  if(devRole()!=="parent"){say("This is only available on a parent phone.");return;}
+  if(!who){say("No parent found to reset.");return;}
+  if(!em||!pw){say("Enter the family sync email and password.");return;}
+  if(!/^\d{4,8}$/.test(p1)){say("The new PIN must be 4 to 8 digits.");return;}
+  if(p1!==p2){say("The two PINs do not match.");return;}
+  var ke=(S.kidsAccount&&S.kidsAccount.email||"").toLowerCase();
+  if(ke&&em.toLowerCase()===ke){say("That is the kids’ account. Use the parents’ sign-in.");return;}
+  say("Checking…");
+  fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="+FH_CLOUD_CONFIG.apiKey,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:em,password:pw,returnSecureToken:true})}).then(function(r){
+    return r.json().then(function(j){
+      if(r.status!==200||!j.idToken){say("Those sign-in details were not accepted. The PIN was not changed.");return;}
+      S.pins=S.pins||{};S.pins[who]=pinMake(p1);
+      try{localStorage.removeItem("familyhub-pinlock");}catch(e){}
+      forgotOpen=false;unlocked=true;unlockedBy=who;save();render();
+      try{alert("PIN reset. You are unlocked.");}catch(e){}
+    });
+  }).catch(function(){say("Could not reach the sign-in service. Check the internet connection and try again.");});
+}
 function pinLockScreen(){
   var ad=pinAdults(),h="<h1>Parent area</h1><div class='card'><p>Choose who you are and enter your PIN.</p>";
   if(ad.length>1){h+="<label for='pinwho'>I am</label><select id='pinwho'>"+ad.map(function(p){return "<option value='"+esc(p.id)+"'>"+esc(p.n)+"</option>";}).join("")+"</select>";}
-  h+="<input id='pin' type='password' inputmode='numeric' placeholder='PIN' autocomplete='off'><button class='btn' data-a='unlock'>Unlock</button><p class='note'>"+((S.pins&&Object.keys(S.pins).length)?"Each parent has their own PIN. After 5 wrong tries the lock waits a minute.":"The starting PIN is 1234. After unlocking, set your own PIN under “This device and PINs”.")+"</p></div>";
+  h+="<input id='pin' type='password' inputmode='numeric' placeholder='PIN' autocomplete='off'><button class='btn' data-a='unlock'>Unlock</button><p class='note'>"+((S.pins&&Object.keys(S.pins).length)?"Each parent has their own PIN. After 5 wrong tries the lock waits a minute.":"The starting PIN is 1234. After unlocking, set your own PIN under “This device and PINs”.")+"</p>"+pinForgotHtml()+"</div>";
   return h;
 }
 function limitedParentHtml(){
@@ -2073,6 +2108,7 @@ if(a.indexOf('member')===0){memberAction(a,b);return;}
 if(a.indexOf('nx')===0){nxAction(a,b);return;}
 if(['addr','delr','delt','goalset','goalclr','setpin','rno','setidle','clrph','savemin','savealltasks'].indexOf(a)>=0&&!unlocked)return;
 if(a==="delt"){archiveTask(d("p"),d("t"));return;}
+if(a==="fgreset"){pinForgot();return;}
 if(a==="partyclose"){closeParty();return;}
 if(wheelBusy&&(a==="addo"||a==="delo"))return;
 if(wheelBusy&&a!=="dospin")cancelWheel();
@@ -2091,7 +2127,7 @@ else if(a==="delev"){S.events.splice(+d("i"),1)}
 else if(a==="addg"){if(v("gi"))S.groc.push({t:v("gi"),s:v("gs"),c:0})}
 else if(a==="gtick"){S.groc[+d("i")].c=!S.groc[+d("i")].c}
 else if(a==="gclear"){S.groc=S.groc.filter(function(g){return !g.c})}
-else if(a==="unlock"){pinUnlock()}
+else if(a==="unlock"){pinUnlock()}else if(a==="fgshow"){forgotOpen=true;render()}else if(a==="fghide"){forgotOpen=false;render()}
 else if(a==="lock"){unlocked=false;unlockedBy="";limitedUnlock=false}
 else if(a==="cv"){cv=d("v")}
 else if(a==="cp"){calP=d("p")}
