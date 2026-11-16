@@ -124,7 +124,7 @@ fieldset{border:1px solid var(--line);border-radius:10px;margin:12px 0;padding:1
 .bg-blocks{background-image:linear-gradient(rgba(128,128,128,.10) 2px,transparent 2px),linear-gradient(90deg,rgba(128,128,128,.10) 2px,transparent 2px);background-size:36px 36px}.bg-stars{background-image:radial-gradient(rgba(128,128,128,.22) 2px,transparent 3px),radial-gradient(rgba(128,128,128,.14) 1.5px,transparent 2.5px);background-size:60px 60px,37px 37px;background-position:0 0,18px 22px}.bg-waves{background-image:repeating-radial-gradient(circle at 0 100%,transparent 0,transparent 22px,rgba(128,128,128,.10) 23px,rgba(128,128,128,.10) 25px)}.bg-dots{background-image:radial-gradient(rgba(128,128,128,.18) 3px,transparent 4px);background-size:28px 28px}.bg-diag{background-image:repeating-linear-gradient(45deg,rgba(128,128,128,.08) 0,rgba(128,128,128,.08) 10px,transparent 10px,transparent 20px)}
 .mystery{padding:10px 14px;border-radius:14px;border:2px dashed #e9a23b;background:var(--card);margin:6px 0}.funline{padding:10px 14px;border-radius:14px;background:var(--card);border:1px solid var(--line);margin:6px 0}
 .lookgrid label{display:block}.cust-panel select{min-height:44px}
-/* ---- v12: glass theme layer ---- */
+.p2-sticky{background:#fff4bd;color:#352c16;border-radius:12px;padding:12px;margin:12px 0;overflow-wrap:anywhere}.p2-sticky p{white-space:pre-wrap;margin:7px 0}.p2-sticky small{font-size:13px}.p2-sticky .btn{font-size:14px;min-height:48px;padding:7px 12px}.p2-bounty{padding:12px 0;border-bottom:1px solid var(--line)}.p2-bounty p{margin:6px 0}.p2-bounty .btn{margin:4px 5px 4px 0}/* ---- v12: glass theme layer ---- */
 :root{--bg-grad:linear-gradient(160deg,#f8f6ff 0%,#eaf1fb 55%,#f6eefa 100%);--glass:rgba(255,255,255,.78);--glass-bar:rgba(221,230,248,.82);--glass-line:rgba(255,255,255,.65);--radius:20px;--shadow:0 1px 2px rgba(25,35,70,.06),0 6px 16px rgba(25,35,70,.08),0 18px 40px rgba(25,35,70,.07);--shadow-hover:0 2px 4px rgba(25,35,70,.08),0 10px 24px rgba(25,35,70,.12),0 24px 48px rgba(25,35,70,.10);--focus:#3b5bdb}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg-grad:linear-gradient(160deg,#0b141d 0%,#12202f 55%,#171a2e 100%);--glass:rgba(26,40,54,.78);--glass-bar:rgba(10,18,26,.85);--glass-line:rgba(255,255,255,.08);--shadow:0 1px 2px rgba(0,0,0,.35),0 6px 16px rgba(0,0,0,.30),0 18px 40px rgba(0,0,0,.25);--shadow-hover:0 2px 4px rgba(0,0,0,.4),0 10px 24px rgba(0,0,0,.38),0 24px 48px rgba(0,0,0,.30);--focus:#8fb0ff}}
 :root[data-theme='dark']{--bg-grad:linear-gradient(160deg,#0b141d 0%,#12202f 55%,#171a2e 100%);--glass:rgba(26,40,54,.78);--glass-bar:rgba(10,18,26,.85);--glass-line:rgba(255,255,255,.08);--shadow:0 1px 2px rgba(0,0,0,.35),0 6px 16px rgba(0,0,0,.30),0 18px 40px rgba(0,0,0,.25);--shadow-hover:0 2px 4px rgba(0,0,0,.4),0 10px 24px rgba(0,0,0,.38),0 24px 48px rgba(0,0,0,.30);--focus:#8fb0ff}
@@ -425,11 +425,46 @@ html:not(.lite) .card,html:not(.lite) .cd{box-shadow:0 1px 2px rgba(25,35,70,.06
 .ds-top .btn{margin:4px 8px 4px 0}.ds-top .ds-x{margin-left:auto;margin-right:0;min-width:48px}
 .daysheet h2{margin:6px 0}
 @media (min-width:701px){.daysheet{left:92px;bottom:0;max-height:45vh}.sheet-spacer{height:48vh}}
+/* Phase 1: glanceable wall photo frame */
+#idle{isolation:isolate;background-position:center;background-size:cover}.idle-date{margin-top:8px}.idle-glance>*+*{margin-top:10px}
+#idle::before{content:"";position:absolute;top:0;right:0;bottom:0;left:0;background:linear-gradient(0deg,rgba(0,0,0,.72),transparent 58%);z-index:-1;pointer-events:none}
+.idle-glance{position:absolute;top:max(22px,env(safe-area-inset-top));right:24px;display:flex;flex-direction:column;align-items:flex-end;max-width:min(420px,80vw)}
+.idle-pill{background:rgba(15,27,45,.68);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:18px;padding:12px 16px;box-shadow:0 4px 22px #0004;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);font-size:18px;line-height:1.35;text-align:right}
+.idle-fav{background:rgba(15,27,45,.78);color:#fff;border:1px solid #ffffff88;border-radius:999px;padding:12px 18px;font:inherit;font-size:17px;min-height:48px;cursor:pointer}
+.idle-fav[aria-pressed="true"]{background:rgba(139,32,64,.88)}
+@media(max-width:600px){#idle{padding:20px}.idle-glance{top:18px;right:16px;left:16px;max-width:none}.idle-pill{font-size:15px;padding:8px 12px}#idle .idle-time{font-size:58px!important}#idle .idle-date{font-size:20px!important}}
+/* Phase 3 cosmetics: no animation on low-power displays or reduced-motion devices */
+.cosmetic-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.cosmetic-item{border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center}.cosmetic-item b{display:block;min-height:42px}.cosmetic-item .btn{margin:8px 0 0;font-size:14px;padding:8px}.personal-avatar.border-gold{border-color:#d9a323!important;box-shadow:0 0 0 5px #d9a32388}.personal-avatar.border-rainbow{border-color:#a34ee0!important;box-shadow:0 0 0 3px #4ba5e8,0 0 0 6px #e4a33a}.personal-avatar.border-neon{border-color:#13cfa5!important;box-shadow:0 0 12px #13cfa5}.personal-hero.glow-blue{box-shadow:0 0 20px #438aff77}.personal-hero.glow-purple{box-shadow:0 0 20px #ad66ec88}.personal-hero.glow-gold{box-shadow:0 0 20px #e6b34088}
 </style>
 </head>
 <body>
 <div id="side"></div><nav><b id="ttl">Family Hub</b><span id="nav"><button id="themebtn" type="button" data-a="nxtheme" aria-label="Switch to dark mode">🌙</button></span></nav>
 <div id="clock"></div><div id="savestatus" role="status" aria-live="polite">Data stays on this device · Not connected to other devices</div><div id="syncstatus" role="status" aria-live="polite"></div><main id="app"></main><div id="idle" data-a="wake"></div>
+<script>
+/* v31.4: voice bridge for the Android (Fire tablet) wrapper. Only active when the wrapper provides window.FHNative
+   and the browser has no speech recognition of its own. Presents the same interface the page already uses. */
+(function(){
+  try{
+    if(window.SpeechRecognition||window.webkitSpeechRecognition)return;
+    var N=window.FHNative;
+    if(!N||typeof N.isAvailable!=="function"||!N.isAvailable())return;
+    var cur=null;
+    function Shim(){this.lang="en-US";this.interimResults=false;this.continuous=false;this.maxAlternatives=1;this.onresult=null;this.onerror=null;this.onend=null;}
+    Shim.prototype.start=function(){if(cur&&cur!==this){var o=cur;cur=null;try{if(o.onend)o.onend();}catch(e){}}cur=this;N.start(this.lang||"en-US");};
+    Shim.prototype.stop=function(){try{N.stop();}catch(e){}};
+    Shim.prototype.abort=function(){try{N.cancel();}catch(e){}};
+    window.__fhSpeech=function(kind,text){
+      var r=cur;if(!r)return;
+      try{
+        if(kind==="partial"||kind==="final"){if(r.onresult)r.onresult({results:[[{transcript:String(text||"")}]]});}
+        else if(kind==="error"){if(r.onerror)r.onerror({error:String(text||"other")});}
+        else if(kind==="end"){cur=null;if(r.onend)r.onend();}
+      }catch(e){}
+    };
+    window.webkitSpeechRecognition=Shim;
+  }catch(e){}
+})();
+</script>
 <script>
 var KEY="familyhub-v1", KEY2="familyhub-photos", view="home", pid=null, unlocked=false, cv="week", cd=new Date(), calP="";
 var P=[{id:"dad",n:"Dad",e:"🧔",c:"#3b5bdb",kid:0},{id:"monica",n:"Monica",e:"👩",c:"#c2427a",kid:0},{id:"julian",n:"Julian",e:"🎮",c:"#117562",kid:1},{id:"emilio",n:"Emilio",e:"⚽",c:"#a85a05",kid:1}];
@@ -550,8 +585,156 @@ function winsCardHtml(){
   return hcard("Chores &amp; Wins! 🏆",body,best?"🔥 "+best+"-day streak!":"🔥 Start a streak today","chores-wins-card").replace("<span>","<span class='streak-badge'>");
 }
 function wheelCardHtml(){return hcard("Decision Wheel 🎲","<p class='wheel-prev'>What’s for dinner? Who unloads the dishwasher? Let the wheel decide.</p><button class='btn spin-big' data-a='go' data-v='spin'>Spin to decide!</button>",'');}
+
+/* v32: kid-writable requests (food opinions, fridge notes, bounty claims) that a parent approves */
+function bqPending(){return (Array.isArray(S.boardReq)?S.boardReq:[]).filter(function(c){return c&&!c.st;});}
+function bqNotice(){return (sync&&sync.boardDenied)?"<p class='note' role='status'>Saved on this device, but it cannot reach the parents yet. A parent needs to publish the updated Firebase rules.</p>":"";}
+function bqFoodShown(id){
+  if(devRole()!=='parent'){var r=bqPending().filter(function(c){return c.kind==='food'&&c.by===id;})[0];if(r)return {likes:r.likes,dislikes:r.dislikes};}
+  return foodPref(id);
+}
+function bqFoodKid(p){
+  if(devRole()==='parent')return '';
+  var r=bqPending().filter(function(c){return c.kind==='food'&&c.by===p.id;})[0];
+  return "<button class='btn g' data-a='bqfood' data-p='"+esc(p.id)+"' style='min-height:48px;margin-top:10px'>Send to parents</button><p class='note' role='status'>"+(r?"Sent. A parent will look at it soon.":"Nothing is saved for the family until a parent approves it.")+"</p>"+bqNotice();
+}
+function bqNoteForm(){
+  var who=P.filter(function(p){return !p.pet&&!p.archived;});
+  return "<label for='bq-author'>From</label><select id='bq-author'>"+who.map(function(p){return "<option value='"+esc(p.id)+"'>"+esc(p.n)+"</option>";}).join('')+"</select><label for='bq-text' class='sr'>Note for the family</label><textarea id='bq-text' maxlength='300' placeholder='Write a note for a parent to approve…' style='width:100%;display:block'></textarea><button class='btn g' data-a='bqnote'>Send note</button>"+(bqPending().some(function(c){return c.kind==='note';})?"<p class='note'>Your note is waiting for a parent.</p>":"")+bqNotice();
+}
+function bqClaimBtns(b){
+  if(bqPending().some(function(c){return c.kind==='claim'&&c.bid===b.id;}))return "<p class='note'>Asked! Waiting for a parent.</p>";
+  return "<p class='note'>Want this one? Tap your name:</p>"+p2Kids().map(function(k){return "<button class='btn' data-a='bqclaim' data-id='"+esc(b.id)+"' data-p='"+esc(k.id)+"'>"+esc(k.n)+" wants it</button>";}).join('');
+}
+function boardReqHtml(){
+  var q=bqPending();if(!q.length)return '';
+  return "<h2>📋 Family board requests</h2><div class='card'><p class='note'>Food opinions, notes and bounty asks sent from the kids’ devices. Nothing is shared until you approve.</p>"+q.map(function(c){
+    var by=person(c.by)||{n:'Someone'},d;
+    if(c.kind==='food')d="Food opinions: likes “"+c.likes+"”; dislikes “"+c.dislikes+"”";
+    else if(c.kind==='note')d="Fridge note: “"+c.text+"”";
+    else{var bn=(S.bounties||[]).filter(function(x){return x.id===c.bid;})[0];d="Wants bounty: "+(bn?bn.title+(bn.status==='open'?'':' (no longer open)'):'(removed)');}
+    return "<div class='row' style='flex-wrap:wrap'><span class='t'><b>"+esc(by.n)+"</b><div class='note'>"+esc(d)+"</div></span><button class='btn g' data-a='bqapprove' data-id='"+esc(c.id)+"'>Approve</button><button class='btn r' data-a='bqdecline' data-id='"+esc(c.id)+"'>Decline</button></div>";}).join('')+"</div>";
+}
+function bqSubmit(o){
+  var snap=JSON.stringify(S);S.boardReq=Array.isArray(S.boardReq)?S.boardReq:[];
+  if(o.kind!=='food'&&S.boardReq.filter(function(c){return !c.st;}).length>=30){alert('Too many requests are waiting. Ask a parent to clear some.');return false;}
+  if(o.kind==='food')S.boardReq=S.boardReq.filter(function(c){return !(c.kind==='food'&&c.by===o.by&&!c.st);});
+  o.id=uid();o.at=p2Now();S.boardReq.push(o);
+  if(!commitOr(snap))return false;render();statusMessage('Sent to a parent.');return true;
+}
+function boardAct(a,b){
+  var id=b.getAttribute('data-id'),p=b.getAttribute('data-p');
+  if(a==='bqfood'){if(!person(p)||person(p).pet)return;var l=v('food-likes-'+p),d=v('food-dislikes-'+p);if(l.length>300||d.length>300)return;if(!l&&!d)return alert('Type at least one food first.');bqSubmit({kind:'food',by:p,likes:l,dislikes:d});return;}
+  if(a==='bqnote'){var t=v('bq-text'),f=v('bq-author');if(!t||t.length>300||!person(f)||person(f).pet)return alert('Choose who you are and write a note.');bqSubmit({kind:'note',by:f,text:t});return;}
+  if(a==='bqclaim'){var bn=(S.bounties||[]).filter(function(x){return x.id===id&&x.status==='open';})[0];if(!bn||!person(p)||!person(p).kid)return;bqSubmit({kind:'claim',by:p,bid:id});return;}
+  if(a!=='bqapprove'&&a!=='bqdecline')return;
+  if(!(unlocked&&p2Parent()))return alert('Unlock the Parent area on a parent phone first.');
+  var snap=JSON.stringify(S),i=-1;(S.boardReq||[]).forEach(function(c,j){if(c.id===id)i=j;});if(i<0)return;var c=S.boardReq[i];
+  if(a==='bqapprove'){
+    if(c.kind==='food'){S.foodPrefs=S.foodPrefs||{};S.foodPrefs[c.by]={likes:c.likes,dislikes:c.dislikes};}
+    else if(c.kind==='note'){S.fridgeNotes=Array.isArray(S.fridgeNotes)?S.fridgeNotes:[];S.fridgeNotes.push({id:uid(),from:c.by,text:c.text,at:p2Now(),read:false});S.fridgeNotes=S.fridgeNotes.slice(-40);}
+    else{
+      var it=(S.bounties||[]).filter(function(x){return x.id===c.bid&&x.status==='open';})[0];
+      if(!it){S.boardReq.splice(i,1);if(commitOr(snap)){render();alert('That bounty is no longer open, so the request was cleared.');}return;}
+      S.tasks[c.by]=S.tasks[c.by]||[];
+      if(!S.tasks[c.by].some(function(x){return x.id===it.id;}))S.tasks[c.by].push({id:it.id,t:it.title,g:'Extra-credit bounties',points:p2Pts(it),days:[0,1,2,3,4,5,6],start:today(),finish:today()});
+      it.status='claimed';it.claimedBy=c.by;it.claimedAt=p2Now();it.claimedVia=unlockedBy||'';it.u=it.claimedAt;
+    }
+  }
+  S.boardReq.splice(i,1);
+  if(!commitOr(snap))return;render();statusMessage(a==='bqapprove'?'Approved.':'Declined.');
+}
+/* Phase 2: public family notes remain separate from private parentNotes. */
+
+function p2Parent(){return devRole()==='parent';}
+function p2Pts(b){var n=Number(b&&b.points);return Math.max(1,Math.min(100,Math.ceil(isFinite(n)?n:1)));}
+function p2Now(){return new Date().toISOString();}
+function p2Kids(){return P.filter(function(x){return x.kid&&!x.archived;});}
+function p2Submitted(pid,id){return Object.keys(S.done||{}).some(function(k){var a=k.split('|');return a[1]===pid&&a[2]===id&&(S.done[k]==='p'||S.done[k]==='a');});}
+function phase2WallHtml(){
+ var canPost=p2Parent();
+ var notes=(Array.isArray(S.fridgeNotes)?S.fridgeNotes:[]).filter(function(n){return n&&!n.archived;}).slice(-8).reverse();
+ var open=(Array.isArray(S.bounties)?S.bounties:[]).filter(function(b){return b&&b.status==='open';});
+ var h="<div class='home-grid duo'><section class='hcard'><div class='ch' style='background:#b17b18'>📝 Family Fridge Notes <span>"+notes.length+" visible</span></div><div class='cb'>";
+ if(canPost){
+  h+="<label for='fridge-author'>From</label><select id='fridge-author'>"+P.filter(function(p){return !p.pet&&!p.archived;}).map(function(p){return "<option value='"+esc(p.id)+"'"+(p.id===unlockedBy?' selected':'')+">"+esc(p.n)+"</option>";}).join('')+"</select><label for='fridge-text' class='sr'>New family note</label><textarea id='fridge-text' maxlength='300' placeholder='Leave a note for the family…' style='width:100%;display:block'></textarea><button class='btn g' data-a='p2noteadd'>Post note</button>";
+ }else h+=bqNoteForm();
+ if(!notes.length)h+="<p class='note'>No notes yet.</p>";
+ notes.forEach(function(n){h+="<div class='p2-sticky'><b>"+esc((person(n.from)||{}).n||'Family')+"</b><p>"+esc(n.text)+"</p><small>"+esc(new Date(n.at).toLocaleDateString())+"</small> "+(canPost?"<button class='btn n' data-a='p2noteread' data-id='"+esc(n.id)+"'>"+(n.read?'✓ Read':'Mark read')+"</button>":(n.read?"<small>✓ Read</small>":""))+"</div>";});
+ h+="</div></section><section class='hcard'><div class='ch' style='background:#7552a5'>🏆 Chore Bounties <span>"+open.length+" available</span></div><div class='cb'>";
+ if(!open.length)h+="<p class='note'>No extra-credit chores available right now.</p>";
+ open.forEach(function(b){h+="<div class='p2-bounty'><b>"+esc(b.title)+"</b><p>⭐ "+esc(String(p2Pts(b)))+" points · Parent approval required</p>"+(canPost?p2Kids().map(function(k){return "<button class='btn' data-a='p2claim' data-id='"+esc(b.id)+"' data-p='"+esc(k.id)+"'>Give to "+esc(k.n)+"</button>";}).join(''):bqClaimBtns(b))+"</div>";});
+ h+="<p class='note'>An unlocked parent assigns a bounty to one child. Points are awarded only after parent approval.</p></div></section></div>";return h;
+}
+function phase2ParentHtml(){
+ var b=Array.isArray(S.bounties)?S.bounties:[],nn=(Array.isArray(S.fridgeNotes)?S.fridgeNotes:[]).filter(function(n){return n&&!n.archived;}).slice(-10).reverse();
+ return "<h2>🏆 Bounty Board management</h2><div class='card'><p class='note'>Parent-only. Whole points, 1 to 100. Each bounty can be assigned once and needs approval for points. A bounty is a same-day chore; if it is not finished, tap Reopen.</p><input id='p2btitle' maxlength='120' placeholder='Extra-credit chore' aria-label='Bounty title'><input id='p2bpoints' type='number' min='1' max='100' step='1' value='5' style='width:100px' aria-label='Bounty points'><button class='btn g' data-a='p2badd'>Post bounty</button>"+
+ b.slice(-15).reverse().map(function(x){return "<div class='row'><span class='t'>"+esc(x.title)+" · "+esc(String(p2Pts(x)))+" ⭐ · "+esc(x.status)+(x.claimedBy?' · '+esc((person(x.claimedBy)||{}).n||x.claimedBy):'')+"</span>"+(x.status==='open'?"<button class='btn r' data-a='p2bcancel' data-id='"+esc(x.id)+"'>Remove</button>":x.status==='claimed'?"<button class='btn n' data-a='p2breopen' data-id='"+esc(x.id)+"'>Reopen</button>":'')+"</div>";}).join('')+
+ (nn.length?"<h3>Fridge notes</h3>"+nn.map(function(n){return "<div class='row'><span class='t'>"+esc((person(n.from)||{}).n||'Family')+": "+esc(String(n.text).slice(0,80))+"</span><button class='btn r' data-a='p2notedel' data-id='"+esc(n.id)+"'>Remove</button></div>";}).join(''):'')+"</div>";}
+function phase2Act(a,b){var id=b.getAttribute('data-id'),snap=JSON.stringify(S),it,p;
+ var parentOk=unlocked&&p2Parent();
+ if(a==='p2noteadd'||a==='p2noteread'){if(!p2Parent())return alert('Notes are posted from a parent phone so they sync to every device.');}
+ if(a==='p2noteadd'){var t=v('fridge-text'),from=v('fridge-author');if(!t||t.length>300||!person(from)||person(from).pet)return alert('Choose a family member and enter a note.');S.fridgeNotes=Array.isArray(S.fridgeNotes)?S.fridgeNotes:[];S.fridgeNotes.push({id:uid(),from:from,text:t,at:p2Now(),read:false});S.fridgeNotes=S.fridgeNotes.slice(-60);}
+ else if(a==='p2noteread'){it=(S.fridgeNotes||[]).filter(function(x){return x.id===id;})[0];if(!it)return;it.read=true;}
+ else if(a==='p2notedel'){if(!parentOk)return alert('Unlock the Parent area first.');it=(S.fridgeNotes||[]).filter(function(x){return x.id===id;})[0];if(!it)return;it.archived=true;}
+ else if(a==='p2badd'){if(!parentOk)return alert('Unlock the Parent area first.');var title=v('p2btitle'),points=Number(v('p2bpoints'));if(!title||title.length>120||!isFinite(points)||points<1||points>100||Math.floor(points)!==points)return alert('Enter a title and a whole number of points from 1 to 100.');S.bounties=Array.isArray(S.bounties)?S.bounties:[];S.bounties.push({id:uid(),title:title,points:points,status:'open',u:p2Now()});S.bounties=S.bounties.slice(-100);}
+ else if(a==='p2bcancel'){if(!parentOk)return alert('Unlock the Parent area first.');it=(S.bounties||[]).filter(function(x){return x.id===id&&x.status==='open';})[0];if(!it)return;it.status='removed';it.u=p2Now();}
+ else if(a==='p2breopen'){if(!parentOk)return alert('Unlock the Parent area first.');it=(S.bounties||[]).filter(function(x){return x.id===id&&x.status==='claimed';})[0];if(!it)return;
+  if(it.claimedBy&&p2Submitted(it.claimedBy,it.id))return alert('That chore was already submitted. Approve or send it back from the approvals list instead.');
+  if(it.claimedBy&&Array.isArray(S.tasks[it.claimedBy]))S.tasks[it.claimedBy]=S.tasks[it.claimedBy].filter(function(x){return x.id!==it.id;});
+  it.status='open';delete it.claimedBy;delete it.claimedAt;delete it.claimedVia;it.u=p2Now();}
+ else if(a==='p2claim'){
+  if(!parentOk)return alert('A parent must unlock the Parent area on a parent phone to assign a bounty.');
+  p=b.getAttribute('data-p');if(!person(p)||!person(p).kid||person(p).archived)return;
+  it=(S.bounties||[]).filter(function(x){return x.id===id&&x.status==='open';})[0];if(!it)return alert('This bounty has already been claimed.');
+  S.tasks[p]=S.tasks[p]||[];if(S.tasks[p].some(function(x){return x.id===it.id;}))return;
+  if(!confirm('Assign '+it.title+' to '+person(p).n+'?'))return;
+  S.tasks[p].push({id:it.id,t:it.title,g:'Extra-credit bounties',points:p2Pts(it),days:[0,1,2,3,4,5,6],start:today(),finish:today()});
+  it.status='claimed';it.claimedBy=p;it.claimedAt=p2Now();it.claimedVia=unlockedBy||'';it.u=it.claimedAt;}
+ else return;
+ if(!commitOr(snap))return;render();statusMessage('Family board updated.');
+}
+/* v31.3: merge shared boards instead of letting the last writer erase the other device's changes */
+function p2MergeBlob(k,local,remote){
+ try{
+  if(k==='fridgeNotes'||k==='bounties'){
+   if(!Array.isArray(remote)||!Array.isArray(local))return remote;
+   var out=[],seen={},li={};
+   local.forEach(function(x){if(x&&x.id)li[x.id]=x;});
+   remote.forEach(function(r){var l=li[r&&r.id],m=r;seen[r&&r.id]=1;
+    if(l&&k==='fridgeNotes'){if((l.read&&!r.read)||(l.archived&&!r.archived)){m=JSON.parse(JSON.stringify(r));if(l.read)m.read=true;if(l.archived)m.archived=true;}}
+    else if(l&&k==='bounties'){var lu=String(l.u||''),ru=String(r.u||'');if(lu>ru||(lu===ru&&l.status!==r.status&&(l.status==='removed'||(l.status==='claimed'&&r.status==='open'))))m=l;}
+    out.push(m);});
+   local.forEach(function(l){if(l&&l.id&&!seen[l.id])out.push(l);});
+   var cap=k==='fridgeNotes'?60:100;if(out.length>cap)out=out.slice(-cap);
+   return out;
+  }
+  if(k==='cosmetics'){
+   if(!local||typeof local!=='object'||!remote||typeof remote!=='object')return remote;
+   var o2=JSON.parse(JSON.stringify(remote));
+   Object.keys(local).forEach(function(id){var l=local[id];if(!l||!Array.isArray(l.owned))return;
+    var r=o2[id]=o2[id]||{owned:[],equipped:{}};if(!Array.isArray(r.owned))r.owned=[];if(!r.equipped||typeof r.equipped!=='object')r.equipped={};
+    l.owned.forEach(function(x){if(r.owned.indexOf(x)<0&&cosmeticItem(x))r.owned.push(x);});
+    var le=l.equipped||{};Object.keys(le).forEach(function(t){if(r.equipped[t]===undefined&&(le[t]===''||r.owned.indexOf(le[t])>=0))r.equipped[t]=le[t];});});
+   var pend=sync.cosPending||{};
+   Object.keys(pend).forEach(function(key){var q=key.split('|'),rr=remote[q[0]];
+    if(rr&&Array.isArray(rr.owned)&&rr.owned.indexOf(q[1])>=0){S.stars=S.stars||{};S.stars[q[0]]=(Number(S.stars[q[0]])||0)+pend[key];delete pend[key];sync.notice='Two parents bought the same item at the same time. The points were refunded once.';}});
+   return o2;
+  }
+ }catch(e){}
+ return remote;
+}
+function p2ClearPending(json){try{var o=JSON.parse(json).v||{},pend=sync.cosPending||{};Object.keys(pend).forEach(function(key){var q=key.split('|');if(o[q[0]]&&Array.isArray(o[q[0]].owned)&&o[q[0]].owned.indexOf(q[1])>=0)delete pend[key];});}catch(e){}}
+function p2Reconcile(){
+ if(!p2Parent())return false;var ch=false;
+ (Array.isArray(S.bounties)?S.bounties:[]).forEach(function(b){if(!b||b.status!=='claimed'||!b.claimedBy)return;
+  Object.keys(S.tasks||{}).forEach(function(pid){if(pid===b.claimedBy||!Array.isArray(S.tasks[pid]))return;
+   var n=S.tasks[pid].filter(function(t){return !(t.id===b.id&&!p2Submitted(pid,b.id));});if(n.length!==S.tasks[pid].length){S.tasks[pid]=n;ch=true;}});});
+ return ch;
+}
+
 function home(){
-  var h=topBarHtml()+nowNextHero(false)+seasonHtml()+boardHtml();
+  var h=topBarHtml()+nowNextHero(false)+seasonHtml()+boardHtml()+phase2WallHtml();
   h+="<div class='dash-container'><div class='dash-left'>"+hcard("📅 Calendar &amp; Schedule",calMiniHtml(),'')+"<div class='dash-row'>"+mealIdeasHtml()+reminderCardHtml()+"</div></div><div class='dash-right'>"+winsCardHtml()+wheelCardHtml()+"</div></div>";
   h+="<div class='home-grid duo'>"+palHtml()+challengeHtml(false)+"</div>"+wxHtml();
   var members='';P.forEach(function(p){members+=homeMemberCard(p);});
@@ -597,7 +780,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v31.2";
+var FH_BUILD="v32.0";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -776,7 +959,7 @@ devApply();setTimeout(function(){try{devDimApply();}catch(e){}},500);
 
 /* ===== Family sync v2: shared family data (calendar, chores, points, groceries, meals, settings) ===== */
 var FH_CLOUD_CONFIG={apiKey:"AIzaSyBpt2dEDYjLLBdvVet3BXvAt9xDRAtXYs0",authDomain:"family-hub-e8690.firebaseapp.com",projectId:"family-hub-e8690",storageBucket:"family-hub-e8690.firebasestorage.app",messagingSenderId:"387756198863",appId:"1:387756198863:web:83784641848a0862a2a0ba"};
-var SYNC_KEY="familyhub-sync",SYNC_V=2,SYNC_COLLS=["events","eventRequests","groc","req","done","meals","cfg","ledger"];
+var SYNC_KEY="familyhub-sync",SYNC_V=2,SYNC_COLLS=["events","eventRequests","groc","req","boardreq","done","meals","cfg","ledger"];
 var sync={awardPending:{},on:false,adapter:null,known:{},ready:false,unsub:null,user:"",state:"off",detail:"",last:"",busy:false,timer:null,applying:false,pending:false,guard:false,guardInfo:"",notice:"",allow:false,cursor:"",ledger:[],starsSynced:{},starsInit:false,stage:"",testLog:"",email:""};
 function syncResetKnown(){sync.known={};SYNC_COLLS.forEach(function(c){sync.known[c]={};});sync.cursor="";sync.ledger=[];sync.starsSynced={};sync.starsInit=false;sync.ready=false;sync.awardPending={};}
 syncResetKnown();
@@ -795,13 +978,13 @@ function syncCut(days){var d=new Date();d.setDate(d.getDate()+days);return d.get
 function syncDoneId(k){return String(k).split("|").join("__");}
 function syncDoneKey(id){var a=String(id).split("__");return a.length===3&&a[0]&&a[1]&&a[2]?a.join("|"):null;}
 function syncInWindow(c,id){if(c==="done")return String(id).slice(0,10)>=syncCut(-14);if(c==="meals")return id>=syncCut(-14)&&id<=syncCut(120);return true;}
-var SYNC_MAX=90000,SYNC_KID_COLLS=["done","eventRequests","req","groc"];
+var SYNC_MAX=90000,SYNC_KID_COLLS=["done","eventRequests","req","groc","boardreq"];
 var SYNC_AUX=[["pp","pendingPoints"],["sb","submissions"],["pc","petClaims"],["db","doneBy"],["bo","bonus"]];
-var SYNC_BLOBS=["prefs","challenge","spin","awards","parentNotes","packed","mealIngredients","foodPrefs","rewardTargets","returnNotes","household","pointNews","petLog","approvalReversals","kidsAccount","recipes"];
+var SYNC_BLOBS=["prefs","challenge","spin","awards","parentNotes","fridgeNotes","bounties","packed","mealIngredients","foodPrefs","rewardTargets","returnNotes","household","pointNews","petLog","approvalReversals","kidsAccount","recipes","cosmetics"];
 var SYNC_ID_RE=/^[A-Za-z0-9_-]{1,120}$/;
 function syncEnsureIds(){var ch=false;[S.groc,S.req].forEach(function(l){(l||[]).forEach(function(it){if(it&&typeof it==="object"&&typeof it.id!=="string"){it.id=syncNewId();ch=true;}});});return ch;}
 function syncList(c){
-  if(c==="events")return S.events||[];if(c==="eventRequests")return S.eventRequests||[];
+  if(c==="events")return S.events||[];if(c==="eventRequests")return S.eventRequests||[];if(c==="boardreq")return S.boardReq||[];
   if(c==="groc")return S.groc||[];if(c==="req")return S.req||[];if(c==="ledger")return sync.ledger;
   var out=[];
   if(c==="done"){Object.keys(S.done||{}).forEach(function(k){var id=syncDoneId(k);if(!syncDoneKey(id)||!SYNC_ID_RE.test(id)||!syncInWindow("done",id))return;var o={id:id,v:S.done[k]};SYNC_AUX.forEach(function(a){if(S[a[1]]&&S[a[1]][k]!==undefined)o[a[0]]=S[a[1]][k];});out.push(o);});return out;}
@@ -814,6 +997,7 @@ function syncValidItem(c,o,id){
   if(!o||typeof o!=="object"||Array.isArray(o)||o.id!==id||!SYNC_ID_RE.test(id))return false;
   if(c==="events"){if(typeof o.t!=="string"||o.t.length>300)return false;if(o.people!==undefined&&!Array.isArray(o.people))return false;if(o.repeat!==undefined&&["none","daily","weekly","monthly","monthlynth","monthlylast"].indexOf(o.repeat)<0)return false;return true;}
   if(c==="eventRequests"){return ["add","edit","delete"].indexOf(o.kind)>=0&&typeof o.by==="string";}
+  if(c==="boardreq"){if(["food","note","claim"].indexOf(o.kind)<0||!syncStr(o.by,100)||o.by.length<1)return false;if(o.kind==="food")return syncStr(o.likes,300)&&syncStr(o.dislikes,300);if(o.kind==="note")return syncStr(o.text,300)&&o.text.length>0;return syncStr(o.bid,120)&&o.bid.length>0;}
   if(c==="groc"){return syncStr(o.t,300)&&(o.s===undefined||syncStr(o.s,100));}
   if(c==="req"){return syncStr(o.p,100)&&syncStr(o.r,100);}
   if(c==="ledger"){return syncStr(o.p,100)&&typeof o.d==="number"&&isFinite(o.d)&&Math.abs(o.d)<=100000;}
@@ -826,6 +1010,9 @@ function syncValidItem(c,o,id){
     if(id==="rewards")return Array.isArray(v)&&v.length<=100&&v.every(function(r){return r&&typeof r.id==="string"&&typeof r.n==="string"&&isFinite(r.c);});
     if(id==="goal")return v===null||(v&&typeof v==="object"&&!Array.isArray(v));
     if(id.indexOf("blob_")===0){if(SYNC_BLOBS.indexOf(id.slice(5))<0||!v||typeof v!=="object")return false;if(id==="blob_kidsAccount")return typeof v.email==="string"&&v.email.length<=200;
+      if(id==="blob_fridgeNotes")return Array.isArray(v)&&v.length<=60&&v.every(function(n){return n&&typeof n==="object"&&typeof n.id==="string"&&typeof n.text==="string"&&n.text.length<=300&&typeof n.from==="string";});
+      if(id==="blob_bounties")return Array.isArray(v)&&v.length<=100&&v.every(function(b){return b&&typeof b==="object"&&typeof b.id==="string"&&typeof b.title==="string"&&["open","claimed","removed"].indexOf(b.status)>=0&&isFinite(Number(b.points));});
+      if(id==="blob_cosmetics")return !Array.isArray(v)&&Object.keys(v).every(function(k){var c=v[k];return c&&typeof c==="object"&&Array.isArray(c.owned)&&c.owned.length<=30&&c.equipped&&typeof c.equipped==="object";});
       if(id==="blob_pins"){return Object.keys(v).every(function(k){return typeof v[k]==="string"&&v[k].length<=120;});}return true;}
     if(id.indexOf("tasks_")===0)return Array.isArray(v)&&v.length<=300&&v.every(function(t){return t&&typeof t==="object"&&typeof t.id==="string"&&typeof t.t==="string";});
     return false;
@@ -833,14 +1020,14 @@ function syncValidItem(c,o,id){
   return false;
 }
 function syncApplyItem(c,id,obj){
-  var key={events:"events",eventRequests:"eventRequests",groc:"groc",req:"req"}[c];
+  var key={events:"events",eventRequests:"eventRequests",groc:"groc",req:"req",boardreq:"boardReq"}[c];
   if(key){var l=(S[key]||[]).slice(),i=-1,n;for(n=0;n<l.length;n++)if(l[n]&&l[n].id===id){i=n;break;}if(i>=0)l[i]=obj;else l.push(obj);S[key]=l;return;}
   if(c==="done"){var k=syncDoneKey(id);S.done[k]=obj.v;SYNC_AUX.forEach(function(a){if(obj[a[0]]!==undefined){S[a[1]]=S[a[1]]||{};S[a[1]][k]=obj[a[0]];}else if(S[a[1]])delete S[a[1]][k];});return;}
   if(c==="meals"){S.meals=S.meals||{};S.meals[id]=obj.v;return;}
-  if(c==="cfg"){if(id==="members"){S.members=obj.v;normalizeMembers();}else if(id.indexOf("tasks_")===0){S.tasks[id.slice(6)]=obj.v;}else if(id.indexOf("blob_")===0){S[id.slice(5)]=obj.v;}else S[id]=obj.v;return;}
+  if(c==="cfg"){if(id==="members"){S.members=obj.v;normalizeMembers();}else if(id.indexOf("tasks_")===0){S.tasks[id.slice(6)]=obj.v;}else if(id.indexOf("blob_")===0){var bk=id.slice(5);S[bk]=(bk==="fridgeNotes"||bk==="bounties"||bk==="cosmetics")?p2MergeBlob(bk,S[bk],obj.v):obj.v;}else S[id]=obj.v;return;}
 }
 function syncRemoveItem(c,id){
-  var key={events:"events",eventRequests:"eventRequests",groc:"groc",req:"req"}[c];
+  var key={events:"events",eventRequests:"eventRequests",groc:"groc",req:"req",boardreq:"boardReq"}[c];
   if(key){S[key]=(S[key]||[]).filter(function(x){return !(x&&x.id===id);});return;}
   if(c==="done"){var k=syncDoneKey(id);if(k){delete S.done[k];SYNC_AUX.forEach(function(a){if(S[a[1]])delete S[a[1]][k];});}return;}
   if(c==="meals"){if(S.meals)delete S.meals[id];return;}
@@ -879,6 +1066,7 @@ function syncDiff(){
   var jobs=[];
   SYNC_COLLS.forEach(function(c){
     if(syncRole()!=="parent"&&SYNC_KID_COLLS.indexOf(c)<0)return;
+    if(c==="boardreq"&&sync.boardDenied)return;
     var list=syncList(c),k=sync.known[c],seen={};
     list.forEach(function(it){
       if(!it||typeof it.id!=="string"||!SYNC_ID_RE.test(it.id))return;seen[it.id]=1;
@@ -933,11 +1121,14 @@ function syncPush(){
       if(r&&r.ok){
         sync.known[j.c][j.id]={rev:r.rev,json:(j.del||j.c==="ledger")?null:j.json,deleted:!!j.del,st:syncSt(j.c,j.json,j.del)};
         if(j.c==="ledger")sync.ledger=sync.ledger.filter(function(x){return x.id!==j.id;});
+        if(j.c==="cfg"&&j.id==="blob_cosmetics")p2ClearPending(j.json);
         if(j.c==="done"){var adk=syncDoneKey(j.id);if(adk&&sync.awardPending)delete sync.awardPending[adk];}
       }else if(r&&r.remote){if(j.c==="done")awardDupCheck(j.id,r.remote);if(syncApplyDoc(j.c,j.id,r.remote))conflicts++;}
       else{delete sync.known[j.c][j.id];}
       next();
-    },function(err){sync.busy=false;syncStore();syncSetState(err&&err.code==="perm"?"error":"offline",err);syncSchedule(15000);});
+    },function(err){
+      if(err&&err.code==="perm"&&j.c==="boardreq"){sync.boardDenied=true;sync.notice="Family requests are saved on this device but cannot be sent yet. A parent needs to publish the updated Firebase rules.";next();return;}
+      sync.busy=false;syncStore();syncSetState(err&&err.code==="perm"?"error":"offline",err);syncSchedule(15000);});
   }
   next();
 }
@@ -1139,6 +1330,7 @@ function syncRender(){
   if(sync.notice){statusMessage(sync.notice);sync.notice="";}
 }
 function syncAfterRemote(){
+  try{p2Reconcile();}catch(e){}
   syncStore();sync.applying=true;
   try{save();}finally{sync.applying=false;}
   syncRender();
@@ -1805,6 +1997,8 @@ function wallHome(){
   h+="<button class='w-box' data-a='go' data-v='house'><h2>🏡 Reminders</h2><div class='w-small'>"+(rem.length?rem.map(function(x){return "<b>"+esc(x.title)+"</b> "+esc(hhDateText(x));}).join("<br>"):"None in the next 3 days")+"</div></button>";
   var rw="";kids.forEach(function(p){var r=rewardTarget(p.id);if(r)rw+="<div>"+esc(p.e)+" "+esc(p.n)+": <b>"+(S.stars[p.id]||0)+"</b>/"+r.c+" ⭐ "+esc(r.e||"")+"</div>";});
   if(S.goal){var gg=S.goal;rw+="<div>"+esc(gg.e||"🎯")+" "+esc(gg.n)+": <b>"+gg.p+"</b>/"+gg.t+"</div>";}
+  var wn=(Array.isArray(S.fridgeNotes)?S.fridgeNotes:[]).filter(function(n){return n&&!n.archived;}).slice(-2).reverse(),wb=(Array.isArray(S.bounties)?S.bounties:[]).filter(function(x){return x&&x.status==='open';});
+  if(wn.length||wb.length)h+="<button class='w-box' data-a='nxwallfull'><h2>📝 Notes · 🏆 "+wb.length+" bounties</h2><div class='w-small'>"+wn.map(function(n){return "<b>"+esc((person(n.from)||{}).n||'Family')+":</b> "+esc(String(n.text).slice(0,60));}).join("<br>")+(wb.length?(wn.length?"<br>":"")+wb.slice(0,2).map(function(x){return "⭐ "+esc(String(p2Pts(x)))+" "+esc(x.title);}).join(" · "):"")+"</div></button>";
   h+="<button class='w-box' data-a='go' data-v='goal'><h2>🏆 Rewards</h2><div class='w-small'>"+(rw||"No reward goals set")+"</div></button>";
   h+="</section></div><footer class='w-foot'><button class='w-link' data-a='nxwallfull'>Full home page</button></footer></div>";
   return h;
@@ -1994,7 +2188,7 @@ document.addEventListener("change",function(e){
   var n=document.getElementById("aiphotoname");if(n)n.textContent=(e.target.files&&e.target.files[0])?"✓ "+e.target.files[0].name:"";
 });
 /* Home on a phone: sections fold up so the page is short */
-var HC_RULES=[[/^(🌅|🌆|🌙|☀️|🌇)?\s*(morning|afternoon|evening|night|good)/i,"board",true],[/calendar\s*&\s*schedule/i,"calsched",true],[/meal ideas/i,"mealideas",false],[/household reminders/i,"hhrem",false],[/chores\s*&\s*wins/i,"wins",false],[/decision wheel/i,"wheel",false],[/family pals/i,"pals",false],[/family challenge/i,"challenge",false],[/^family$/i,"family",true],[/more around the house/i,"around",false]];
+var HC_RULES=[[/^(🌅|🌆|🌙|☀️|🌇)?\s*(morning|afternoon|evening|night|good)/i,"board",true],[/calendar\s*&\s*schedule/i,"calsched",true],[/meal ideas/i,"mealideas",false],[/household reminders/i,"hhrem",false],[/chores\s*&\s*wins/i,"wins",false],[/decision wheel/i,"wheel",false],[/family pals/i,"pals",false],[/fridge notes/i,"fridge",false],[/chore bounties/i,"bounties",false],[/family challenge/i,"challenge",false],[/^family$/i,"family",true],[/more around the house/i,"around",false]];
 function hcSmall(){return window.innerWidth<=700&&devRole()!=="wall";}
 function homeCollapse(){
   if(view!=="home"||!hcSmall())return;
@@ -2302,7 +2496,7 @@ var secOpen={},secInit=false,secFilter="";
 function secStore(){try{localStorage.setItem("familyhub-secopen",JSON.stringify(secOpen));}catch(e){}}
 function secKey(t){return String(t).replace(/<[^>]*>/g,"").toLowerCase().replace(/&amp;/g,"and").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"")||"section";}
 function secCount(key,body){
-  var re={"waiting-for-approval":/data-a='appr'/g,"reward-requests":/data-a='rok'/g,"calendar-change-requests":/data-a='nxevapprove'/g,"updates-between-parents":/data-a='nxnoteack'/g,"waiting-for-your-approval":/data-a='nxaiyes'/g}[key];
+  var re={"waiting-for-approval":/data-a='appr'/g,"reward-requests":/data-a='rok'/g,"calendar-change-requests":/data-a='nxevapprove'/g,"family-board-requests":/data-a='bqapprove'/g,"updates-between-parents":/data-a='nxnoteack'/g,"waiting-for-your-approval":/data-a='nxaiyes'/g}[key];
   if(!re)return 0;var m=body.match(re);return m?m.length:0;
 }
 function parentSections(html){
@@ -2365,17 +2559,21 @@ var h="<h1>Parent area</h1>"+membersHtml()+"<h2>Waiting for approval</h2><div cl
 Object.keys(S.done).forEach(function(k){if(S.done[k]!=="p")return;var a=k.split("|"),p=person(a[1]),t=(S.tasks[a[1]]||[]).filter(function(x){return x.id===a[2]})[0]||petClaimTask(k);if(!p||!t)return;t=JSON.parse(JSON.stringify(t));if((S.submissions||{})[k])t.t=S.submissions[k].title;n++;
 h+=approvalRow(k,p,t,a[0]);});
 if(!n)h+="<span class='note'>Nothing waiting.</span>";
-h+="</div><p class='note'>Accept the amount shown, tap Half or +1, or type any amount in 0.5-point steps (you can give more than the listed value). Approving 0 marks the chore complete without points; Send back returns it for more work.</p>"+awardHistoryHtml()+reqHtml()+eventReqHtml()+parentNotesHtml()+"<h2>Add a chore or task</h2><div class='card'><select id='tp' aria-label='Who is this task for'>"+P.map(function(p){return "<option value='"+p.id+"'>"+esc(p.n)+"</option>"}).join("")+"</select><input id='tg' placeholder='Group (Morning, After school…)'><input id='tt' placeholder='Chore or task'><label class='timedchk' for='ntimed'><input type='checkbox' id='ntimed'> Timed (shows a countdown)</label><span id='ntwrap' style='display:none'><input id='tm' type='number' min='1' max='240' step='1' placeholder='Minutes' value='5' style='width:110px' aria-label='Minutes for the countdown'></span><label for='tpoints'>Points (children and pet chores)</label><input id='tpoints' type='number' min='0' max='1000' step='1' value='1' style='width:100px'><button class='btn' data-a='addt'>Add task</button><p class='note'>New tasks appear every day. Use Edit name / schedule below to choose weekdays and a due time.</p></div>";
+h+="</div><p class='note'>Accept the amount shown, tap Half or +1, or type any amount in 0.5-point steps (you can give more than the listed value). Approving 0 marks the chore complete without points; Send back returns it for more work.</p>"+awardHistoryHtml()+reqHtml()+eventReqHtml()+boardReqHtml()+parentNotesHtml()+phase2ParentHtml()+"<h2>Add a chore or task</h2><div class='card'><select id='tp' aria-label='Who is this task for'>"+P.map(function(p){return "<option value='"+p.id+"'>"+esc(p.n)+"</option>"}).join("")+"</select><input id='tg' placeholder='Group (Morning, After school…)'><input id='tt' placeholder='Chore or task'><label class='timedchk' for='ntimed'><input type='checkbox' id='ntimed'> Timed (shows a countdown)</label><span id='ntwrap' style='display:none'><input id='tm' type='number' min='1' max='240' step='1' placeholder='Minutes' value='5' style='width:110px' aria-label='Minutes for the countdown'></span><label for='tpoints'>Points (children and pet chores)</label><input id='tpoints' type='number' min='0' max='1000' step='1' value='1' style='width:100px'><button class='btn' data-a='addt'>Add task</button><p class='note'>New tasks appear every day. Use Edit name / schedule below to choose weekdays and a due time.</p></div>";
 h+=deviceAdminHtml();h+=syncAdminHtml();h+=feedAdminHtml();h+=aiAdminHtml();h+=displayFxHtml();h+=challengeAdminHtml();h+=manageTasksHtml();
 h+=wxSettingsHtml()+setHtml()+hhBackupHtml()+"<h2>Settings</h2><div class='card'><label for='hubtheme'>Appearance</label><select id='hubtheme'><option value='auto'>Automatic</option><option value='light'>Light</option><option value='dark'>Dark</option></select><br><input id='np' type='password' inputmode='numeric' placeholder='New PIN'><button class='btn' data-a='setpin'>Change PIN</button> <button class='btn n' data-a='lock'>Lock</button></div>";return h}
 function v(id){var e=document.getElementById(id);return e?e.value.trim():""}
 document.addEventListener("click",function(e){var b=e.target.closest("[data-a]");if(!b)return;var a=b.getAttribute("data-a"),d=function(k){return b.getAttribute("data-"+k)};
+if(a==="p3cosmetic"){cosmeticAction(b);return;}
+if(a.indexOf("p2")===0){phase2Act(a,b);return;}
+if(a.indexOf("bq")===0){boardAct(a,b);return;}
 if((a==='tick'||a==='rstart'||a==='rdone')&&shownDay!==today()){checkDay();return;}
 var beforeState=JSON.stringify(S);
 if(a==='appr'||a==='rej')rememberForms();
 if(a.indexOf('member')===0){memberAction(a,b);return;}
 if(a.indexOf('nx')===0){nxAction(a,b);return;}
 if(['addr','delr','delt','goalset','goalclr','setpin','rno','setidle','clrph','savemin','savealltasks'].indexOf(a)>=0&&!unlocked)return;
+if(a==="idlefav"){var key=idlePhotoKey();if(key){var favorites=idleFavorites();if(favorites[key])delete favorites[key];else favorites[key]=true;try{localStorage.setItem("familyhub-photo-favorites-v1",JSON.stringify(favorites));tick();}catch(ex){alert("Could not save favorite on this device.");}}return;}
 if(a==="delt"){archiveTask(d("p"),d("t"));return;}
 if(a==="fgreset"){pinForgot();return;}
 if(a==="sectog"||a==="secjump"||a==="secall"||a==="secnone"){secAction(a,b);return;}
@@ -2625,14 +2823,26 @@ document.addEventListener('change',function(e){
   document.getElementById('hhtitle').value=title;document.getElementById('hhnotes').value=notes;document.getElementById('hhperson').value=p;
 });
 
-var last=Date.now(),fi=0;
+var last=Date.now(),fi=0,idlePhotoIndex=-1;
 function showIdle(){unlocked=false;document.getElementById("idle").style.display="flex";frame();tick()}
 var photoRawCache=null,photoListCache=[];
 function photosFrame(){var raw=null;try{raw=localStorage.getItem(KEY2);}catch(x){}if(raw===photoRawCache)return photoListCache;photoRawCache=raw;try{photoListCache=JSON.parse(raw)||[];}catch(x){photoListCache=[];}return photoListCache;}
-function frame(){var el=document.getElementById("idle"),ph=photosFrame();el.style.backgroundImage=ph.length?"url("+ph[fi++%ph.length]+")":"none"}
+function idleFavorites(){try{var x=JSON.parse(localStorage.getItem("familyhub-photo-favorites-v1")||"{}");return x&&typeof x==="object"&&!Array.isArray(x)?x:{};}catch(e){return {};}}
+var idleKeyRaw=null,idleKeyList=[];
+function idleHash(str){var hash=2166136261;for(var i=0;i<str.length;i++){hash^=str.charCodeAt(i);hash=Math.imul(hash,16777619);}return "p"+(hash>>>0).toString(36);}
+function idleKeys(){var ph=photosFrame();if(idleKeyRaw!==ph){idleKeyRaw=ph;idleKeyList=ph.map(function(x){return idleHash(String(x));});}return idleKeyList;}
+function idlePhotoKey(){var k=idleKeys();return idlePhotoIndex>=0&&k[idlePhotoIndex]?k[idlePhotoIndex]:"";}
+function idleNextEvent(){var now=new Date(),hm=p2(now.getHours())+":"+p2(now.getMinutes()),day=today();return eventsAhead(day,14).filter(function(e){return e.d>day||!e.m||(e.end||e.m)>=hm;}).sort(function(a,b){return (a.d+(a.m||"00:00")).localeCompare(b.d+(b.m||"00:00"));})[0];}
+function idleOverlay(n,t,d){var e=idleNextEvent(),ev=e?"📅 Next up · "+esc(e.t)+" · "+esc(e.d===today()?"Today":niceDate(e.d))+(e.m?" "+esc(niceTime(e.m)):""):"📅 Nothing upcoming";
+var weather="";try{if(S.weather&&typeof wxInner==="function"){var w=wxInner();if(w)weather="<div class='idle-pill' aria-label='Weather'>"+w+"</div>";}}catch(ex){}
+var key=idlePhotoKey(),fav=key&&!!idleFavorites()[key];return "<div class='idle-glance'><div class='idle-pill'>"+ev+"</div>"+weather+(key?"<button type='button' class='idle-fav' data-a='idlefav' aria-pressed='"+fav+"'>"+(fav?"❤️ Favorited":"♡ Favorite (this screen)")+"</button>":"")+"</div><div class='idle-time' style='font-size:80px;font-weight:bold;text-shadow:0 2px 12px #000'>"+t+"</div><div class='idle-date' style='font-size:26px;text-shadow:0 2px 8px #000'>"+d+"</div>";}
+function frame(){var el=document.getElementById("idle"),ph=photosFrame(),idx=-1;
+  if(ph.length){var ks=idleKeys(),fv=idleFavorites(),fl=[];ks.forEach(function(k,i){if(fv[k])fl.push(i);});
+    if(fl.length&&fi%2===1)idx=fl[((fi-1)/2)%fl.length];else idx=fi%ph.length;fi++;}
+  idlePhotoIndex=idx;el.style.backgroundImage=idx>=0?"url("+ph[idx]+")":"none";if(el.style.display==="flex")tick();}
 function tick(){checkDay();autoRefresh();updateNowLines();if(unlocked&&Date.now()-last>300000){unlocked=false;if(view==='par'||view==='house')render();}var n=new Date(),t=n.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}),d=n.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"}),el=document.getElementById("idle");
 document.getElementById("clock").innerHTML="<b>"+t+"</b><span>"+d+"</span>";var bgc=document.querySelector(".bigclock");if(bgc)bgc.textContent=t;
-if(el.style.display==="flex")el.innerHTML="<div style='font-size:80px;font-weight:bold;text-shadow:0 2px 12px #000'>"+t+"</div><div style='font-size:26px;text-shadow:0 2px 8px #000'>"+d+"</div>";
+if(el.style.display==="flex")el.innerHTML=idleOverlay(n,t,d);
 else if(!wheelBusy&&!document.getElementById("party")&&view!=="routine"&&Date.now()-last>S.idle*60000)showIdle()}
 setInterval(tick,5000);setInterval(function(){if(document.getElementById("idle").style.display==="flex")frame()},8000);
 ["click","touchstart","keydown"].forEach(function(t){document.addEventListener(t,function(){last=Date.now()},true)});
@@ -2994,8 +3204,8 @@ function dislikersOf(item){
   return out;
 }
 function foodHtml(p){
-  var f=foodPref(p.id);
-  return "<section class='card'><h2>🍽️ My food opinions</h2><p class='note'>Separate foods with commas. Used for meal ideas and ingredient lists.</p><label for='food-likes-"+p.id+"'>Foods I like</label><input id='food-likes-"+p.id+"' maxlength='300' style='width:100%' placeholder='pasta, tacos, apples' value='"+esc(f.likes||'')+"'><label for='food-dislikes-"+p.id+"'>Foods I do not like</label><input id='food-dislikes-"+p.id+"' maxlength='300' style='width:100%' placeholder='mushrooms, olives' value='"+esc(f.dislikes||'')+"'></section>";
+  var f=bqFoodShown(p.id);
+  return "<section class='card'><h2>🍽️ My food opinions</h2><p class='note'>Separate foods with commas. Used for meal ideas and ingredient lists.</p><label for='food-likes-"+p.id+"'>Foods I like</label><input id='food-likes-"+p.id+"' maxlength='300' style='width:100%' placeholder='pasta, tacos, apples' value='"+esc(f.likes||'')+"'><label for='food-dislikes-"+p.id+"'>Foods I do not like</label><input id='food-dislikes-"+p.id+"' maxlength='300' style='width:100%' placeholder='mushrooms, olives' value='"+esc(f.dislikes||'')+"'>"+bqFoodKid(p)+"</section>";
 }
 function mealPrefsHtml(){
   var rows=S.members.filter(function(m){return !m.pet&&!m.archived;}).map(function(m){var f=foodPref(m.id);return (f.likes||f.dislikes)?"<div class='note'><b>"+esc(m.n)+":</b> "+(f.likes?"likes "+esc(f.likes):'')+(f.likes&&f.dislikes?'; ':'')+(f.dislikes?"doesn't like "+esc(f.dislikes):'')+"</div>":'';}).join('');
@@ -3181,7 +3391,7 @@ function noteWin(p,id,k,before){
 function winBefore(p){statCache=null;var cp=challengeProgress();return {lv:levelOf(p).i,sdone:streakOf(p).today,cp:cp?cp.pct:null};}
 function fxMode(){var id=(view==='person'||view==='routine')&&pid&&person(pid)?pid:(fxQueue&&fxQueue.who)||null;if(!id||!person(id))return {mode:'on',snd:false};var L=lookOf(id);return {mode:L.fx,snd:L.snd};}
 function fxToast(text){var el=document.getElementById('fxtoast');if(!el){el=document.createElement('div');el.id='fxtoast';el.setAttribute('role','status');el.setAttribute('aria-live','polite');document.body.appendChild(el);}el.textContent=text;el.style.display='block';if(el._t)clearTimeout(el._t);el._t=setTimeout(function(){el.style.display='none';},3200);}
-function fxBeep(kind){try{var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;actx=actx||new AC();var notes=kind==='tick'?[660,880]:kind==='routine'||kind==='bonus'?[660,880,1175]:[523,659,784,1047,1319],t=actx.currentTime;notes.forEach(function(f,i){var o=actx.createOscillator(),g=actx.createGain(),s=t+i*0.09;o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0.0001,s);g.gain.exponentialRampToValueAtTime(0.16,s+0.02);g.gain.exponentialRampToValueAtTime(0.0001,s+0.22);o.connect(g);g.connect(actx.destination);o.start(s);o.stop(s+0.25);});}catch(x){}}
+function fxBeep(kind,who){try{var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;actx=actx||new AC();var ch=(who&&kind!=='tick'&&typeof cosmeticClass==='function')?cosmeticClass(who,'chime'):'';var notes=ch==='chime-bell'?[880,1109,1319,1760]:ch==='chime-sparkle'?[1319,1568,1760,2093,2637]:kind==='tick'?[660,880]:kind==='routine'||kind==='bonus'?[660,880,1175]:[523,659,784,1047,1319],t=actx.currentTime;notes.forEach(function(f,i){var o=actx.createOscillator(),g=actx.createGain(),s=t+i*0.09;o.type=ch==='chime-sparkle'?'triangle':'sine';o.frequency.value=f;g.gain.setValueAtTime(0.0001,s);g.gain.exponentialRampToValueAtTime(0.16,s+0.02);g.gain.exponentialRampToValueAtTime(0.0001,s+0.22);o.connect(g);g.connect(actx.destination);o.start(s);o.stop(s+0.25);});}catch(x){}}
 function fxBurst(q){
   var n=q.kind==='tick'?12:q.kind==='routine'||q.kind==='bonus'?26:46,layer=document.createElement('div'),x0=q.rect?q.rect.x:window.innerWidth/2,y0=q.rect?q.rect.y:window.innerHeight/2,em=['⭐','✨','🎉','🟣','🟡','🟢'],h='';
   layer.className='fx-layer';layer.setAttribute('aria-hidden','true');
@@ -3195,7 +3405,7 @@ function fxRun(){
   var q=fxQueue;fxQueue=null;if(!q)return;var m=fxMode();if(m.mode==='off')return;
   fxToast(q.msg);
   if(m.mode==='on'&&!lessMotion())fxBurst(q);
-  if(m.snd)fxBeep(q.kind);
+  if(m.snd)fxBeep(q.kind,q.who);
   if(q.kind==='level'&&m.mode==='on'&&q.who&&person(q.who)){var pk=PACKS[lookOf(q.who).pack],lv=levelOf(q.who);showParty(pk.ladder[lv.i],person(q.who).n+', level up!','You are now '+pk.names[lv.i]+'.',person(q.who).c);}
 }
 function autoRefresh(){
@@ -3226,12 +3436,43 @@ function petClaimsHtml(p){
   return "<div class='card'><b>🐾 Pet care waiting for a parent</b>"+rows.map(function(k){return "<div class='li'>"+esc(S.petClaims[k].title)+" <span class='note'>· "+pts((S.pendingPoints||{})[k]||0)+" waiting</span></div>";}).join('')+"</div>";
 }
 function pts(n){return n+(Number(n)===1?' point':' points')}
+/* Phase 3: earned-point cosmetic shop. Purchases require parent unlock for synced accounting. */
+var COSMETIC_ITEMS=[
+ {id:'border-gold',name:'Golden frame',icon:'🏅',cost:12,type:'border'},
+ {id:'border-rainbow',name:'Rainbow frame',icon:'🌈',cost:20,type:'border'},
+ {id:'border-neon',name:'Neon frame',icon:'⚡',cost:15,type:'border'},
+ {id:'glow-blue',name:'Blue header glow',icon:'💙',cost:15,type:'glow'},
+ {id:'glow-purple',name:'Purple header glow',icon:'💜',cost:18,type:'glow'},
+ {id:'glow-gold',name:'Golden header glow',icon:'✨',cost:22,type:'glow'},
+ {id:'chime-bell',name:'Bell celebration',icon:'🔔',cost:10,type:'chime'},
+ {id:'chime-sparkle',name:'Sparkle celebration',icon:'🎵',cost:14,type:'chime'}
+];
+function cosmeticState(id){var all=S.cosmetics||{},c=all[id];return c&&typeof c==='object'?c:{owned:[],equipped:{}};}
+function cosmeticItem(id){return COSMETIC_ITEMS.filter(function(x){return x.id===id;})[0];}
+function cosmeticShop(p){var c=cosmeticState(p.id),balance=Number(S.stars[p.id])||0;
+ var h='<section class="card cosmetic-shop"><h2>✨ Avatar & Theme Shop</h2><p class="note">Spend approved points on decorations. Your levels and achievements stay intact. ⭐ '+balance+' available.</p>';
+ h+='<p class="note">A parent must unlock purchases so points and items can sync safely.</p><div class="cosmetic-grid">';
+ COSMETIC_ITEMS.forEach(function(x){var owned=c.owned.indexOf(x.id)>=0,equipped=c.equipped[x.type]===x.id;
+ h+='<div class="cosmetic-item"><div style="font-size:30px">'+x.icon+'</div><b>'+esc(x.name)+'</b><div class="note">'+x.cost+' ⭐</div><button class="btn '+(equipped?'g':'n')+'" data-a="p3cosmetic" data-p="'+p.id+'" data-item="'+x.id+'">'+(equipped?'Equipped ✓':owned?'Equip': 'Buy · '+x.cost+' ⭐')+'</button></div>';});
+ h+='</div></section>';return h;}
+function cosmeticClass(id,type){var c=cosmeticState(id),v=c.equipped[type];return cosmeticItem(v)&&c.owned.indexOf(v)>=0?v:'';}
+function cosmeticAction(b){var id=b.getAttribute('data-p'),item=cosmeticItem(b.getAttribute('data-item')),p=person(id);
+ if(!item||!p||!p.kid||p.archived)return;
+ if(!unlocked||devRole()!=='parent'){alert('Ask a parent to unlock the Parent area on a parent phone before buying or equipping cosmetics.');return;}
+ var snap=JSON.stringify(S),pkey='';
+ var c=S.cosmetics=S.cosmetics||{},entry=c[id]=c[id]||{owned:[],equipped:{}};
+ if(!Array.isArray(entry.owned))entry.owned=[];if(!entry.equipped||typeof entry.equipped!=='object')entry.equipped={};
+ if(entry.owned.indexOf(item.id)<0){var bal=Number(S.stars[id])||0;if(bal<item.cost){alert('Earn '+(item.cost-bal)+' more points first.');return;}
+  if(!confirm('Spend '+item.cost+' points on '+item.name+' for '+p.n+'?'))return;
+  S.stars[id]=bal-item.cost;entry.owned.push(item.id);pkey=id+'|'+item.id;sync.cosPending=sync.cosPending||{};sync.cosPending[pkey]=item.cost;}
+ entry.equipped[item.type]=entry.equipped[item.type]===item.id?'':item.id;
+ if(!save()){rollbackTo(snap);if(pkey&&sync.cosPending)delete sync.cosPending[pkey];render();return;}render();}
 function pers(){
   var p=person(pid);if(!p||p.archived)return '<h1>Member unavailable</h1><button class="btn" data-a="go" data-v="home">Family Home</button>';
   var g=prog(pid),pct=g[1]?Math.round(g[0]/g[1]*100):0,left=g[1]-g[0]-g[2],up=personalEvents(pid,2),next=up.filter(function(e){var n=new Date(),time=p2(n.getHours())+':'+p2(n.getMinutes());return e.d>today()||!e.m||(e.end||e.m)>=time;})[0];
   var h='<div class="personal-switch"><button class="btn n" data-a="go" data-v="home">← Family Home</button><button class="btn n" data-a="nxcustopen" aria-expanded="'+(custOpen?'true':'false')+'">⚙ Customize</button>'+P.map(function(x){return '<button class="member-chip'+(x.id===pid?' selected':'')+'" data-a="who" data-p="'+x.id+'" aria-pressed="'+(x.id===pid?'true':'false')+'" style="border-color:'+x.c+'">'+esc(x.e)+' '+esc(x.n)+'</button>';}).join('')+'</div>';
-  h+='<section class="personal-hero" style="border-top-color:'+p.c+'"><div class="personal-avatar" style="border-color:'+p.c+'" aria-hidden="true">'+esc(p.e)+'</div><div class="personal-intro"><p class="personal-eyebrow">'+(p.pet?'CARE & ROUTINES':p.kid?'MY SPACE':'MY DAY')+'</p><h1>'+esc(p.n)+(p.pet?'’s care':'’s day')+'</h1><p>'+ (p.pet?'Everything to keep '+esc(p.n)+' happy and cared for.':p.kid?'Your plans, your progress, your next adventure.':'Your schedule and the things that need your attention.')+'</p></div><div class="personal-progress"><b>'+g[0]+' / '+g[1]+'</b><span>'+ (p.kid?'tasks approved':'tasks done')+'</span><div class="goal-track" role="progressbar" aria-label="Today’s completed tasks" aria-valuemin="0" aria-valuemax="'+Math.max(1,g[1])+'" aria-valuenow="'+g[0]+'"><i style="width:'+pct+'%;background:'+p.c+'"></i></div></div></section>';
-  h+=personExtras(p);
+  h+='<section class="personal-hero '+cosmeticClass(pid,'glow')+'" style="border-top-color:'+p.c+'"><div class="personal-avatar '+cosmeticClass(pid,'border')+'" style="border-color:'+p.c+'" aria-hidden="true">'+esc(p.e)+'</div><div class="personal-intro"><p class="personal-eyebrow">'+(p.pet?'CARE & ROUTINES':p.kid?'MY SPACE':'MY DAY')+'</p><h1>'+esc(p.n)+(p.pet?'’s care':'’s day')+'</h1><p>'+ (p.pet?'Everything to keep '+esc(p.n)+' happy and cared for.':p.kid?'Your plans, your progress, your next adventure.':'Your schedule and the things that need your attention.')+'</p></div><div class="personal-progress"><b>'+g[0]+' / '+g[1]+'</b><span>'+ (p.kid?'tasks approved':'tasks done')+'</span><div class="goal-track" role="progressbar" aria-label="Today’s completed tasks" aria-valuemin="0" aria-valuemax="'+Math.max(1,g[1])+'" aria-valuenow="'+g[0]+'"><i style="width:'+pct+'%;background:'+p.c+'"></i></div></div></section>';
+  h+=personExtras(p);if(p.kid)h+=cosmeticShop(p);
   if(custOpen)h+=custHtml(p);
   if(showSec(pid,'weather'))h+=wxHtml();
   if(showSec(pid,'stats'))h+='<div class="personal-stats"><div><b>'+left+'</b><span>Still to do</span></div><div><b>'+ (p.kid?g[2]:up.length)+'</b><span>'+(p.kid?'Awaiting approval':'Plans today & tomorrow')+'</span></div><div><b>'+ (p.kid?'⭐ '+(S.stars[pid]||0):next?niceTime(next.m):'—')+'</b><span>'+(p.kid?'My points':next?'Next: '+esc(next.t):'No upcoming plans')+'</span></div></div>';
@@ -3289,7 +3530,7 @@ function validRewardCost(raw){var n=Number(raw);return String(raw).trim()!==''&&
 function normalizeHub(){
   normalizeMembers();seedPets();S.bonus=S.bonus||{};
   S.events.forEach(function(e){if(!e.id)e.id=uid();if(!e.repeat)e.repeat='none';if(e.repeat==='monthly'&&e.skipShort===undefined)e.skipShort=true;});
-  S.submissions=S.submissions||{};S.reminderLog=S.reminderLog||{};S.returnNotes=S.returnNotes||{};S.eventRequests=S.eventRequests||[];S.doneBy=S.doneBy||{};S.petClaims=S.petClaims||{};S.parentNotes=S.parentNotes||[];S.petLog=S.petLog||{};S.mealIngredients=S.mealIngredients||{};S.prefs=S.prefs||{};S.packed=S.packed||{};S.foodPrefs=S.foodPrefs||{};
+  S.submissions=S.submissions||{};S.reminderLog=S.reminderLog||{};S.returnNotes=S.returnNotes||{};S.eventRequests=S.eventRequests||[];S.boardReq=Array.isArray(S.boardReq)?S.boardReq:[];S.doneBy=S.doneBy||{};S.petClaims=S.petClaims||{};S.parentNotes=S.parentNotes||[];S.petLog=S.petLog||{};S.mealIngredients=S.mealIngredients||{};S.prefs=S.prefs||{};S.packed=S.packed||{};S.foodPrefs=S.foodPrefs||{};
 }
 function nxAction(a,b){
   function d(k){return b.getAttribute('data-'+k);}
@@ -3461,6 +3702,7 @@ function validateHubBackup(s){
   if(s.spin&&(!Array.isArray(s.spin)||s.spin.some(function(i){return !text(i);})))return false;
   if(s.meals&&(!obj(s.meals)||Object.keys(s.meals).some(function(d){var m=s.meals[d];return !hhDateValid(d)||!obj(m)||Object.keys(m).some(function(k){return ['b','l','d','e','o'].indexOf(k)<0||!text(m[k]);});})))return false;
   if(s.doneBy&&(!obj(s.doneBy)||Object.keys(s.doneBy).some(function(k){var a=k.split('|');return a.length!==3||!hhDateValid(a[0])||!person(a[1])||!Array.isArray(s.doneBy[k])||s.doneBy[k].some(function(id){return !person(id);});})))return false;
+  if(s.boardReq&&(!Array.isArray(s.boardReq)||s.boardReq.length>100||s.boardReq.some(function(c){return !obj(c)||['food','note','claim'].indexOf(c.kind)<0||typeof c.id!=='string'||!person(c.by)||(c.kind==='food'&&(typeof c.likes!=='string'||typeof c.dislikes!=='string'||c.likes.length>300||c.dislikes.length>300))||(c.kind==='note'&&(typeof c.text!=='string'||!c.text||c.text.length>300))||(c.kind==='claim'&&(typeof c.bid!=='string'||!c.bid));})))return false;
   if(s.eventRequests&&(!Array.isArray(s.eventRequests)||s.eventRequests.length>200||s.eventRequests.some(function(c){return !obj(c)||['add','edit','delete'].indexOf(c.kind)<0||!person(c.by)||(c.sourceId&&!safeId(c.sourceId))||(c.day&&!hhDateValid(c.day))||(c.kind!=='delete'&&!eventValid(c.e));})))return false;
   if(s.bonus&&(!obj(s.bonus)||Object.keys(s.bonus).some(function(k){return !keyOk(k)||s.bonus[k]!==1;})))return false;
   if(s.seeded&&(!obj(s.seeded)||Object.keys(s.seeded).length>10||Object.keys(s.seeded).some(function(k){return typeof s.seeded[k]!=='boolean';})))return false;
@@ -3470,6 +3712,9 @@ function validateHubBackup(s){
   if(s.weather&&(!obj(s.weather)||!text(s.weather.name)||s.weather.name.length>80||typeof s.weather.lat!=='number'||typeof s.weather.lon!=='number'||Math.abs(s.weather.lat)>90||Math.abs(s.weather.lon)>180||['f','c'].indexOf(s.weather.units)<0))return false;
   if(s.prefs&&(!obj(s.prefs)||Object.keys(s.prefs).some(function(id){var pr=s.prefs[id];return !person(id)||!obj(pr)||(pr.theme!==undefined&&['auto','light','dark'].indexOf(pr.theme)<0)||(pr.look!==undefined&&!lookValid(pr.look))||(pr.hide!==undefined&&(!Array.isArray(pr.hide)||pr.hide.length>10||pr.hide.some(function(x){return ['weather','stats','schedule','reminders','shop','goal','food'].indexOf(x)<0;})));})))return false;
   if(s.mealIngredients&&(!obj(s.mealIngredients)||Object.keys(s.mealIngredients).length>100||Object.keys(s.mealIngredients).some(function(k){var a=s.mealIngredients[k];return k==='__proto__'||k.length>60||!Array.isArray(a)||a.length>30||a.some(function(t){return !text(t)||t.length>60;});})))return false;
+  if(s.cosmetics&&(!obj(s.cosmetics)||Object.keys(s.cosmetics).some(function(id){var c=s.cosmetics[id];return !person(id)||!obj(c)||!Array.isArray(c.owned)||c.owned.length>30||c.owned.some(function(v){return !cosmeticItem(v);})||!obj(c.equipped)||Object.keys(c.equipped).some(function(t){return ['border','glow','chime'].indexOf(t)<0||(c.equipped[t]!==''&&c.owned.indexOf(c.equipped[t])<0);});})))return false;
+  if(s.fridgeNotes&&(!Array.isArray(s.fridgeNotes)||s.fridgeNotes.length>60||s.fridgeNotes.some(function(n){return !obj(n)||!safeId(n.id)||!text(n.text)||n.text.length>300||!person(n.from)||typeof n.read!=='boolean';})))return false;
+  if(s.bounties&&(!Array.isArray(s.bounties)||s.bounties.length>100||s.bounties.some(function(b){return !obj(b)||!safeId(b.id)||!text(b.title)||b.title.length>120||!(typeof b.points==='number'&&isFinite(b.points)&&b.points>=1&&b.points<=100&&b.points*2===Math.floor(b.points*2))||['open','claimed','removed'].indexOf(b.status)<0||(b.claimedBy&&!person(b.claimedBy));})))return false;
   if(s.parentNotes&&(!Array.isArray(s.parentNotes)||s.parentNotes.length>60||s.parentNotes.some(function(n){return !obj(n)||!safeId(n.id)||!text(n.text)||n.text.length>300||(n.from&&!person(n.from))||typeof n.ack!=='boolean';})))return false;
   if(s.petLog&&(!obj(s.petLog)||Object.keys(s.petLog).some(function(k){var a=k.split('|');return a.length!==3||!hhDateValid(a[0])||!person(a[1])||!Array.isArray(s.petLog[k])||s.petLog[k].length>100||s.petLog[k].some(function(x){return !obj(x)||!Array.isArray(x.ids)||x.ids.some(function(id){return !person(id);})||!Array.isArray(x.claims)||x.claims.some(function(c){return !text(c)||c.split('|').length!==3;});});})))return false;
   if(s.petClaims&&(!obj(s.petClaims)||Object.keys(s.petClaims).some(function(k){var c=s.petClaims[k];return !obj(c)||k.split('|').length!==3||!person(c.pet)||!safeId(c.task)||!text(c.title);})))return false;
@@ -3509,7 +3754,7 @@ document.addEventListener('change',function(e){
   if(e.target.id==='chtemplate'){var ct=CH_TEMPLATES[+e.target.value];if(ct){document.getElementById('chtitle').value=ct[0];document.getElementById('chemoji').value=ct[1];document.getElementById('chreward').value=ct[2];}return;}
   if(e.target.id==='ekind'){var kt=KIND_TEMPLATES[e.target.value],lbox=document.getElementById('echeck'),nbox=document.getElementById('enotes');if(kt){if(lbox&&!lbox.value.trim()&&kt.list)lbox.value=kt.list.join('\n');if(nbox&&!nbox.value.trim()&&kt.notes)nbox.value=kt.notes;}return;}
   var fm=/^food-(likes|dislikes)-(.+)$/.exec(e.target.id||'');
-  if(fm&&person(fm[2])){var snapF=JSON.stringify(S);S.foodPrefs=S.foodPrefs||{};var fp=S.foodPrefs[fm[2]]=S.foodPrefs[fm[2]]||{likes:'',dislikes:''};fp[fm[1]]=e.target.value.slice(0,300);if(!save()){rollbackTo(snapF);render();}return;}
+  if(fm&&person(fm[2])){if(devRole()!=='parent')return;var snapF=JSON.stringify(S);S.foodPrefs=S.foodPrefs||{};var fp=S.foodPrefs[fm[2]]=S.foodPrefs[fm[2]]||{likes:'',dislikes:''};fp[fm[1]]=e.target.value.slice(0,300);if(!save()){rollbackTo(snapF);render();}return;}
   if(e.target.id==='calview'){cv=e.target.value;storeCalendarView();render();var cvel=document.getElementById('calview');if(cvel)cvel.focus();return;}
   if(e.target.id==='calwho'){calP=e.target.value;render();var cwel=document.getElementById('calwho');if(cwel)cwel.focus();return;}
   if(e.target.id==='wxunits'&&unlocked){if(S.weather){var snapW=JSON.stringify(S);S.weather.units=e.target.value==='c'?'c':'f';if(!save()){rollbackTo(snapW);render();return;}render();wxRefresh(true);}return;}
