@@ -898,7 +898,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v33.0";
+var FH_BUILD="v33.1";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -1180,6 +1180,12 @@ function syncLedgerScan(){
   });
   return ch;
 }
+/* v33.1: on a kids' or wall device, a change the database refuses (for example a chore approved on this
+   device before it became a kids' device) is held back on this device instead of blocking every later change. */
+var syncHeldMap={};
+function syncHeldKey(c,id){return c+"/"+id;}
+function syncHeld(c,id,js,del){var h=syncHeldMap[syncHeldKey(c,id)];return !!(h&&h.js===js&&h.del===!!del);}
+function syncHeldCount(){return Object.keys(syncHeldMap).length;}
 function syncDiff(){
   var jobs=[];
   SYNC_COLLS.forEach(function(c){
@@ -1191,11 +1197,12 @@ function syncDiff(){
       var js=JSON.stringify(it),kn=k[it.id];
       if(js.length>SYNC_MAX)return;
       if(c==="ledger"){if(!kn)jobs.push({c:c,id:it.id,json:js,del:false,base:0});return;}
+      if(syncHeld(c,it.id,js,false))return;
       if(!kn||kn.deleted||kn.json!==js)jobs.push({c:c,id:it.id,json:js,del:false,base:kn?kn.rev:0});
       else if(c==="done"&&syncRole()==="parent"&&kn.st===undefined)jobs.push({c:c,id:it.id,json:js,del:false,base:kn.rev});
     });
     if(c==="ledger"||c==="cfg")return;
-    Object.keys(k).forEach(function(id){var kn=k[id];if(!seen[id]&&!kn.deleted&&syncInWindow(c,id))jobs.push({c:c,id:id,json:kn.json||"",del:true,base:kn.rev});});
+    Object.keys(k).forEach(function(id){var kn=k[id];if(!seen[id]&&!kn.deleted&&syncInWindow(c,id)&&!syncHeld(c,id,kn.json||"",true))jobs.push({c:c,id:id,json:kn.json||"",del:true,base:kn.rev});});
   });
   return jobs;
 }
@@ -1225,9 +1232,10 @@ function syncPush(){
   SYNC_COLLS.forEach(function(c){if(c==="ledger")return;Object.keys(sync.known[c]).forEach(function(id){if(!sync.known[c][id].deleted)knownCount++;});});
   if(!sync.allow&&dels>=3&&dels*2>=knownCount){sync.guard=true;sync.guardInfo=dels+" of "+knownCount+" shared items would be deleted for everyone.";syncSetState("paused");return;}
   sync.guard=false;sync.busy=true;syncSetState("sending");syncFast();
-  var i=0,conflicts=0;
+  var i=0,conflicts=0,okN=0,heldN=0,heldErr=null;
   function done(){
     sync.busy=false;sync.allow=false;syncStore();
+    if(heldN)sync.notice=heldN+" change"+(heldN===1?" on this device was":"s on this device were")+" not allowed to be shared (for example chores approved here before this became a kids’ device). "+(heldN===1?"It stays":"They stay")+" on this device only. Everything else was sent.";
     if(conflicts){sync.notice="Another device changed "+conflicts+" item"+(conflicts===1?"":"s")+" at the same time. The newer version was kept.";syncAfterRemote();}
     syncSetState("ok");
     if(syncDiff().length)syncSchedule(300);
@@ -1237,6 +1245,7 @@ function syncPush(){
     var j=jobs[i++];
     sync.adapter.put(j.c,j.id,j.base,j.json,j.del,syncSt(j.c,j.json,j.del)).then(function(r){
       if(r&&r.ok){
+        okN++;delete syncHeldMap[syncHeldKey(j.c,j.id)];
         sync.known[j.c][j.id]={rev:r.rev,json:(j.del||j.c==="ledger")?null:j.json,deleted:!!j.del,st:syncSt(j.c,j.json,j.del)};
         if(j.c==="ledger")sync.ledger=sync.ledger.filter(function(x){return x.id!==j.id;});
         if(j.c==="cfg"&&j.id==="blob_cosmetics")p2ClearPending(j.json);
@@ -1246,6 +1255,7 @@ function syncPush(){
       next();
     },function(err){
       if(err&&err.code==="perm"&&j.c==="boardreq"){sync.boardDenied=true;sync.notice="Family requests are saved on this device but cannot be sent yet. A parent needs to publish the updated Firebase rules.";next();return;}
+      if(err&&err.code==="perm"&&syncRole()!=="parent"){syncHeldMap[syncHeldKey(j.c,j.id)]={js:j.json,del:!!j.del};heldN++;heldErr=err;next();return;}
       sync.busy=false;syncStore();syncSetState(err&&err.code==="perm"?"error":"offline",err);syncSchedule(15000);});
   }
   next();
