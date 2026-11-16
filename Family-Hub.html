@@ -12,7 +12,7 @@
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:"Trebuchet MS",Verdana,Arial,sans-serif;font-size:18px}
 nav{display:flex;align-items:center;background:var(--bar);color:var(--barink);padding:10px 16px}
-nav b{font-size:24px;margin-right:auto}
+nav b{font-size:24px;margin-right:4px}nav #nav{margin-left:auto}#aibtn[hidden]{display:none}#aibtn{font-weight:700;margin-left:8px;white-space:nowrap}
 nav button{margin-left:8px;background:transparent;color:var(--barink);border:2px solid var(--mute);border-radius:12px;padding:10px 16px;font:inherit;font-size:16px}
 nav button.on{background:var(--card);color:var(--ink)}
 #themebtn{min-width:52px;min-height:48px;font-size:22px;line-height:1}
@@ -101,6 +101,10 @@ fieldset{border:1px solid var(--line);border-radius:10px;margin:12px 0;padding:1
 @keyframes moR{from{transform:translateX(-40px);opacity:.3}to{transform:none;opacity:1}}
 @media(prefers-reduced-motion:reduce){.mo-wrap.mo-l,.mo-wrap.mo-r{animation:none}}
 @media(min-width:900px){.mo.mg{height:calc(100vh - 250px);height:calc(100dvh - 250px)}.mo.mg>div{font-size:13px}.mo.mg .mchip{height:20px;line-height:20px;font-size:13px}.mo.mg .mc-num{font-size:15px}}
+.kh-card .kh-top{display:flex;align-items:center;justify-content:space-between}.kh-tabs{display:flex;flex-wrap:wrap}.kh-tabs .btn{margin:4px 6px 4px 0;min-height:48px}.kh-big{font-size:34px;font-weight:800;margin:6px 0}.kh-opt{display:block;width:100%;margin:6px 0;min-height:52px;text-align:left}.kh-timer{margin:8px 0}.kh-q h3{margin:6px 0}
+.aip-back{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(10,18,30,.55);z-index:20}
+.aip{position:fixed;left:50%;top:max(8px,env(safe-area-inset-top,0px));transform:translateX(-50%);width:min(96vw,560px);max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);overflow-y:auto;-webkit-overflow-scrolling:touch;background:var(--bg);color:var(--ink);border-radius:20px;box-shadow:0 18px 48px rgba(0,0,0,.45);padding:12px 14px 16px;z-index:21}
+.aip-top{display:flex;align-items:center;justify-content:space-between;margin:0 0 6px}.aip-top b{font-size:20px}
 .evd-back{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(10,18,30,.55);z-index:20}
 .evd{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(92vw,460px);max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch;background:var(--card);color:var(--ink);border-radius:20px;box-shadow:0 18px 48px rgba(0,0,0,.45);padding:18px 18px 16px;z-index:21}
 .evd-bar{height:8px;border-radius:8px;margin:0 0 12px}
@@ -462,7 +466,7 @@ html:not(.lite) .card,html:not(.lite) .cd{box-shadow:0 1px 2px rgba(25,35,70,.06
 </style>
 </head>
 <body>
-<div id="side"></div><nav><b id="ttl">Family Hub</b><span id="nav"><button id="themebtn" type="button" data-a="nxtheme" aria-label="Switch to dark mode">🌙</button></span></nav>
+<div id="side"></div><nav><b id="ttl">Family Hub</b><button id="aibtn" type="button" data-a="aipanel" aria-label="Open the AI helper" hidden>✨ AI</button><span id="nav"><button id="themebtn" type="button" data-a="nxtheme" aria-label="Switch to dark mode">🌙</button></span></nav>
 <div id="clock"></div><div id="savestatus" role="status" aria-live="polite">Data stays on this device · Not connected to other devices</div><div id="syncstatus" role="status" aria-live="polite"></div><main id="app"></main><div id="idle" data-a="wake"></div>
 <script>
 /* v31.4: voice bridge for the Android (Fire tablet) wrapper. Only active when the wrapper provides window.FHNative
@@ -513,7 +517,7 @@ function nav(){var v=[["home","🏠","Home"],["cal","📅","Calendar"],["chores"
 if(devRole()!=="parent")v=v.filter(function(x){return x[0]!=="par";});document.getElementById("side").innerHTML=v.map(function(x){var on=view===x[0]||((view==="person"||view==="routine")&&x[0]==="chores");return '<button data-a="'+(x[0]==="photos"?"pfnow":"go")+'" data-v="'+x[0]+'" class="'+(on?"on":"")+'"><i>'+x[1]+'</i><span>'+x[2]+"</span></button>"}).join("")}
 function render(){statCache=null;nav();applyTheme();var h="";
 if(view==="home")h=home();else if(view==="house")h=household();else if(view==="person")h=pers();else if(view==="cal")h=cal();else if(view==="groc")h=groc();else if(view==="meals")h=meals();else if(view==="spin")h=spin();else if(view==="routine"&&rt)h=routine();else if(view==="goal")h=goal();else if(view==="chores")h=chores();else h=parent();
-document.getElementById("app").innerHTML=h;
+h+=aiPanelHtml();document.getElementById("app").innerHTML=h;aiBtnSync();
 if(view==="spin")drawWheel();else if(wheelBusy)cancelWheel();
 showKidNews();uiAfterRender();wxRefresh();fitMonth();}
 function homeOld(){var d=new Date().toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
@@ -636,6 +640,7 @@ function boardReqHtml(){
     var by=person(c.by)||{n:'Someone'},d;
     if(c.kind==='food')d="Food opinions: likes “"+c.likes+"”; dislikes “"+c.dislikes+"”";
     else if(c.kind==='note')d="Fridge note: “"+c.text+"”";
+    else if(c.kind==='ask')return "<div class='row' style='flex-wrap:wrap'><span class='t'><b>"+esc(by.n)+" asks:</b><div class='note'>“"+esc(c.text)+"”</div><label class='sr' for='bqans-"+esc(c.id)+"'>Your answer</label><textarea id='bqans-"+esc(c.id)+"' maxlength='500' placeholder='Type your answer for "+esc(by.n)+"…' style='width:100%'></textarea></span><button class='btn g' data-a='bqapprove' data-id='"+esc(c.id)+"'>Send answer</button><button class='btn r' data-a='bqdecline' data-id='"+esc(c.id)+"'>Remove</button></div>";
     else{var bn=(S.bounties||[]).filter(function(x){return x.id===c.bid;})[0];d="Wants bounty: "+(bn?bn.title+(bn.status==='open'?'':' (no longer open)'):'(removed)');}
     return "<div class='row' style='flex-wrap:wrap'><span class='t'><b>"+esc(by.n)+"</b><div class='note'>"+esc(d)+"</div></span><button class='btn g' data-a='bqapprove' data-id='"+esc(c.id)+"'>Approve</button><button class='btn r' data-a='bqdecline' data-id='"+esc(c.id)+"'>Decline</button></div>";}).join('')+"</div>";
 }
@@ -646,6 +651,92 @@ function bqSubmit(o){
   o.id=uid();o.at=p2Now();S.boardReq.push(o);
   if(!commitOr(snap))return false;render();statusMessage('Sent to a parent.');return true;
 }
+var KH_DATA={"wonder": [["Why is the sky blue?", "Sunlight is made of all colors mixed together. Air scatters blue light the most, so blue reaches your eyes from every part of the sky."], ["Why are sunsets red and orange?", "At sunset, sunlight travels through much more air. Most of the blue light gets scattered away, so mostly red and orange is left."], ["Why do we have seasons?", "Earth is tilted. As it travels around the sun, different parts get more direct sunlight, which makes summer where it is tilted toward the sun and winter where it is tilted away."], ["How do airplanes stay in the air?", "Wings are shaped so the air they move through gets pushed downward, and the wing gets pushed up. That push is called lift. Engines push the plane forward so air keeps flowing over the wings."], ["Why does the moon change shape?", "The sun always lights half of the moon. As the moon orbits Earth, we see different amounts of that lit half, from a thin crescent to a full circle."], ["What makes thunder?", "Lightning heats the air around it to an extremely hot temperature. The air expands so fast that it makes a boom. You see lightning first because light travels much faster than sound."], ["Why do we yawn?", "Scientists are not completely sure. Some think yawning helps cool the brain or wake us up. Yawns are also catching: seeing someone yawn can make you yawn."], ["How do magnets work?", "Magnets make an invisible area around them called a magnetic field. It pulls on iron and some metals. Opposite ends attract each other and matching ends push apart."], ["Why is the ocean salty?", "Rain slowly washes tiny bits of salt and minerals off rocks. Rivers carry them to the sea. When ocean water evaporates, the water leaves but the salt stays behind."], ["How do bees make honey?", "Bees drink nectar from flowers and bring it to the hive. Other bees pass it along and fan it to dry out the water until it becomes thick, sweet honey."], ["Why do we dream?", "Nobody knows for certain. Many scientists think the brain sorts through the day's memories while we sleep, and dreams are part of that."], ["What is a black hole?", "A black hole is a place where gravity is so strong that nothing, not even light, can escape. Many form when a giant star runs out of fuel and collapses."], ["Why do leaves change color in fall?", "Leaves are green because of a chemical called chlorophyll. In fall it breaks down, and the yellow and orange colors that were hiding underneath show up."], ["How do we hear?", "Sound makes the air vibrate. Those vibrations shake your eardrum and three tiny bones, and then a spiral part of your ear turns them into signals your brain understands."], ["Why does ice float?", "Water gets bigger as it freezes. That makes ice less dense than liquid water, so it floats on top."], ["How big is the sun?", "The sun is so big that about 1.3 million Earths could fit inside it."], ["Why do we get hiccups?", "A muscle under your lungs called the diaphragm twitches suddenly. Your vocal cords snap shut, and that makes the 'hic' sound."], ["How do fish breathe underwater?", "Fish have gills. Gills pull the oxygen that is dissolved in the water into the fish's blood."], ["What are fossils?", "Fossils are the remains or prints of plants and animals that lived long ago. Over millions of years they turn to stone and stay hidden in rock."], ["Why do cats purr?", "Cats often purr when they are happy, but they may also purr to calm themselves. The sound comes from fast vibrations in their throat muscles."], ["How do plants make their food?", "Plants use sunlight, water and carbon dioxide from the air to make sugar. This is called photosynthesis, and it also makes the oxygen we breathe."], ["Why is Mars red?", "The soil on Mars has a lot of iron in it, and the iron has rusted. That gives the planet its reddish color."], ["How fast does light travel?", "About 300,000 kilometers (186,000 miles) every second. Light from the sun takes around 8 minutes to reach Earth."], ["Why do we need sleep?", "While you sleep your body repairs itself, you grow, and your brain stores what you learned. Without sleep it is hard to think, feel and play well."]], "quiz": [["What is 7 × 8?", ["54", "56", "64", "48"], 1], ["What is 144 ÷ 12?", ["10", "11", "12", "14"], 2], ["What is 3/4 of 20?", ["12", "15", "16", "10"], 1], ["What is 15% of 200?", ["20", "25", "30", "35"], 2], ["A square has sides of 6 cm. What is its perimeter?", ["12 cm", "24 cm", "36 cm", "18 cm"], 1], ["Which of these is NOT a prime number?", ["7", "11", "9", "13"], 2], ["Which planet is closest to the sun?", ["Venus", "Earth", "Mars", "Mercury"], 3], ["At what temperature does water boil at sea level?", ["50°C", "90°C", "100°C", "120°C"], 2], ["What gas do plants take in from the air for photosynthesis?", ["Oxygen", "Carbon dioxide", "Nitrogen", "Helium"], 1], ["What is the largest organ of the human body?", ["Heart", "Liver", "Brain", "Skin"], 3], ["How many bones does an adult human have?", ["106", "206", "306", "406"], 1], ["What is the hardest natural substance?", ["Gold", "Iron", "Diamond", "Quartz"], 2], ["Which travels faster?", ["Sound", "Light", "They are the same", "It depends"], 1], ["Which gas makes up most of Earth's air?", ["Oxygen", "Carbon dioxide", "Nitrogen", "Hydrogen"], 2], ["What is the capital of France?", ["Rome", "Madrid", "Paris", "Berlin"], 2], ["Which is the largest ocean?", ["Atlantic", "Indian", "Arctic", "Pacific"], 3], ["How many continents are there?", ["5", "6", "7", "8"], 2], ["What is the highest mountain above sea level?", ["K2", "Mount Everest", "Mount Fuji", "Denali"], 1], ["What is the capital of Japan?", ["Tokyo", "Beijing", "Seoul", "Kyoto"], 0], ["In which continent is the Sahara Desert?", ["Asia", "Africa", "Australia", "South America"], 1], ["Who was the first President of the United States?", ["Abraham Lincoln", "Thomas Jefferson", "George Washington", "John Adams"], 2], ["Which is spelled correctly?", ["neccessary", "necessary", "necesary", "nessessary"], 1], ["How many days are in a leap year?", ["364", "365", "366", "367"], 2], ["What do we call animals that eat only plants?", ["Carnivores", "Herbivores", "Omnivores", "Insectivores"], 1], ["Which is a mammal?", ["Shark", "Frog", "Dolphin", "Penguin"], 2], ["How many sides does a hexagon have?", ["5", "6", "7", "8"], 1], ["What is 0.5 as a fraction?", ["1/4", "1/3", "1/2", "2/3"], 2], ["Which part of a plant takes in water from the soil?", ["Leaves", "Roots", "Flowers", "Petals"], 1], ["What force pulls things toward the Earth?", ["Magnetism", "Friction", "Gravity", "Wind"], 2], ["Which season comes after winter?", ["Summer", "Spring", "Fall", "Winter again"], 1]], "pep": ["{n}, every chore you finish is a win for the whole family. Keep going!", "Little steps add up. One more thing and you're closer to your goal, {n}.", "You can do hard things, {n}. Start with the easiest one and build momentum.", "Mistakes mean you're learning. Try again, {n}!", "Your effort matters more than being perfect, {n}.", "Take a deep breath, stretch, then tackle the next thing. You've got this!", "Teamwork makes the family run. Thanks for doing your part, {n}!", "Five minutes of focus can beat an hour of worry. Start the timer, {n}!", "Be proud of how far you've come, {n}.", "Kind words and hard work make a great combination, {n}.", "Done is better than perfect. Finish it, then celebrate!", "Every expert was once a beginner, {n}.", "You're braver than you think and stronger than you feel, {n}.", "Ask for help when you need it. That's smart, not weak.", "Today is a fresh start, {n}. Make it a good one!", "Curiosity is your superpower, {n}. Keep asking why!", "Finish strong, {n}. Future you will say thank you!", "A little progress each day becomes big results, {n}.", "Make someone smile today, {n}. It's free and it works."]};
+var kh={open:false,tab:'hw',qi:null,quiz:null,timer:{run:false,end:0,total:0,msg:''},tick:null,pepi:null};
+function khKey(id){return 'familyhub-hw-'+id;}
+function khList(id){try{var a=JSON.parse(localStorage.getItem(khKey(id))||'[]');return Array.isArray(a)?a.filter(function(x){return x&&typeof x.t==='string';}).slice(0,30):[];}catch(e){return [];}}
+function khSave(id,a){try{localStorage.setItem(khKey(id),JSON.stringify(a.slice(0,30)));}catch(e){}}
+function khDay(){var n=new Date();return Math.floor(Date.UTC(n.getFullYear(),n.getMonth(),n.getDate())/86400000);}
+function khHash(id){var h=0;for(var i=0;i<id.length;i++)h=(h*31+id.charCodeAt(i))%9973;return h;}
+function khFmt(sec){sec=Math.max(0,sec);return Math.floor(sec/60)+':'+(sec%60<10?'0':'')+(sec%60);}
+function khLeft(){return kh.timer.run?Math.max(0,Math.ceil((kh.timer.end-Date.now())/1000)):0;}
+function khAnswered(id){return (Array.isArray(S.boardReq)?S.boardReq:[]).filter(function(c){return c&&c.kind==='ask'&&c.by===id&&c.st==='a';});}
+function khAsking(id){return (Array.isArray(S.boardReq)?S.boardReq:[]).filter(function(c){return c&&c.kind==='ask'&&c.by===id&&!c.st;});}
+function khAskBox(p,label){
+  if(devRole()==='parent')return '';
+  var h="<label for='kh-ask'>"+label+"</label><textarea id='kh-ask' maxlength='300' rows='2' style='width:100%' placeholder='Type your question…'></textarea><button class='btn g' data-a='khask' data-p='"+esc(p.id)+"'>Ask a parent</button>"+bqNotice();
+  khAsking(p.id).forEach(function(c){h+="<p class='note'>⏳ Waiting for a parent: “"+esc(c.text)+"”</p>";});
+  khAnswered(p.id).forEach(function(c){h+="<div class='card'><b>You asked:</b> "+esc(c.text)+"<p><b>A parent says:</b> "+esc(c.ans)+"</p><button class='btn n' data-a='khgot' data-id='"+esc(c.id)+"'>Got it</button></div>";});
+  return h;
+}
+function helperHtml(p){
+  if(!kh.open)return "<section class='card kh-card'><button class='btn g kh-open' data-a='khopen' style='width:100%;min-height:56px;font-size:18px'>🌟 My helper: homework, wonders, quiz</button></section>";
+  var tabs=[['hw','📚 Homework'],['wd','🔭 Wonder'],['qz','🧠 Quiz'],['pp','💪 Pep']],h="<section class='card kh-card'><div class='kh-top'><b>🌟 My helper</b><button class='btn n' data-a='khclose' aria-label='Close helper'>✕</button></div><div class='kh-tabs' role='tablist'>"+tabs.map(function(t){return "<button class='btn"+(kh.tab===t[0]?' g':' n')+"' role='tab' aria-selected='"+(kh.tab===t[0])+"' data-a='khtab' data-t='"+t[0]+"'>"+t[1]+"</button>";}).join('')+"</div>";
+  if(kh.tab==='hw')h+=khHw(p);else if(kh.tab==='wd')h+=khWonder(p);else if(kh.tab==='qz')h+=khQuiz(p);else h+=khPep(p);
+  return h+"</section>";
+}
+function khHw(p){
+  var left=khLeft(),t=kh.timer,h="";
+  var next=dueTasks(p.id,today()).filter(function(x){return !st(p.id,x.id);})[0];
+  h+="<p class='note'>"+(next?"Next up on your list: <b>"+esc(next.t)+"</b>":"Your list is all done or waiting for approval. Nice!")+"</p>";
+  h+="<div class='kh-timer' role='timer' aria-live='off'><div id='kh-time' class='kh-big'>"+(t.run?khFmt(left):(t.msg||'Focus timer'))+"</div>";
+  if(t.run)h+="<button class='btn r' data-a='khstop'>Stop</button>";
+  else h+=[10,15,25].map(function(m){return "<button class='btn' data-a='khstart' data-m='"+m+"'>"+m+" min focus</button>";}).join('')+"<button class='btn n' data-a='khstart' data-m='5' data-b='1'>5 min break</button>";
+  h+="</div><h3>Homework checklist</h3>";
+  var L=khList(p.id);if(!L.length)h+="<p class='note'>Add what you need to do. It stays on this device.</p>";
+  L.forEach(function(x,i){h+="<div class='row'><button class='btn"+(x.d?' g':' n')+"' data-a='khchk' data-i='"+i+"' data-p='"+esc(p.id)+"' aria-pressed='"+(!!x.d)+"' aria-label='Mark done: "+esc(x.t)+"'>"+(x.d?'✓':'○')+"</button><span class='t'"+(x.d?" style='text-decoration:line-through;opacity:.7'":'')+">"+esc(x.t)+"</span></div>";});
+  h+="<label for='kh-new' class='sr'>New homework item</label><input id='kh-new' maxlength='80' placeholder='Math worksheet, read 20 minutes…' style='width:100%'><button class='btn g' data-a='khadd' data-p='"+esc(p.id)+"'>Add</button>"+(L.some(function(x){return x.d;})?"<button class='btn n' data-a='khclear' data-p='"+esc(p.id)+"'>Clear finished</button>":'');
+  h+=khAskBox(p,"Stuck on something? Ask a parent:");
+  return h;
+}
+function khWonder(p){
+  var W=KH_DATA.wonder,i=(kh.qi===null?(khDay()+khHash(p.id))%W.length:kh.qi),w=W[i];
+  return "<div class='kh-q'><h3>🔭 Wonder of the day</h3><p><b>"+esc(w[0])+"</b></p><p>"+esc(w[1])+"</p><button class='btn' data-a='khwonder' data-p='"+esc(p.id)+"'>Show me another</button></div>"+khAskBox(p,"Wondering about something else? Ask a parent:");
+}
+function khQuizNew(){var Q=KH_DATA.quiz,idx=[],used={};while(idx.length<5){var r=Math.floor(Math.random()*Q.length);if(!used[r]){used[r]=1;idx.push(r);}}kh.quiz={idx:idx,n:0,score:0,picked:-1};}
+function khQuiz(p){
+  if(!kh.quiz)khQuizNew();
+  var z=kh.quiz,Q=KH_DATA.quiz;
+  if(z.n>=z.idx.length){var best=0;try{best=Number(localStorage.getItem('familyhub-quizbest-'+p.id))||0;}catch(e){}
+    return "<div class='kh-q'><h3>🧠 Quiz done!</h3><p class='kh-big'>"+z.score+" / "+z.idx.length+"</p><p>"+(z.score===z.idx.length?'Perfect! 🌟':z.score>=3?'Great job!':'Good try. Practice makes progress!')+(best?" Your best: "+best+" / "+z.idx.length+".":'')+"</p><button class='btn g' data-a='khqnew'>Play again</button></div>";}
+  var q=Q[z.idx[z.n]],h="<div class='kh-q'><p class='note'>Question "+(z.n+1)+" of "+z.idx.length+" · Score "+z.score+"</p><p><b>"+esc(q[0])+"</b></p>";
+  q[1].forEach(function(o,i){var cls='btn n';if(z.picked>=0){if(i===q[2])cls='btn g';else if(i===z.picked)cls='btn r';}h+="<button class='"+cls+" kh-opt' data-a='khpick' data-i='"+i+"' data-p='"+esc(p.id)+"'"+(z.picked>=0?" disabled":'')+">"+esc(o)+"</button>";});
+  if(z.picked>=0)h+="<p role='status'>"+(z.picked===q[2]?'Correct! ✅':'Not quite. The answer is: '+esc(q[1][q[2]]))+"</p><button class='btn' data-a='khnext'>"+(z.n+1>=z.idx.length?'See my score':'Next question')+"</button>";
+  return h+"</div>";
+}
+function khPep(p){
+  var g=prog(p.id),i=(kh.pepi===null?(khDay()+khHash(p.id))%KH_DATA.pep.length:kh.pepi);
+  var line=g[1]?(g[0]>=g[1]?"You finished everything today. Amazing, "+esc(p.n)+"! 🎉":"You've done "+g[0]+" of "+g[1]+" today"+(g[2]?" ("+g[2]+" waiting for a parent to check)":'')+". "+(g[1]-g[0]-g[2])+" to go!"):"No chores on your list today. Enjoy it!";
+  return "<div class='kh-q'><p class='kh-big' style='font-size:22px'>"+line+"</p><p>"+esc(KH_DATA.pep[i].replace(/\{n\}/g,p.n))+"</p><button class='btn' data-a='khpep'>Give me another</button></div>";
+}
+function khAct(a,b){
+  var p=b.getAttribute('data-p')||pid,pp=person(p);
+  if(a==='khopen'){kh.open=true;render();return;}
+  if(a==='khclose'){kh.open=false;render();return;}
+  if(a==='khtab'){kh.tab=b.getAttribute('data-t');render();return;}
+  if(a==='khstart'){var m=+b.getAttribute('data-m');if(!(m>0&&m<=60))return;kh.timer={run:true,end:Date.now()+m*60000,total:m*60,msg:'',brk:!!b.getAttribute('data-b')};khTimerOn();render();return;}
+  if(a==='khstop'){kh.timer={run:false,end:0,total:0,msg:''};render();return;}
+  if(a==='khadd'){var t=v('kh-new');if(!t||!pp)return;var L=khList(p);L.push({t:t.slice(0,80),d:false});khSave(p,L);render();return;}
+  if(a==='khchk'){var L2=khList(p),i=+b.getAttribute('data-i');if(L2[i]){L2[i].d=!L2[i].d;khSave(p,L2);render();}return;}
+  if(a==='khclear'){khSave(p,khList(p).filter(function(x){return !x.d;}));render();return;}
+  if(a==='khwonder'){var W=KH_DATA.wonder,cur=(kh.qi===null?(khDay()+khHash(p))%W.length:kh.qi);kh.qi=(cur+1)%W.length;render();return;}
+  if(a==='khqnew'){khQuizNew();render();return;}
+  if(a==='khpick'){if(!kh.quiz||kh.quiz.picked>=0)return;var q=KH_DATA.quiz[kh.quiz.idx[kh.quiz.n]],i3=+b.getAttribute('data-i');kh.quiz.picked=i3;if(i3===q[2])kh.quiz.score++;render();return;}
+  if(a==='khnext'){if(!kh.quiz)return;kh.quiz.n++;kh.quiz.picked=-1;if(kh.quiz.n>=kh.quiz.idx.length&&pp){try{var bst=Number(localStorage.getItem('familyhub-quizbest-'+pid))||0;if(kh.quiz.score>bst)localStorage.setItem('familyhub-quizbest-'+pid,String(kh.quiz.score));}catch(e){}}render();return;}
+  if(a==='khpep'){var cur2=(kh.pepi===null?(khDay()+khHash(pid||''))%KH_DATA.pep.length:kh.pepi);kh.pepi=(cur2+1)%KH_DATA.pep.length;render();return;}
+  if(a==='khask'){if(!pp||pp.pet)return;var tx=v('kh-ask');if(!tx||tx.length>300)return alert('Type your question first.');bqSubmit({kind:'ask',by:p,text:tx});return;}
+  if(a==='khgot'){var id=b.getAttribute('data-id'),snap=JSON.stringify(S);S.boardReq=(S.boardReq||[]).filter(function(c){return c.id!==id;});if(commitOr(snap))render();return;}
+}
+function khTimerOn(){
+  if(kh.tick)return;
+  kh.tick=setInterval(function(){
+    var el=document.getElementById('kh-time');
+    if(!kh.timer.run){clearInterval(kh.tick);kh.tick=null;return;}
+    var l=khLeft();
+    if(l<=0){var wasBreak=kh.timer.brk;kh.timer={run:false,end:0,total:0,msg:wasBreak?'Break over! Ready to focus?':'Time! Great focus. Take a 5 minute break. 🎉'};clearInterval(kh.tick);kh.tick=null;try{fxBeep('ok',pid);}catch(e){}if(view==='person')render();return;}
+    if(el)el.textContent=khFmt(l);
+  },1000);
+}
 function boardAct(a,b){
   var id=b.getAttribute('data-id'),p=b.getAttribute('data-p');
   if(a==='bqfood'){if(!person(p)||person(p).pet)return;var l=v('food-likes-'+p),d=v('food-dislikes-'+p);if(l.length>300||d.length>300)return;if(!l&&!d)return alert('Type at least one food first.');bqSubmit({kind:'food',by:p,likes:l,dislikes:d});return;}
@@ -654,6 +745,9 @@ function boardAct(a,b){
   if(a!=='bqapprove'&&a!=='bqdecline')return;
   if(!(unlocked&&p2Parent()))return alert('Unlock the Parent area on a parent phone first.');
   var snap=JSON.stringify(S),i=-1;(S.boardReq||[]).forEach(function(c,j){if(c.id===id)i=j;});if(i<0)return;var c=S.boardReq[i];
+  if(a==='bqapprove'&&c.kind==='ask'){var ans=v('bqans-'+id);if(!ans||ans.length>500)return alert('Type an answer first (500 characters or less).');c.ans=ans;c.st='a';c.ansAt=p2Now();
+    S.boardReq=S.boardReq.filter(function(x){return !(x.kind==='ask'&&x.st==='a'&&x.ansAt&&Date.now()-Date.parse(x.ansAt)>14*86400000);});
+    if(!commitOr(snap))return;render();statusMessage('Answer sent.');return;}
   if(a==='bqapprove'){
     if(c.kind==='food'){S.foodPrefs=S.foodPrefs||{};S.foodPrefs[c.by]={likes:c.likes,dislikes:c.dislikes};}
     else if(c.kind==='note'){S.fridgeNotes=Array.isArray(S.fridgeNotes)?S.fridgeNotes:[];S.fridgeNotes.push({id:uid(),from:c.by,text:c.text,at:p2Now(),read:false});S.fridgeNotes=S.fridgeNotes.slice(-40);}
@@ -804,7 +898,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v32.2";
+var FH_BUILD="v33.0";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -1021,7 +1115,7 @@ function syncValidItem(c,o,id){
   if(!o||typeof o!=="object"||Array.isArray(o)||o.id!==id||!SYNC_ID_RE.test(id))return false;
   if(c==="events"){if(typeof o.t!=="string"||o.t.length>300)return false;if(o.people!==undefined&&!Array.isArray(o.people))return false;if(o.repeat!==undefined&&["none","daily","weekly","monthly","monthlynth","monthlylast"].indexOf(o.repeat)<0)return false;return true;}
   if(c==="eventRequests"){return ["add","edit","delete"].indexOf(o.kind)>=0&&typeof o.by==="string";}
-  if(c==="boardreq"){if(["food","note","claim"].indexOf(o.kind)<0||!syncStr(o.by,100)||o.by.length<1)return false;if(o.kind==="food")return syncStr(o.likes,300)&&syncStr(o.dislikes,300);if(o.kind==="note")return syncStr(o.text,300)&&o.text.length>0;return syncStr(o.bid,120)&&o.bid.length>0;}
+  if(c==="boardreq"){if(["food","note","claim","ask"].indexOf(o.kind)<0||!syncStr(o.by,100)||o.by.length<1)return false;if(o.kind==="food")return syncStr(o.likes,300)&&syncStr(o.dislikes,300);if(o.kind==="ask")return syncStr(o.text,300)&&o.text.length>0&&(o.ans===undefined||syncStr(o.ans,500));if(o.kind==="note")return syncStr(o.text,300)&&o.text.length>0;return syncStr(o.bid,120)&&o.bid.length>0;}
   if(c==="groc"){return syncStr(o.t,300)&&(o.s===undefined||syncStr(o.s,100));}
   if(c==="req"){return syncStr(o.p,100)&&syncStr(o.r,100);}
   if(c==="ledger"){return syncStr(o.p,100)&&typeof o.d==="number"&&isFinite(o.d)&&Math.abs(o.d)<=100000;}
@@ -1719,10 +1813,10 @@ function feedBoxInner(){
 }
 function feedAdminHtml(){return "<h2>Calendar feeds</h2><div class='card' id='feedbox'>"+feedBoxInner()+"</div>";}
 function aiBoxInner(){
-  if(view==="cal")return aiQuickInner();
-  var h="<p class='note'>Describe or photograph something and the helper proposes calendar events or dinners. Nothing changes until a parent approves it below. Free allowance is limited each day, and what you send goes to Google's Gemini service, so leave out private details.</p>";
-  h+="<label for='aiurl'>Helper address</label><input id='aiurl' maxlength='200' placeholder='https://familyhub-helper.yourname.workers.dev' value='"+esc((S.ai&&S.ai.url)||"")+"' style='width:100%'><button class='btn' data-a='nxaiurl'>Save address</button>";
-  h+="<label for='aitask'>What should it do?</label><select id='aitask'>"+[["event","Find calendar events (flyer, message, schedule)"],["meal","Suggest dinners"],["fridge","Dinners from a fridge/pantry photo"]].map(function(x){return "<option value='"+x[0]+"'"+(aiMode===x[0]?" selected":"")+">"+x[1]+"</option>";}).join("")+"</select>";
+  if(view==="cal"&&!aiPanelOpen)return aiQuickInner();
+  var hasUrl=!!(S.ai&&S.ai.url),slim=aiPanelOpen&&hasUrl,h=slim?"<p class='note'>Nothing changes until you approve it. What you send goes to Google's Gemini, so leave out private details.</p>":"<p class='note'>Describe or photograph something and the helper proposes calendar events or dinners. Nothing changes until a parent approves it below. Free allowance is limited each day, and what you send goes to Google's Gemini service, so leave out private details.</p>";
+  if(slim)h+="<input type='hidden' id='aiurl' value='"+esc(S.ai.url)+"'>";else h+="<label for='aiurl'>Helper address</label><input id='aiurl' maxlength='200' placeholder='https://familyhub-helper.yourname.workers.dev' value='"+esc((S.ai&&S.ai.url)||"")+"' style='width:100%'><button class='btn' data-a='nxaiurl'>Save address</button>";
+  h+="<label for='aitask' style='display:block'>What should it do?</label><select id='aitask'>"+[["event","Find calendar events (flyer, message, schedule)"],["meal","Suggest dinners"],["fridge","Dinners from a fridge/pantry photo"]].map(function(x){return "<option value='"+x[0]+"'"+(aiMode===x[0]?" selected":"")+">"+x[1]+"</option>";}).join("")+"</select>";
   h+="<label for='aitext'>Text (paste a message, or add notes)</label><textarea id='aitext' rows='4' maxlength='6000' style='width:100%' placeholder='Paste a text or email here…'></textarea>";
   h+="<label for='aiphoto'>Photo or screenshot (optional)</label><input id='aiphoto' type='file' accept='image/*'>";
   h+="<label for='aicount'>How many dinners? (dinner tasks only)</label><select id='aicount'><option>3</option><option>5</option><option>7</option></select>";
@@ -1730,6 +1824,21 @@ function aiBoxInner(){
   if(aiMsg)h+="<p class='note' role='status'>"+esc(aiMsg)+"</p>";
   return h;
 }
+function aiBtnSync(){var b=document.getElementById('aibtn');if(b)b.hidden=(devRole()!=='parent');}
+function aiPanelHtml(){
+  if(!aiPanelOpen||devRole()!=='parent'||!unlocked)return '';
+  return "<div class='aip-back' data-a='aipanelclose'></div><div class='aip' role='dialog' aria-modal='true' aria-label='AI helper'><div class='aip-top'><b>✨ AI helper</b><button class='btn n' data-a='aipanelclose' aria-label='Close AI helper'>✕</button></div><div class='card' id='aibox'>"+aiBoxInner()+"</div><div id='aiprops'>"+aiPropsHtml()+"</div></div>";
+}
+function aiPanelAct(a){
+  if(a==='aipanelclose'){aiPanelOpen=false;render();return;}
+  if(devRole()!=='parent')return;
+  if(!unlocked){alert('Tap 🔒 Parent and sign in first, then use ✨ AI.');return;}
+  aiPanelOpen=!aiPanelOpen;
+  if(aiPanelOpen){aiQuickOpen=false;aiMode=(view==='meals')?'meal':'event';}
+  render();
+  if(aiPanelOpen){var t=document.getElementById('aitext');if(t&&t.focus)try{t.focus();}catch(x){}}
+}
+document.addEventListener('keydown',function(e){if((e.key==='Escape'||e.keyCode===27)&&aiPanelOpen){aiPanelOpen=false;render();}});
 function aiPropsHtml(){return aiProps.length?"<h2>Waiting for your approval</h2>"+aiPropsCards():"";}
 function aiPropsCards(){
   if(!aiProps.length)return "";
@@ -1744,7 +1853,7 @@ function aiPropsCards(){
   });
   return h;
 }
-function aiAdminHtml(){return "<h2>AI helper</h2><div class='card' id='aibox'>"+aiBoxInner()+"</div>"+(aiProps.length?"<h2>Waiting for your approval</h2><div id='aiprops' data-nohead='1'>"+aiPropsCards()+"</div>":"");}
+function aiAdminHtml(){if(aiPanelOpen)return "";return "<h2>AI helper</h2><div class='card' id='aibox'>"+aiBoxInner()+"</div>"+(aiProps.length?"<h2>Waiting for your approval</h2><div id='aiprops' data-nohead='1'>"+aiPropsCards()+"</div>":"");}
 function aiRefreshProps(){var b=document.getElementById("aiprops");if(b&&b.getAttribute("data-nohead")&&!aiProps.length){render();return;}if(!b&&aiProps.length&&view==="parent"){render();return;}if(b)b.innerHTML=b.getAttribute("data-nohead")?aiPropsCards():aiPropsHtml();var a=document.getElementById("aimsgbox");}
 function aiRefreshMsg(){var b=document.getElementById("aibox");if(!b)return;var t=document.getElementById("aitext"),keep=t?t.value:"";var sel=document.getElementById("aitask");if(sel)aiMode=sel.value;b.innerHTML=aiBoxInner();var t2=document.getElementById("aitext");if(t2)t2.value=keep;}
 /* shrink a photo to a JPEG no wider than 1280px */
@@ -2193,7 +2302,7 @@ window.syncAfterSave=function(){if(_asvV25)_asvV25();try{if(syncRole()==="parent
 setInterval(function(){try{privStep(false);}catch(e){}},30000);
 if(window.addEventListener)window.addEventListener("online",function(){privSchedule(1500);});
 /* ===== v29: calmer calendar, Add-with-AI on the calendar, collapsible Home on phones ===== */
-var aiQuickOpen=false,evFormOpen=false;
+var aiQuickOpen=false,evFormOpen=false,aiPanelOpen=false;
 function aiQuickInner(){
   var h="<b>✨ Add events with AI</b><p class='note'>Paste a message, or add a photo of a flyer, schedule or screenshot. You check everything before it goes on the calendar.</p>";
   if(!(S.ai&&S.ai.url))return h+"<p>The helper is not set up yet. Parent area &gt; AI helper.</p>";
@@ -2204,7 +2313,7 @@ function aiQuickInner(){
   return h;
 }
 function aiQuickBlock(){
-  if(!unlocked)return "";
+  if(!unlocked||aiPanelOpen)return "";
   return (aiQuickOpen?"<div class='card' id='aibox'>"+aiBoxInner()+"</div>":"")+"<div id='aiprops'>"+aiPropsHtml()+"</div>";
 }
 document.addEventListener("change",function(e){
@@ -2591,6 +2700,8 @@ document.addEventListener("click",function(e){var b=e.target.closest("[data-a]")
 if(a==="p3cosmetic"){cosmeticAction(b);return;}
 if(a.indexOf("p2")===0){phase2Act(a,b);return;}
 if(a.indexOf("bq")===0){boardAct(a,b);return;}
+if(a==="aipanel"||a==="aipanelclose"){aiPanelAct(a);return;}
+if(a.indexOf("kh")===0){khAct(a,b);return;}
 if((a==='tick'||a==='rstart'||a==='rdone')&&shownDay!==today()){checkDay();return;}
 var beforeState=JSON.stringify(S);
 if(a==='appr'||a==='rej')rememberForms();
@@ -2970,16 +3081,18 @@ function moBar(){
   return "<div class='mo-bar'><button class='btn' data-a='nxcalnav' data-n='-1' aria-label='Previous month'>◀</button><b class='mo-ttl'>"+esc(cd.toLocaleDateString(undefined,{month:'long',year:'numeric'}))+"</b><button class='btn' data-a='nxcalnav' data-n='1' aria-label='Next month'>▶</button><button class='btn g' data-a='nxcalnav' data-n='0'>Today</button><button class='btn push' data-a='nxnewcalendar' aria-label='Add event'>＋</button></div><div class='mo-sel'><label for='calview' class='sr'>View</label><select id='calview'>"+opts+"</select><label for='calwho' class='sr'>Show</label><select id='calwho'><option value=''>Everyone</option>"+P.map(function(q){return "<option value='"+q.id+"'"+(calP===q.id?' selected':'')+">"+esc(q.n)+"</option>";}).join('')+"</select></div>";
 }
 var moScrolled=false;
-function fitMonth(){
+function fitMonth(again){
   var g=document.querySelector('.mo.mg');
   if(!g||view!=='cal'||cv!=='month'){moScrolled=false;return;}
   var bar=document.querySelector('.mo-bar');
-  if(!moScrolled&&bar&&window.scrollTo){var y=(window.pageYOffset||0)+bar.getBoundingClientRect().top-4;window.scrollTo(0,Math.max(0,y));moScrolled=true;}
+  if(!moScrolled&&bar&&window.scrollTo){g.style.height='3000px';var y=(window.pageYOffset||0)+bar.getBoundingClientRect().top-4;window.scrollTo(0,Math.max(0,y));moScrolled=true;}
   var sd=document.getElementById('side'),bot=0;
   if(sd&&sd.getBoundingClientRect){var r=sd.getBoundingClientRect();if(r.top>(window.innerHeight||0)/2)bot=(window.innerHeight||0)-r.top;}
   var top=g.getBoundingClientRect().top,avail=(window.innerHeight||600)-top-bot-6;
   g.style.height=Math.max(300,Math.round(avail))+'px';
+  if(!again)setTimeout(function(){fitMonth(true);},400);
 }
+window.addEventListener('resize',function(){fitMonth(true);});
 function eventDetailHtml(){
   if(!calDetail||evFormOpen||eventEdit)return '';
   var q=calDetail.split('|'),ev=evOn(q[1]).filter(function(x){return x.series===q[0]&&(x.origin||x.d)===q[1];})[0];
@@ -3521,7 +3634,7 @@ function pers(){
   var g=prog(pid),pct=g[1]?Math.round(g[0]/g[1]*100):0,left=g[1]-g[0]-g[2],up=personalEvents(pid,2),next=up.filter(function(e){var n=new Date(),time=p2(n.getHours())+':'+p2(n.getMinutes());return e.d>today()||!e.m||(e.end||e.m)>=time;})[0];
   var h='<div class="personal-switch"><button class="btn n" data-a="go" data-v="home">← Family Home</button><button class="btn n" data-a="nxcustopen" aria-expanded="'+(custOpen?'true':'false')+'">⚙ Customize</button>'+P.map(function(x){return '<button class="member-chip'+(x.id===pid?' selected':'')+'" data-a="who" data-p="'+x.id+'" aria-pressed="'+(x.id===pid?'true':'false')+'" style="border-color:'+x.c+'">'+esc(x.e)+' '+esc(x.n)+'</button>';}).join('')+'</div>';
   h+='<section class="personal-hero '+cosmeticClass(pid,'glow')+'" style="border-top-color:'+p.c+'"><div class="personal-avatar '+cosmeticClass(pid,'border')+'" style="border-color:'+p.c+'" aria-hidden="true">'+esc(p.e)+'</div><div class="personal-intro"><p class="personal-eyebrow">'+(p.pet?'CARE & ROUTINES':p.kid?'MY SPACE':'MY DAY')+'</p><h1>'+esc(p.n)+(p.pet?'’s care':'’s day')+'</h1><p>'+ (p.pet?'Everything to keep '+esc(p.n)+' happy and cared for.':p.kid?'Your plans, your progress, your next adventure.':'Your schedule and the things that need your attention.')+'</p></div><div class="personal-progress"><b>'+g[0]+' / '+g[1]+'</b><span>'+ (p.kid?'tasks approved':'tasks done')+'</span><div class="goal-track" role="progressbar" aria-label="Today’s completed tasks" aria-valuemin="0" aria-valuemax="'+Math.max(1,g[1])+'" aria-valuenow="'+g[0]+'"><i style="width:'+pct+'%;background:'+p.c+'"></i></div></div></section>';
-  h+=personExtras(p);if(p.kid)h+=cosmeticShop(p);
+  h+=personExtras(p);if(p.kid)h+=helperHtml(p)+cosmeticShop(p);
   if(custOpen)h+=custHtml(p);
   if(showSec(pid,'weather'))h+=wxHtml();
   if(showSec(pid,'stats'))h+='<div class="personal-stats"><div><b>'+left+'</b><span>Still to do</span></div><div><b>'+ (p.kid?g[2]:up.length)+'</b><span>'+(p.kid?'Awaiting approval':'Plans today & tomorrow')+'</span></div><div><b>'+ (p.kid?'⭐ '+(S.stars[pid]||0):next?niceTime(next.m):'—')+'</b><span>'+(p.kid?'My points':next?'Next: '+esc(next.t):'No upcoming plans')+'</span></div></div>';
@@ -3753,7 +3866,7 @@ function validateHubBackup(s){
   if(s.spin&&(!Array.isArray(s.spin)||s.spin.some(function(i){return !text(i);})))return false;
   if(s.meals&&(!obj(s.meals)||Object.keys(s.meals).some(function(d){var m=s.meals[d];return !hhDateValid(d)||!obj(m)||Object.keys(m).some(function(k){return ['b','l','d','e','o'].indexOf(k)<0||!text(m[k]);});})))return false;
   if(s.doneBy&&(!obj(s.doneBy)||Object.keys(s.doneBy).some(function(k){var a=k.split('|');return a.length!==3||!hhDateValid(a[0])||!person(a[1])||!Array.isArray(s.doneBy[k])||s.doneBy[k].some(function(id){return !person(id);});})))return false;
-  if(s.boardReq&&(!Array.isArray(s.boardReq)||s.boardReq.length>100||s.boardReq.some(function(c){return !obj(c)||['food','note','claim'].indexOf(c.kind)<0||typeof c.id!=='string'||!person(c.by)||(c.kind==='food'&&(typeof c.likes!=='string'||typeof c.dislikes!=='string'||c.likes.length>300||c.dislikes.length>300))||(c.kind==='note'&&(typeof c.text!=='string'||!c.text||c.text.length>300))||(c.kind==='claim'&&(typeof c.bid!=='string'||!c.bid));})))return false;
+  if(s.boardReq&&(!Array.isArray(s.boardReq)||s.boardReq.length>100||s.boardReq.some(function(c){return !obj(c)||['food','note','claim','ask'].indexOf(c.kind)<0||typeof c.id!=='string'||!person(c.by)||(c.kind==='food'&&(typeof c.likes!=='string'||typeof c.dislikes!=='string'||c.likes.length>300||c.dislikes.length>300))||(c.kind==='ask'&&(typeof c.text!=='string'||!c.text||c.text.length>300||(c.ans!==undefined&&(typeof c.ans!=='string'||c.ans.length>500))))||(c.kind==='note'&&(typeof c.text!=='string'||!c.text||c.text.length>300))||(c.kind==='claim'&&(typeof c.bid!=='string'||!c.bid));})))return false;
   if(s.eventRequests&&(!Array.isArray(s.eventRequests)||s.eventRequests.length>200||s.eventRequests.some(function(c){return !obj(c)||['add','edit','delete'].indexOf(c.kind)<0||!person(c.by)||(c.sourceId&&!safeId(c.sourceId))||(c.day&&!hhDateValid(c.day))||(c.kind!=='delete'&&!eventValid(c.e));})))return false;
   if(s.bonus&&(!obj(s.bonus)||Object.keys(s.bonus).some(function(k){return !keyOk(k)||s.bonus[k]!==1;})))return false;
   if(s.seeded&&(!obj(s.seeded)||Object.keys(s.seeded).length>10||Object.keys(s.seeded).some(function(k){return typeof s.seeded[k]!=='boolean';})))return false;
