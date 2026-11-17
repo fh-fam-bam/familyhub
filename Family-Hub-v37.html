@@ -1439,7 +1439,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v37.2";
+var FH_BUILD="v37.3";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -1740,6 +1740,8 @@ function syncDiff(){
     if(c==="ledger"||c==="cfg")return;
     Object.keys(k).forEach(function(id){var kn=k[id];if(!seen[id]&&!kn.deleted&&syncInWindow(c,id))jobs.push({c:c,id:id,json:kn.json||"",del:true,base:kn.rev});});
   });
+  /* v37.3: leave out changes the rules already refused (they are retried once they change or the page reloads) */
+  if(sync.permSkip)jobs=jobs.filter(function(j){return sync.permSkip[j.c+"/"+j.id]!==(j.del?"#del":j.json);});
   return jobs;
 }
 function syncSchedule(ms){if(sync.timer)clearTimeout(sync.timer);sync.timer=setTimeout(function(){sync.timer=null;syncPush();},ms||400);}
@@ -1772,6 +1774,7 @@ function syncPush(){
   function done(){
     sync.busy=false;sync.allow=false;syncStore();
     if(conflicts){sync.notice="Another device changed "+conflicts+" item"+(conflicts===1?"":"s")+" at the same time. The newer version was kept.";syncAfterRemote();}
+    if(sync.permNew){statusMessage(sync.permNew+" change"+(sync.permNew===1?"":"s")+" on this device "+(sync.permNew===1?"was":"were")+" not allowed by the family sync rules and "+(sync.permNew===1?"was":"were")+" skipped ("+sync.permLast+"). Everything else synced.");sync.permNew=0;}
     syncSetState("ok");
     if(syncDiff().length)syncSchedule(300);
   }
@@ -1789,6 +1792,12 @@ function syncPush(){
       next();
     },function(err){
       if(err&&err.code==="perm"&&j.c==="boardreq"){sync.boardDenied=true;sync.notice="Family requests are saved on this device but cannot be sent yet. A parent needs to publish the updated Firebase rules.";next();return;}
+      /* v37.3: one refused change no longer blocks all syncing. Skip it (until it changes), remember it, keep going. */
+      if(err&&err.code==="perm"){
+        sync.permSkip=sync.permSkip||{};sync.permSkip[j.c+"/"+j.id]=j.del?"#del":j.json;
+        sync.permLast=(j.del?"delete of ":"")+j.c+" / "+j.id;sync.permNew=(sync.permNew||0)+1;sync.permTotal=(sync.permTotal||0)+1;
+        next();return;
+      }
       sync.busy=false;syncStore();syncSetState(err&&err.code==="perm"?"error":"offline",err);syncSchedule(15000);});
   }
   next();
@@ -2003,6 +2012,9 @@ function syncLimitedInner(){
   var msg={connecting:"Connecting…",ok:"Synced"+(sync.last?" at "+sync.last:""),sending:"Sending changes…",offline:"Offline. Changes will send when the connection returns.",signedout:"Not signed in.",nosdk:"Could not reach the sync service.",paused:"Paused.",error:"Problem: "+esc(sync.detail||"unknown"),off:""}[sync.state]||"";
   var h="<p><b>Family sync:</b> "+msg+(sync.user?" · Signed in as "+esc(sync.user):"")+"</p>";
   if(!sync.user)h+="<label for='syncemail'>Sync email</label><input id='syncemail' type='email' autocomplete='username' value='"+esc(sync.email||"")+"'><label for='syncpw'>Password</label><input id='syncpw' type='password' autocomplete='current-password'><button class='btn' data-a='nxsyncin'>Sign in</button>";
+  /* v37.3: connection check on kids'/wall devices, using this device's own sign-in */
+  else h+="<button class='btn n' data-a='nxsynccheck'>Check connection</button>";
+  if(sync.testLog)h+="<pre style='white-space:pre-wrap;word-break:break-word;font-size:14px'>"+esc(sync.testLog)+"</pre>";
   return h;
 }
 function syncBoxInner(){
@@ -2053,7 +2065,28 @@ function syncConnTest(){
     });
   }).catch(function(e){out("Failed: "+((e&&e.message)||e)+". The phone could not reach Google (blocker, VPN, or key restriction).");});
 }
+/* v37.3: check the database with this device's current sign-in (no password needed) */
+function syncQuickCheck(){
+  var log=[];function out(t){log.push(t);sync.testLog=log.join("\n");syncRefreshAdmin();}
+  if(!sync.adapter||!sync.user){out("Not signed in to family sync on this device.");return;}
+  out("Signed in as "+sync.user+". Device type: "+syncRole()+".");
+  out("Checking the database…");
+  new Promise(function(res){res(sync.adapter.token());}).then(function(t){
+    return fetch("https://firestore.googleapis.com/v1/projects/"+FH_CLOUD_CONFIG.projectId+"/databases/(default)/documents/households/family/items?pageSize=1",{headers:{Authorization:"Bearer "+t}}).then(function(r){
+      return r.text().then(function(x){
+        var j={};try{j=JSON.parse(x);}catch(e){}
+        if(r.status===200)out("Reading family data: OK. The rules allow this account to read.");
+        else if(r.status===403)out("Reading family data: REFUSED (403). The Firebase rules do not include this account. Add its User UID (Firebase > Authentication > Users) to the rules.");
+        else out("Reading family data: answered "+r.status+" "+((j.error&&j.error.message)||x.slice(0,160)));
+        if(sync.permLast)out("Last change the rules refused to accept from this device: "+sync.permLast+" ("+(sync.permTotal||0)+" skipped since the page opened).");
+        else out("No refused changes from this device since the page opened.");
+        out("Done.");
+      });
+    });
+  }).catch(function(e){out("Failed: "+((e&&e.message)||e)+". Check the Wi-Fi, or sign out and sign in again.");});
+}
 function syncAction(a){
+  if(a==="nxsynccheck"&&(unlocked||(typeof limitedUnlock!=="undefined"&&limitedUnlock))){syncQuickCheck();return;}
   if(!unlocked&&!(typeof limitedUnlock!=="undefined"&&limitedUnlock&&(a==="nxsyncin"||a==="nxsyncon")))return;
   if(a==="nxsyncon"){sync.on=true;syncStore();syncStart();syncRefreshAdmin();return;}
   if(a==="nxsyncoff"){sync.on=false;syncStop();if(sync.adapter&&sync.adapter.signOut){try{sync.adapter.signOut();}catch(e){}}sync.adapter=null;sync.user="";syncResetKnown();syncStore();syncSetState("off");syncRefreshAdmin();return;}
