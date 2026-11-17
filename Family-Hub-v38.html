@@ -678,6 +678,7 @@ function boardReqHtml(){
 function bqSubmit(o){
   var snap=JSON.stringify(S);S.boardReq=Array.isArray(S.boardReq)?S.boardReq:[];
   if(o.kind!=='food'&&S.boardReq.filter(function(c){return !c.st;}).length>=30){alert('Too many requests are waiting. Ask a parent to clear some.');return false;}
+  if(S.boardReq.length>=REQ_SOFT_MAX){alert('The family board is full. Ask a parent to answer or clear some requests first.');return false;}
   if(o.kind==='food')S.boardReq=S.boardReq.filter(function(c){return !(c.kind==='food'&&c.by===o.by&&!c.st);});
   o.id=uid();o.at=p2Now();S.boardReq.push(o);
   if(!commitOr(snap))return false;render();statusMessage('Sent to a parent.');return true;
@@ -1314,7 +1315,7 @@ function p2Pts(b){var n=Number(b&&b.points);return Math.max(1,Math.min(100,Math.
 function p2Now(){return new Date().toISOString();}
 function p2Kids(){return P.filter(function(x){return x.kid&&!x.archived;});}
 function p2Submitted(pid,id){return Object.keys(S.done||{}).some(function(k){var a=k.split('|');return a[1]===pid&&a[2]===id&&(S.done[k]==='p'||S.done[k]==='a');});}
-function fnShow(n){if(!n||n.archived)return false;if(n.read){var t=Date.parse(n.readAt||n.at);if(isFinite(t)&&Date.now()-t>3*86400000)return false;}return true;}
+function fnShow(n){if(!n||n.archived)return false;if(n.read&&n.readAt){var t=Date.parse(n.readAt);if(isFinite(t)&&Date.now()-t>3*86400000)return false;}return true;}
 function phase2WallHtml(){
  var canPost=p2Parent();
  var notes=(Array.isArray(S.fridgeNotes)?S.fridgeNotes:[]).filter(fnShow).slice(-8).reverse();
@@ -1366,7 +1367,8 @@ function p2MergeBlob(k,local,remote){
    var out=[],seen={},li={};
    local.forEach(function(x){if(x&&x.id)li[x.id]=x;});
    remote.forEach(function(r){var l=li[r&&r.id],m=r;seen[r&&r.id]=1;
-    if(l&&k==='fridgeNotes'){if((l.read&&!r.read)||(l.archived&&!r.archived)){m=JSON.parse(JSON.stringify(r));if(l.read)m.read=true;if(l.archived)m.archived=true;}}
+    if(l&&k==='fridgeNotes'){var rdM=!!(l.read||r.read),arM=!!(l.archived||r.archived),raM=[l.readAt,r.readAt].filter(function(x){return typeof x==='string'&&isFinite(Date.parse(x));}).sort()[0];
+      if(rdM!==!!r.read||arM!==!!r.archived||(raM||'')!==(r.readAt||'')){m=JSON.parse(JSON.stringify(r));m.read=rdM;if(arM)m.archived=true;if(raM)m.readAt=raM;}}
     else if(l&&k==='bounties'){var lu=String(l.u||''),ru=String(r.u||'');if(lu>ru||(lu===ru&&l.status!==r.status&&(l.status==='removed'||(l.status==='claimed'&&r.status==='open'))))m=l;}
     out.push(m);});
    local.forEach(function(l){if(l&&l.id&&!seen[l.id])out.push(l);});
@@ -1447,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.6";
+var FH_BUILD="v38.7";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -1646,7 +1648,7 @@ function syncDoneId(k){return String(k).split("|").join("__");}
 function syncDoneKey(id){var a=String(id).split("__");return a.length===3&&a[0]&&a[1]&&a[2]?a.join("|"):null;}
 function syncInWindow(c,id){if(c==="done")return String(id).slice(0,10)>=syncCut(-14);if(c==="meals")return id>=syncCut(-14)&&id<=syncCut(120);return true;}
 var SYNC_MAX=90000,SYNC_KID_COLLS=["done","eventRequests","req","groc","boardreq","hw"];
-var SYNC_AUX=[["pp","pendingPoints"],["sb","submissions"],["pc","petClaims"],["db","doneBy"],["bo","bonus"]];
+var SYNC_AUX=[["pp","pendingPoints"],["sb","submissions"],["pc","petClaims"],["db","doneBy"],["bo","bonus"],["at","approvalTag"]];
 var SYNC_BLOBS=["prefs","challenge","spin","awards","parentNotes","fridgeNotes","bounties","packed","mealIngredients","foodPrefs","rewardTargets","returnNotes","household","pointNews","petLog","approvalReversals","kidsAccount","recipes","cosmetics","trial","walletLog","petCare","coach"];
 var SYNC_ID_RE=/^[A-Za-z0-9_-]{1,120}$/;
 function syncEnsureIds(){var ch=false;[S.groc,S.req].forEach(function(l){(l||[]).forEach(function(it){if(it&&typeof it==="object"&&typeof it.id!=="string"){it.id=syncNewId();ch=true;}});});return ch;}
@@ -1721,6 +1723,8 @@ function syncApplyDoc(c,id,rd){
     S.stars=S.stars||{};S.stars[obj.p]=(Number(S.stars[obj.p])||0)+obj.d;sync.starsSynced[obj.p]=(Number(sync.starsSynced[obj.p])||0)+obj.d;
     return true;
   }
+  /* v38.7: another parent's approval of a chore we approved but have not uploaded yet: count the points once */
+  if(c==="done"&&obj.v==="a"&&sync.inflight!==c+"/"+id)awardRevokeDup(syncDoneKey(id),false,obj.at);
   syncApplyItem(c,id,obj);sync.known[c][id]={rev:rd.rev,json:rd.json,deleted:false,st:rd.st};return true;
 }
 function syncLedgerScan(){
@@ -1758,15 +1762,35 @@ function syncFast(){window.FH_FAST_UNTIL=Date.now()+60000;}
 /* v30.1: if another parent approved the same chore first, take back our own award so points count once */
 function awardDupCheck(id,rd){
   try{
-    var k=syncDoneKey(id),pa=sync.awardPending&&sync.awardPending[k];if(!pa)return;
-    delete sync.awardPending[k];
-    var o=JSON.parse(rd.json);
-    if(!o||o.v!=="a"||rd.deleted)return;
-    S.stars=S.stars||{};S.stars[pa.p]=(Number(S.stars[pa.p])||0)-pa.n;
-    if(S.goal&&S.goal.by){S.goal.p=(S.goal.p||0)-pa.n;S.goal.by[pa.p]=(S.goal.by[pa.p]||0)-pa.n;}
-    sync.notice="Two parents approved the same chore at the same time. Its points were counted once.";
-    save();
+    var k=syncDoneKey(id);if(!(sync.awardPending&&sync.awardPending[k]))return;
+    var o=null;try{o=JSON.parse(rd.json);}catch(x){}
+    if(!o||o.v!=="a"||rd.deleted){delete sync.awardPending[k];return;}
+    awardRevokeDup(k,true,o.at);
   }catch(e){}
+}
+/* v38.7: take back this device's not-yet-uploaded award for chore k because another parent's approval of the
+   same completion is already in the family data. Also removes those points from any ledger entry that has not
+   been sent yet, so other devices never see them twice. Legitimate re-approvals are untouched: they only have a
+   pending award when this device approved and nobody else's approval of the same completion has arrived. */
+function awardRevokeDup(k,doSave,remoteTag){
+  var pa=sync.awardPending&&sync.awardPending[k];if(!pa)return false;
+  delete sync.awardPending[k];
+  /* our own approval coming back (for example after an upload whose reply was lost): keep the points */
+  if(remoteTag&&pa.t&&remoteTag===pa.t)return false;
+  var n=Number(pa.n)||0;
+  if(n){
+    S.stars=S.stars||{};S.stars[pa.p]=(Number(S.stars[pa.p])||0)-n;
+    if(S.goal&&S.goal.by){S.goal.p=(S.goal.p||0)-n;S.goal.by[pa.p]=(S.goal.by[pa.p]||0)-n;}
+    var left=n;
+    for(var i=sync.ledger.length-1;i>=0&&left>0;i--){var le=sync.ledger[i];
+      if(!le||le.p!==pa.p||!(le.d>0)||(sync.known.ledger&&sync.known.ledger[le.id])||sync.inflight==="ledger/"+le.id)continue;
+      var take=Math.min(le.d,left);le.d-=take;left-=take;sync.starsSynced[pa.p]=(Number(sync.starsSynced[pa.p])||0)-take;}
+    sync.ledger=sync.ledger.filter(function(x){return x&&x.d!==0;});
+  }
+  if(S.awards&&S.awards[k])S.awards[k].shared=true;
+  sync.notice="Two parents approved the same chore. Its points were counted once.";
+  if(doSave)save();
+  return true;
 }
 function syncPush(){
   if(!sync.on||!sync.adapter||sync.busy||!sync.user||!sync.ready)return;
@@ -1781,7 +1805,7 @@ function syncPush(){
   sync.guard=false;sync.busy=true;syncSetState("sending");syncFast();
   var i=0,conflicts=0,adopted=0;
   function done(){
-    sync.busy=false;sync.allow=false;syncStore();
+    sync.busy=false;sync.allow=false;sync.inflight="";syncStore();
     if(conflicts){sync.notice="Another device changed "+conflicts+" item"+(conflicts===1?"":"s")+" at the same time. The newer version was kept.";syncAfterRemote();}
     else if(adopted)syncAfterRemote();
     if(sync.permNew){statusMessage(sync.permNew+" change"+(sync.permNew===1?"":"s")+" on this device "+(sync.permNew===1?"was":"were")+" not allowed by the family sync rules and "+(sync.permNew===1?"was":"were")+" skipped ("+sync.permLast+"). Everything else synced.");sync.permNew=0;}
@@ -1789,8 +1813,12 @@ function syncPush(){
     if(syncDiff().length)syncSchedule(300);
   }
   function next(){
+    sync.inflight="";
     if(i>=jobs.length){done();return;}
     var j=jobs[i++];
+    /* v38.7: send the ledger entry as it is now (a duplicate approval may have reduced or removed it) */
+    if(j.c==="ledger"){var le=null;for(var q=0;q<sync.ledger.length;q++)if(sync.ledger[q].id===j.id)le=sync.ledger[q];if(!le||!le.d){next();return;}j.json=JSON.stringify(le);}
+    sync.inflight=j.c+"/"+j.id;
     sync.adapter.put(j.c,j.id,j.base,j.json,j.del,syncSt(j.c,j.json,j.del)).then(function(r){
       if(r&&r.ok){
         sync.known[j.c][j.id]={rev:r.rev,json:(j.del||j.c==="ledger")?null:j.json,deleted:!!j.del,st:syncSt(j.c,j.json,j.del)};
@@ -1820,7 +1848,7 @@ function syncPush(){
         sync.permNew=(sync.permNew||0)+1;
         next();return;
       }
-      sync.busy=false;syncStore();syncSetState(err&&err.code==="perm"?"error":"offline",err);syncSchedule(15000);});
+      sync.busy=false;sync.inflight="";syncStore();syncSetState(err&&err.code==="perm"?"error":"offline",err);syncSchedule(15000);});
   }
   next();
 }
@@ -2063,7 +2091,7 @@ function syncBoxInner(){
   }
   h+="<button class='btn n' data-a='nxsynctest'>Run connection check</button>";
   if(sync.testLog)h+="<pre style='white-space:pre-wrap;word-break:break-word;font-size:14px'>"+esc(sync.testLog)+"</pre>";
-  h+="<button class='btn n' data-a='nxsyncoff'>Turn off sync on this device</button><p class='note'>Restoring a backup changes the shared calendar for every device.</p>";
+  h+="<button class='btn n' data-a='nxsyncoff'>Turn off sync on this device</button><p class='note'>Restoring a backup on this device asks first whether to update every family device or only this one.</p>";
   return h;
 }
 function syncAdminHtml(){return "<h2>Family sync</h2><div class='card' id='syncbox'>"+syncBoxInner()+"</div>";}
@@ -2119,7 +2147,10 @@ function syncQuickCheck(){
 function syncAction(a){
   if(a==="nxsynccheck"&&(unlocked||(typeof limitedUnlock!=="undefined"&&limitedUnlock))){syncQuickCheck();return;}
   if(!unlocked&&!(typeof limitedUnlock!=="undefined"&&limitedUnlock&&(a==="nxsyncin"||a==="nxsyncon")))return;
-  if(a==="nxsyncon"){sync.on=true;syncStore();syncStart();syncRefreshAdmin();return;}
+  if(a==="nxsyncon"){var lr=null;try{lr=localStorage.getItem('familyhub-local-restore');}catch(e){}
+    if(lr&&!confirm("This device has a backup that was restored on this device only.\n\nWhen family sync turns on, the family's shared copy replaces matching items here, and anything that exists only in the restored backup (for example older events, chores or lists) is added for everyone.\n\nTurn on family sync?"))return;
+    try{localStorage.removeItem('familyhub-local-restore');}catch(e){}
+    sync.on=true;syncStore();syncStart();syncRefreshAdmin();return;}
   if(a==="nxsyncoff"){sync.on=false;syncStop();if(sync.adapter&&sync.adapter.signOut){try{sync.adapter.signOut();}catch(e){}}sync.adapter=null;sync.user="";syncResetKnown();syncStore();syncSetState("off");syncRefreshAdmin();return;}
   if(a==="nxsyncin"){
     var em=(document.getElementById("syncemail")||{}).value||"",pw=(document.getElementById("syncpw")||{}).value||"";
@@ -3094,10 +3125,13 @@ var gUndo=null;
 function grocRow(g,i){
   return "<div class='gsw' data-gi='"+i+"'><div class='gsw-bg' aria-hidden='true'>🗑 Delete</div><div class='row gsw-fg'><button class='chk "+(g.c?"a":"")+"' aria-label='"+esc((g.c?'Bought, tap to put back: ':'Mark as bought: ')+g.t)+"' aria-pressed='"+(g.c?'true':'false')+"' data-a='gtick' data-i='"+i+"'>"+(g.c?"✓":"")+"</button><span class='t "+(g.c?"done":"")+"'>"+esc(g.t)+"</span><button class='gx' data-a='gdel' data-i='"+i+"' aria-label='Delete "+esc(g.t)+"'>🗑</button></div></div>";
 }
-function groc(){
+var gDraft={gi:"",gs:""};
+function grocKeepDraft(){var a=document.getElementById("gi"),b=document.getElementById("gs");gDraft={gi:a?a.value:"",gs:b?b.value:""};
+  var f=document.activeElement&&document.activeElement.id;if(f==="gi"||f==="gs")setTimeout(function(){var e=document.getElementById(f);if(e&&document.activeElement!==e){e.focus();try{var L=e.value.length;e.setSelectionRange(L,L);}catch(x){}}},0);}
+function groc(){grocKeepDraft();
   var stores=[],known=[];S.groc.forEach(function(g){var s=g.s||"Any store";if(!g.c&&stores.indexOf(s)<0)stores.push(s);if(g.s&&known.indexOf(g.s)<0)known.push(g.s);});
   var left=S.groc.filter(function(g){return !g.c;}).length,got=S.groc.length-left;
-  var h="<h1>Groceries</h1><p class='sub'>"+(S.groc.length?left+" to buy"+(got?" · "+got+" in the cart":""):"Nothing on the list")+"</p><div class='card gadd'><input id='gi' placeholder='Add an item' enterkeyhint='done'><input id='gs' placeholder='Store (optional)' list='gstores'><datalist id='gstores'>"+known.map(function(s){return "<option value='"+esc(s)+"'>";}).join('')+"</datalist><button class='btn g' data-a='addg'>Add item</button></div>";
+  var h="<h1>Groceries</h1><p class='sub'>"+(S.groc.length?left+" to buy"+(got?" · "+got+" in the cart":""):"Nothing on the list")+"</p><div class='card gadd'><input id='gi' placeholder='Add an item' enterkeyhint='done' value='"+esc(gDraft.gi)+"'><input id='gs' placeholder='Store (optional)' list='gstores' value='"+esc(gDraft.gs)+"'><datalist id='gstores'>"+known.map(function(s){return "<option value='"+esc(s)+"'>";}).join('')+"</datalist><button class='btn g' data-a='addg'>Add item</button></div>";
   if(gUndo)h+="<div class='gundo' role='status'><span>Removed <b>"+esc(gUndo.items.length===1?gUndo.items[0].g.t:gUndo.items.length+" items")+"</b></span><button class='btn' data-a='gundo'>Undo</button></div>";
   if(!S.groc.length)h+="<p class='note'>The list is empty.</p>";
   else h+="<p class='note gtip'>Tap the circle when it is in the cart. To delete, swipe an item to the left or tap 🗑.</p>";
@@ -3107,7 +3141,7 @@ function groc(){
 }
 function grocUndoArm(items){
   if(gUndo&&gUndo.timer)clearTimeout(gUndo.timer);
-  gUndo={items:items,timer:setTimeout(function(){gUndo=null;if(view==="groc")render();},8000)};
+  gUndo={items:items,timer:setTimeout(function(){gUndo=null;if(view==="groc"){var u=document.querySelector(".gundo");if(u&&u.parentNode)u.parentNode.removeChild(u);}},8000)};
 }
 function initializeChorePoints(){
   S.pendingPoints=S.pendingPoints||{};
@@ -3158,7 +3192,8 @@ function approveChore(k,raw){
   else if(trialOn()){var capv=Number(trial().cap)||60,roomv=Math.max(0,capv-weekEarned(p.id,weekStartOf(q[0])));if(n>roomv){capped=n-roomv;n=roomv;}}
   var balanceBefore=S.stars[p.id]||0,goalBefore=S.goal?(S.goal.p||0):0;
   S.done[k]='a';
-  sync.awardPending=sync.awardPending||{};sync.awardPending[k]={p:p.id,n:n};
+  var atg=Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+  sync.awardPending=sync.awardPending||{};sync.awardPending[k]={p:p.id,n:n,t:atg};S.approvalTag=S.approvalTag||{};S.approvalTag[k]=atg;
   S.stars[p.id]=balanceBefore+n;
   S.awards[k]={points:n,full:full,title:(S.submissions[k]||{}).title||t.t,person:p.id,date:q[0],approvedAt:new Date().toISOString(),goalId:S.goal?(S.goal.id||'legacy'):null};
   if(capped){S.awards[k].capped=capped;}if(achOnly)S.awards[k].ach=true;
@@ -3193,7 +3228,7 @@ function reverseApproval(k,goalAmount){
   var amount=Number(goalAmount);if(!isFinite(amount)||amount<0||amount>reversalGoalMax(a)||Math.floor(amount*2)!==amount*2)return false;
   if(a.goalId!==undefined&&amount!==reversalGoalAmount(a))return false;
   var previous=JSON.parse(JSON.stringify(S));
-  S.stars[a.person]=(S.stars[a.person]||0)-a.points;S.done[k]='p';S.pendingPoints=S.pendingPoints||{};S.pendingPoints[k]=a.full;
+  S.stars[a.person]=(S.stars[a.person]||0)-a.points;S.done[k]='p';if(S.approvalTag)delete S.approvalTag[k];if(sync.awardPending)delete sync.awardPending[k];S.pendingPoints=S.pendingPoints||{};S.pendingPoints[k]=a.full;
   if(S.goal&&amount){S.goal.p-=amount;S.goal.by=S.goal.by||{};S.goal.by[a.person]-=amount;}
   var news=(S.pointNews||{})[a.person];if(news){news.points=Math.max(0,news.points-a.points);delete news.reward;delete news.family;if(!news.points)delete S.pointNews[a.person];}
   S.approvalReversals=S.approvalReversals||[];S.approvalReversals.push({key:k,award:JSON.parse(JSON.stringify(a)),reversedAt:new Date().toISOString(),goalPointsRemoved:amount});a.reversedAt=new Date().toISOString();
@@ -3373,7 +3408,7 @@ else if(a==="tick"){var k=today()+"|"+d("p")+"|"+d("t"),s=S.done[k],kid=person(d
 if(kid){if(!s)submitChore(d("p"),d("t"));else if(s==="p"){if(!confirm("Take back this submission? A parent will not see it until you submit it again."))return;delete S.done[k];if(S.pendingPoints)delete S.pendingPoints[k];if(S.bonus)delete S.bonus[k];}}else if(person(d("p")).pet){openWho(d("p"),d("t"));return;}else{if(s){delete S.done[k];if(S.bonus)delete S.bonus[k];}else{var wb=winBefore(d("p"));S.done[k]="a";if(mysteryTask(d("p"),today())===d("t")){S.bonus=S.bonus||{};S.bonus[k]=1;}noteWin(d("p"),d("t"),k,wb);}}}
 else if(a==="addev"){if(v("et")){S.events.push({d:v("ed"),m:v("em"),t:v("et"),p:v("ep")})}}
 else if(a==="delev"){S.events.splice(+d("i"),1)}
-else if(a==="addg"){if(v("gi"))S.groc.push({t:v("gi"),s:v("gs"),c:0})}
+else if(a==="addg"){if(v("gi")){S.groc.push({t:v("gi"),s:v("gs"),c:0});var gx=document.getElementById("gi"),gy=document.getElementById("gs");if(gx)gx.value="";if(gy)gy.value="";}}
 else if(a==="gtick"){S.groc[+d("i")].c=!S.groc[+d("i")].c}
 else if(a==="gclear"){var gc=[];S.groc.forEach(function(g,i){if(g.c)gc.push({g:g,i:i});});S.groc=S.groc.filter(function(g){return !g.c});if(gc.length)grocUndoArm(gc);}
 else if(a==="gdel"){var gi=+d("i"),gg=S.groc[gi];if(!gg)return;S.groc.splice(gi,1);grocUndoArm([{g:gg,i:gi}]);}
@@ -3776,7 +3811,7 @@ function saveCalendarEvent(){
     var by=v('ebyk');if(!by||!person(by)||!person(by).kid){alert('Choose your name first.');return false;}
     if(!people.length||people.some(function(id){return !person(id)||!person(id).kid;})){alert('Pick at least one child. A parent can add other people when they approve.');return false;}
     var snapEv=JSON.stringify(S);
-    S.eventRequests=S.eventRequests||[];S.eventRequests.push({id:uid(),kind:source?'edit':'add',by:by,sourceId:source?source.id:'',one:!!one,day:eventDay,e:e,at:new Date().toISOString()});
+    S.eventRequests=S.eventRequests||[];if(S.eventRequests.length>=REQ_SOFT_MAX){alert('There are too many calendar suggestions waiting. Ask a parent to review them first.');return false;}S.eventRequests.push({id:uid(),kind:source?'edit':'add',by:by,sourceId:source?source.id:'',one:!!one,day:eventDay,e:e,at:new Date().toISOString()});
     if(!save()){rollbackTo(snapEv);render();return false;}
     evFormOpen=false;eventEdit='';eventDay='';eventScope='one';render();statusMessage('Sent to a parent for approval.');return true;
   }
@@ -4355,6 +4390,7 @@ function validRewardCost(raw){var n=Number(raw);return String(raw).trim()!==''&&
 function normalizeHub(){
   normalizeMembers();seedPets();S.bonus=S.bonus||{};
   S.events.forEach(function(e){if(!e.id)e.id=uid();if(!e.repeat)e.repeat='none';if(e.repeat==='monthly'&&e.skipShort===undefined)e.skipShort=true;});
+  if(Array.isArray(S.fridgeNotes))S.fridgeNotes.forEach(function(n){if(n&&n.read&&!n.readAt)n.readAt=new Date().toISOString();});
   S.submissions=S.submissions||{};S.reminderLog=S.reminderLog||{};S.returnNotes=S.returnNotes||{};S.eventRequests=S.eventRequests||[];S.boardReq=Array.isArray(S.boardReq)?S.boardReq:[];S.doneBy=S.doneBy||{};S.petClaims=S.petClaims||{};S.parentNotes=S.parentNotes||[];S.petLog=S.petLog||{};S.mealIngredients=S.mealIngredients||{};S.prefs=S.prefs||{};S.packed=S.packed||{};S.foodPrefs=S.foodPrefs||{};
 }
 function nxAction(a,b){
@@ -4441,7 +4477,7 @@ function nxAction(a,b){
       if(!isKidEvent(e)){alert('Only a parent can delete this event.');return;}
       var dby=v('ebyk');if(!dby||!person(dby)||!person(dby).kid){alert('Choose your name first.');return;}
       if(!confirm('Ask a parent to delete '+(e.repeat!=='none'&&eventScope==='one'?'only this occurrence':'this event and its series')+'?'))return;
-      S.eventRequests=S.eventRequests||[];S.eventRequests.push({id:uid(),kind:'delete',by:dby,sourceId:e.id,one:e.repeat!=='none'&&eventScope==='one',day:eventDay,e:null,at:new Date().toISOString()});
+      S.eventRequests=S.eventRequests||[];if(S.eventRequests.length>=REQ_SOFT_MAX){alert('There are too many calendar suggestions waiting. Ask a parent to review them first.');return;}S.eventRequests.push({id:uid(),kind:'delete',by:dby,sourceId:e.id,one:e.repeat!=='none'&&eventScope==='one',day:eventDay,e:null,at:new Date().toISOString()});
       evFormOpen=false;eventEdit='';eventDay='';eventScope='one';save();render();statusMessage('Sent to a parent for approval.');return;
     }
     if(!confirm('Delete '+(e.repeat!=='none'&&eventScope==='one'?'only this occurrence':'this event and its series')+'?'))return;
@@ -4504,6 +4540,9 @@ var midT=null;function scheduleMidnight(){try{clearTimeout(midT);}catch(e){}midT
 scheduleMidnight();window.addEventListener('online',function(){checkDay();scheduleMidnight();});
 window.addEventListener('focus',function(){checkDay();});
 window.addEventListener('storage',function(e){if(e.key===KEY&&e.newValue!==e.oldValue){storageConflict=true;showStorageConflict();}});
+/* v38.7: one set of limits. The app stops adding new requests at REQ_SOFT_MAX (with a message, nothing is dropped);
+   restore accepts far more than that so any backup the app or several synced devices produce can be restored. */
+var REQ_SOFT_MAX=400,BOARD_MAX_RESTORE=2000;
 function validateHubBackup(s){
   if(!s|| (s.members&&!validMembers(s.members)))return false;
   var P=s.members||defaultMembers;
@@ -4531,8 +4570,8 @@ function validateHubBackup(s){
   if(s.spin&&(!Array.isArray(s.spin)||s.spin.some(function(i){return !text(i);})))return false;
   if(s.meals&&(!obj(s.meals)||Object.keys(s.meals).some(function(d){var m=s.meals[d];return !hhDateValid(d)||!obj(m)||Object.keys(m).some(function(k){return ['b','l','d','e','o'].indexOf(k)<0||!text(m[k]);});})))return false;
   if(s.doneBy&&(!obj(s.doneBy)||Object.keys(s.doneBy).some(function(k){var a=k.split('|');return a.length!==3||!hhDateValid(a[0])||!person(a[1])||!Array.isArray(s.doneBy[k])||s.doneBy[k].some(function(id){return !person(id);});})))return false;
-  if(s.boardReq&&(!Array.isArray(s.boardReq)||s.boardReq.length>100||s.boardReq.some(function(c){return !obj(c)||['food','note','claim','ask'].indexOf(c.kind)<0||typeof c.id!=='string'||!person(c.by)||(c.kind==='food'&&(typeof c.likes!=='string'||typeof c.dislikes!=='string'||c.likes.length>300||c.dislikes.length>300))||(c.kind==='ask'&&(typeof c.text!=='string'||!c.text||c.text.length>300||(c.ans!==undefined&&(typeof c.ans!=='string'||c.ans.length>500))))||(c.kind==='note'&&(typeof c.text!=='string'||!c.text||c.text.length>300))||(c.kind==='claim'&&(typeof c.bid!=='string'||!c.bid));})))return false;
-  if(s.eventRequests&&(!Array.isArray(s.eventRequests)||s.eventRequests.length>200||s.eventRequests.some(function(c){return !obj(c)||['add','edit','delete'].indexOf(c.kind)<0||!person(c.by)||(c.sourceId&&!safeId(c.sourceId))||(c.day&&!hhDateValid(c.day))||(c.kind!=='delete'&&!eventValid(c.e));})))return false;
+  if(s.boardReq&&(!Array.isArray(s.boardReq)||s.boardReq.length>BOARD_MAX_RESTORE||s.boardReq.some(function(c){return !obj(c)||['food','note','claim','ask'].indexOf(c.kind)<0||typeof c.id!=='string'||!person(c.by)||(c.kind==='food'&&(typeof c.likes!=='string'||typeof c.dislikes!=='string'||c.likes.length>300||c.dislikes.length>300))||(c.kind==='ask'&&(typeof c.text!=='string'||!c.text||c.text.length>300||(c.ans!==undefined&&(typeof c.ans!=='string'||c.ans.length>500))))||(c.kind==='note'&&(typeof c.text!=='string'||!c.text||c.text.length>300))||(c.kind==='claim'&&(typeof c.bid!=='string'||!c.bid));})))return false;
+  if(s.eventRequests&&(!Array.isArray(s.eventRequests)||s.eventRequests.length>BOARD_MAX_RESTORE||s.eventRequests.some(function(c){return !obj(c)||['add','edit','delete'].indexOf(c.kind)<0||!person(c.by)||(c.sourceId&&!safeId(c.sourceId))||(c.day&&!hhDateValid(c.day))||(c.kind!=='delete'&&!eventValid(c.e));})))return false;
   if(s.bonus&&(!obj(s.bonus)||Object.keys(s.bonus).some(function(k){return !keyOk(k)||s.bonus[k]!==1;})))return false;
   if(s.seeded&&(!obj(s.seeded)||Object.keys(s.seeded).length>10||Object.keys(s.seeded).some(function(k){return typeof s.seeded[k]!=='boolean';})))return false;
   if(s.challenge!==undefined&&s.challenge!==null){var c=s.challenge;if(!obj(c)||typeof c.t!=='string'||!c.t.trim()||c.t.length>80||typeof c.e!=='string'||c.e.length>16||c.target!==Math.floor(c.target)||c.target<1||c.target>1000||!hhDateValid(c.start)||!hhDateValid(c.end)||c.end<c.start||(c.reward!==undefined&&(typeof c.reward!=='string'||c.reward.length>80))||(c.celebrated!==undefined&&typeof c.celebrated!=='boolean'))return false;}
@@ -4568,15 +4607,69 @@ function restoreBackupText(){
     var wrapper=JSON.parse(text);
     if(wrapper.app!=='Family Hub'||wrapper.formatVersion!==1||!validateHubBackup(wrapper.data))throw Error('invalid');
     var data=wrapper.data,count=0;(data.members||defaultMembers).forEach(function(p){count+=data.tasks[p.id].length;});
-    if(!confirm('Replace this device’s data with '+data.events.length+' calendar series and '+count+' tasks from this backup? Current data will be kept as a recovery copy.'))return;
     var disk=localStorage.getItem(KEY),parsed=null;try{parsed=disk?JSON.parse(disk):null;}catch(ignore){}
     if(storageConflict||(parsed&&(Number(parsed._rev)||0)!==baseRevision)){showStorageConflict();return;}
-    try{localStorage.setItem(KEY+'-recovery',JSON.stringify({app:'Family Hub',formatVersion:1,exportedAt:new Date().toISOString(),data:S}));}catch(storageError){throw new Error('recovery-storage-failed');}
-    var previous=S;S=data;initialDataProblem=false;normalizeHub();initializeChorePoints();
-    if(!save()){S=previous;normalizeMembers();return;}
-    unlocked=false;view='home';taskEdit=null;eventEdit='';render();statusMessage('Backup restored. Parent area is locked.');
-  }catch(x){alert(x&&x.message==='recovery-storage-failed'?'Could not create the recovery copy. Check available browser storage; your current data was not replaced.':'Could not restore this file. Use a valid Family Hub backup with supported data and positive reward prices.');}
+    rsPending={data:data,count:count};
+    if(restoreSyncActive()){restoreChoiceShow();return;}
+    if(!confirm('Replace this device’s data with '+data.events.length+' calendar series and '+count+' tasks from this backup?\n\nFamily sync is off on this device, so nothing is sent to other devices now. If you turn sync on later, you will be asked first. Current data will be kept as a recovery copy.'))return;
+    restoreCommit('offline');
+  }catch(x){alert('Could not restore this file. Use a valid Family Hub backup with supported data and positive reward prices.');}
 }
+/* v38.7: restore scope. A restored state on a synced device would upload changes and deletions for every device,
+   so the parent must choose: share it with the family, or keep it on this device only (sync is switched off here). */
+var rsPending=null,RS_LOCAL_KEY='familyhub-local-restore';
+function restoreSyncActive(){return !!sync.on;}
+function restoreScope(data){
+  var out={add:0,upd:0,del:0,cols:{},points:[],err:false},prev=S,names={events:'calendar',eventRequests:'calendar requests',groc:'groceries',req:'reward requests',boardreq:'family board',done:'chore check-offs',meals:'meals',cfg:'settings and lists',hw:'homework'};
+  try{
+    S=JSON.parse(JSON.stringify(data));normalizeMembers();
+    syncDiff().forEach(function(j){if(j.c==="ledger")return;var kn=sync.known[j.c]&&sync.known[j.c][j.id];var kind=j.del?'del':(kn&&!kn.deleted?'upd':'add');out[kind]++;var nm=names[j.c]||j.c;out.cols[nm]=(out.cols[nm]||0)+1;});
+    var ids={};Object.keys(data.stars||{}).forEach(function(p){ids[p]=1;});Object.keys(sync.starsSynced||{}).forEach(function(p){ids[p]=1;});
+    Object.keys(ids).forEach(function(p){var now=Number((sync.starsSynced||{})[p])||0,then=Number((data.stars||{})[p])||0;if(now!==then)out.points.push({p:p,from:now,to:then});});
+  }catch(e){out.err=true;}
+  finally{S=prev;normalizeMembers();}
+  return out;
+}
+function restoreChoiceShow(){
+  var d=rsPending&&rsPending.data;if(!d)return;
+  var sc=restoreScope(d),el=document.getElementById('rschoice');
+  if(!el){el=document.createElement('div');el.id='rschoice';el.className='party';el.setAttribute('role','dialog');el.setAttribute('aria-modal','true');el.setAttribute('aria-labelledby','rs-title');document.body.appendChild(el);}
+  var cols=Object.keys(sc.cols).map(function(k){return esc(k)+' ('+sc.cols[k]+')';}).join(', ');
+  var pts=sc.points.map(function(x){var m=(data_person(d,x.p)||{}).n||x.p;return '<li>'+esc(m)+': '+x.from+' → '+x.to+' points</li>';}).join('');
+  el.innerHTML="<div class='party-panel' style='max-width:620px;text-align:left'><h2 id='rs-title'>Restore this backup for whom?</h2>"+
+    "<p>This device is connected to <b>family sync</b>. The backup has "+d.events.length+" calendar series and "+rsPending.count+" tasks.</p>"+
+    (sc.err?"<p class='note'>The exact changes could not be counted, so treat this as a family-wide change.</p>":
+    "<p><b>If you update the whole family</b>, every synced device will change:</p><ul><li>"+sc.add+" item"+(sc.add===1?'':'s')+" added, "+sc.upd+" changed, <b>"+sc.del+" deleted</b>"+(cols?" ("+cols+")":"")+"</li>"+(pts?"<li>Shared points change:<ul>"+pts+"</ul></li>":"<li>Shared points stay the same.</li>")+"</ul>")+
+    "<p><b>If you restore on this device only</b>, family sync is turned off here first, so nothing is sent. The other devices keep the family's current data. Turning sync back on later asks you first.</p>"+
+    "<p class='note'>Either way, this device's current data is kept as a recovery copy.</p>"+
+    "<div style='display:flex;flex-wrap:wrap;gap:8px'><button class='btn r' style='min-height:52px' data-rs='share'>Restore and update the whole family</button><button class='btn g' style='min-height:52px' data-rs='local'>Restore on this device only</button><button class='btn n' style='min-height:52px' data-rs='cancel'>Cancel</button></div></div>";
+}
+function data_person(d,id){return (d.members||defaultMembers).filter(function(p){return p.id===id;})[0];}
+function restoreChoiceClose(){var el=document.getElementById('rschoice');if(el&&el.parentNode)el.parentNode.removeChild(el);}
+function restoreSyncOffHere(){
+  sync.on=false;syncStop();if(sync.adapter&&sync.adapter.signOut){try{sync.adapter.signOut();}catch(e){}}
+  sync.adapter=null;sync.user="";syncResetKnown();syncStore();syncSetState("off");
+}
+function restoreCommit(mode){
+  var p=rsPending;rsPending=null;restoreChoiceClose();if(!p||!p.data||!unlocked)return false;
+  try{localStorage.setItem(KEY+'-recovery',JSON.stringify({app:'Family Hub',formatVersion:1,exportedAt:new Date().toISOString(),data:S}));}
+  catch(storageError){alert('Could not create the recovery copy. Check available browser storage; your current data was not replaced.');return false;}
+  if(mode==='local')restoreSyncOffHere();
+  var previous=S;S=p.data;initialDataProblem=false;normalizeHub();initializeChorePoints();
+  if(!save()){S=previous;normalizeMembers();return false;}
+  try{if(mode==='share')localStorage.removeItem(RS_LOCAL_KEY);else localStorage.setItem(RS_LOCAL_KEY,new Date().toISOString());}catch(e){}
+  if(mode==='share'){sync.allow=true;syncSchedule(200);}
+  unlocked=false;view='home';taskEdit=null;eventEdit='';render();
+  statusMessage(mode==='share'?'Backup restored and being shared with the whole family. Parent area is locked.':mode==='local'?'Backup restored on this device only. Family sync is off here. Parent area is locked.':'Backup restored on this device. Parent area is locked.');
+  return true;
+}
+document.addEventListener('click',function(e){
+  var b=e.target&&e.target.closest?e.target.closest('[data-rs]'):null;if(!b)return;
+  e.preventDefault();var a=b.getAttribute('data-rs');
+  if(a==='cancel'){rsPending=null;restoreChoiceClose();return;}
+  if(a==='share'){if(!confirm('Update every family device with this backup? Deleted items disappear for everyone.'))return;restoreCommit('share');return;}
+  if(a==='local'){restoreCommit('local');return;}
+});
 function effectiveTheme(){var t=personTheme()||S.theme||'auto';if(t==='light'||t==='dark')return t;return (window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}
 function applyTheme(){applyLite();var theme=personTheme()||S.theme||'auto';if(theme==='auto')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',theme);var tb=document.getElementById('themebtn');if(tb){var dk=effectiveTheme()==='dark';tb.textContent=dk?'☀️':'🌙';tb.setAttribute('aria-label',dk?'Switch to light mode':'Switch to dark mode');}}
 document.addEventListener('change',function(e){
@@ -5402,24 +5495,234 @@ function coachReady(){return !!coachBase();}
 function coachUsed(){try{var o=JSON.parse(localStorage.getItem("familyhub-coach-day")||"{}");return o.d===today()?(+o.n||0):0;}catch(e){return 0;}}
 function coachCount(){try{localStorage.setItem("familyhub-coach-day",JSON.stringify({d:today(),n:coachUsed()+1}));}catch(e){}}
 function coachBtn(kid,cls){return coachReady()?"<button class='btn "+(cls||"")+"' data-co='open'"+(kid?" data-k='"+esc(kid)+"'":"")+">🧑‍🏫 Help me with a problem</button>":"";}
-/* answer checking: numbers, fractions, mixed numbers, "x = 5", units */
-function coachNum(s){
-  s=String(s||"").toLowerCase().replace(/[,$\s]/g,"").replace(/^[a-z]=/,"").replace(/(cm|mm|km|m|kg|g|lb|lbs|oz|in|ft|yd|mi|l|ml|°|degrees|units?|sq|cubic|%)+$/,"");
+/* ===== v38.7: careful answer checking for the Homework coach =====
+   Parses fractions, mixed numbers, decimals, percents, money and real units (with conversion),
+   double-checks plain arithmetic problems with its own calculator, and stays neutral when unsure. */
+var CQ_VULGAR={"½":"1/2","⅓":"1/3","⅔":"2/3","¼":"1/4","¾":"3/4","⅕":"1/5","⅖":"2/5","⅗":"3/5","⅘":"4/5","⅙":"1/6","⅚":"5/6","⅐":"1/7","⅛":"1/8","⅜":"3/8","⅝":"5/8","⅞":"7/8","⅑":"1/9","⅒":"1/10"};
+var CQ_WORDS={zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90,hundred:100,thousand:1000,half:0.5};
+/* unit -> [dimension, factor to base unit, label] */
+var CQ_UNITS=(function(){
+  var u={};
+  function add(names,dim,f,label){names.split("|").forEach(function(n){u[n]=[dim,f,label];});}
+  add("mm|millimeter|millimeters|millimetre|millimetres","len",0.001,"mm");
+  add("cm|centimeter|centimeters|centimetre|centimetres","len",0.01,"cm");
+  add("m|meter|meters|metre|metres","len",1,"m");
+  add("km|kilometer|kilometers|kilometre|kilometres","len",1000,"km");
+  add("in|inch|inches|\"","len",0.0254,"in");
+  add("ft|foot|feet|'","len",0.3048,"ft");
+  add("yd|yard|yards","len",0.9144,"yd");
+  add("mi|mile|miles","len",1609.344,"mi");
+  add("mm2|mm^2|mm²|sq mm|square mm|square millimeters","area",1e-6,"mm²");
+  add("cm2|cm^2|cm²|sq cm|square cm|square centimeters|square centimetres","area",1e-4,"cm²");
+  add("m2|m^2|m²|sq m|square m|square meters|square metres","area",1,"m²");
+  add("km2|km^2|km²|sq km|square km|square kilometers","area",1e6,"km²");
+  add("in2|in^2|in²|sq in|square in|square inches","area",0.00064516,"in²");
+  add("ft2|ft^2|ft²|sq ft|square ft|square feet","area",0.09290304,"ft²");
+  add("yd2|yd^2|yd²|sq yd|square yd|square yards","area",0.83612736,"yd²");
+  add("square units|sq units|units2|units^2|units²|sq. units|square unit","areau",1,"square units");
+  add("mm3|mm^3|mm³|cubic mm|cubic millimeters","vol",1e-9,"mm³");
+  add("cm3|cm^3|cm³|cubic cm|cubic centimeters|cc","vol",1e-6,"cm³");
+  add("m3|m^3|m³|cubic m|cubic meters","vol",1,"m³");
+  add("in3|in^3|in³|cubic in|cubic inches","vol",0.000016387064,"in³");
+  add("ft3|ft^3|ft³|cubic ft|cubic feet","vol",0.028316846592,"ft³");
+  add("ml|milliliter|milliliters|millilitre|millilitres","vol",1e-6,"mL");
+  add("l|liter|liters|litre|litres","vol",0.001,"L");
+  add("cubic units|units3|units^3|units³|cu units","volu",1,"cubic units");
+  add("mg|milligram|milligrams","mass",0.001,"mg");
+  add("g|gram|grams","mass",1,"g");
+  add("kg|kilogram|kilograms","mass",1000,"kg");
+  add("oz|ounce|ounces","mass",28.349523125,"oz");
+  add("lb|lbs|pound|pounds","mass",453.59237,"lb");
+  add("ms|millisecond|milliseconds","time",0.001,"ms");
+  add("s|sec|secs|second|seconds","time",1,"s");
+  add("min|mins|minute|minutes","time",60,"min");
+  add("h|hr|hrs|hour|hours","time",3600,"h");
+  add("day|days","time",86400,"days");
+  add("week|weeks","time",604800,"weeks");
+  add("°|deg|degree|degrees","angle",1,"°");
+  add("°f|degrees f|degrees fahrenheit|fahrenheit","tempf",1,"°F");
+  add("°c|degrees c|degrees celsius|celsius","tempc",1,"°C");
+  add("cent|cents|¢","money",0.01,"¢");
+  add("dollar|dollars","money",1,"$");
+  add("%|percent|per cent","pct",0.01,"%");
+  return u;
+})();
+function cqGcd(a,b){a=Math.abs(a);b=Math.abs(b);while(b){var t=b;b=a%b;a=t;}return a;}
+function cqPrep(s){
+  s=String(s==null?"":s).trim();
+  s=s.replace(/[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅐⅛⅜⅝⅞⅑⅒]/g,function(c){return " "+CQ_VULGAR[c];});
+  s=s.replace(/[−–—]/g,"-").replace(/[×✕]/g,"*").replace(/÷/g,"/").replace(/⁄/g,"/").replace(/ /g," ");
+  return s.replace(/\s+/g," ").trim();
+}
+/* number at the start: mixed (1 1/2, 1-1/2, 1 and 1/2), fraction, decimal, thousands commas */
+function cqNumPrefix(s){
   var m;
-  if((m=/^(-?\d+)(?:and|\+)?(\d+)\/(\d+)$/.exec(s))&&+m[3])return (+m[1]<0?-1:1)*(Math.abs(+m[1])+(+m[2])/(+m[3]));
-  if((m=/^(-?\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)$/.exec(s))&&+m[2])return (+m[1])/(+m[2]);
-  if(/^-?\d*\.?\d+$/.test(s))return +s;
+  if((m=/^([+-]?)(\d+)(?:\s+and\s+|\s+|-)(\d+)\s*\/\s*(\d+)(?!\d|\s*\/)/.exec(s))&&+m[4]){
+    var w=+m[2],n=+m[3],d=+m[4],sg=m[1]==="-"?-1:1;return {val:sg*(w+n/d),num:sg*(w*d+n),den:d,mixed:true,frac:true,len:m[0].length};}
+  if((m=/^([+-]?)(\d+)\s*\/\s*(\d+)(?![\d.])/.exec(s))&&+m[3]){var sg2=m[1]==="-"?-1:1;return {val:sg2*(+m[2])/(+m[3]),num:sg2*(+m[2]),den:+m[3],frac:true,len:m[0].length};}
+  if((m=/^([+-]?)(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d*\.?\d+)(?:\s*\/\s*(\d*\.?\d+))?/.exec(s))&&m[2]!==""&&m[2]!=="."){
+    var v=+(m[2].replace(/,/g,"")),dec=(m[2].split(".")[1]||"").length;
+    if(m[3]!==undefined){if(!+m[3])return null;v=v/(+m[3]);dec=-1;}
+    return {val:(m[1]==="-"?-1:1)*v,dec:dec,len:m[0].length};}
   return null;
 }
-function coachNorm(s){return String(s||"").toLowerCase().replace(/^\s*[a-z]\s*=\s*/,"").replace(/[^a-z0-9./-]/g,"");}
+/* parse one answer -> {kind:"num",val,unit,frac,...} | {kind:"multi",vals:[...]} | {kind:"text",t} | null */
+function cqParse(raw){
+  var s=cqPrep(raw);if(!s)return null;
+  s=s.replace(/^(the\s+)?answer\s*(is|:)\s*/i,"").replace(/^[a-z]\s*=\s*/i,"").replace(/^=\s*/,"").replace(/[.!]+$/,"").trim();
+  var low=s.toLowerCase();
+  /* several answers: "2, 3" / "2 or 3" / "x = 2 or x = 3" */
+  if(!/^\d{1,3}(,\d{3})+(\.\d+)?\b/.test(low)&&/(,|;|\bor\b|\band\b)/.test(low)&&!/\d\s+and\s+\d+\s*\//.test(low)){
+    var parts=low.split(/\s*(?:,|;|\bor\b|\band\b)\s*/).map(function(x){return x.replace(/^[a-z]\s*=\s*/,"").trim();}).filter(Boolean);
+    if(parts.length>1){var vals=parts.map(cqParse);if(vals.every(function(x){return x&&x.kind==="num";}))return {kind:"multi",vals:vals};}
+  }
+  var money=false;if(/^\$\s*/.test(low)){money=true;low=low.replace(/^\$\s*/,"");}
+  var neg=false;if(/^-\s*\$/.test(low)){neg=true;money=true;low=low.replace(/^-\s*\$\s*/,"");}
+  var n=cqNumPrefix(low);
+  if(!n){
+    var w=low.replace(/[^a-z ]/g,"").trim();
+    if(CQ_WORDS[w]!==undefined)return {kind:"num",val:CQ_WORDS[w],unit:null};
+    return {kind:"text",t:low.replace(/\b(a|an|the)\b/g,"").replace(/[^a-z0-9]+/g," ").trim()};
+  }
+  var rest=low.slice(n.len).trim().replace(/\.$/,""),unit=null,noun="";
+  if(rest){
+    var r2=rest.replace(/\s+/g," ").replace(/\bsq\./g,"sq").replace(/\bcu\.?\s/g,"cubic ").replace(/\.$/,"");
+    if(CQ_UNITS[r2])unit=CQ_UNITS[r2];
+    else{var ws=r2.split(" ");for(var k=Math.min(3,ws.length);k>=1&&!unit;k--){var cand=ws.slice(0,k).join(" ");if(CQ_UNITS[cand])unit=CQ_UNITS[cand];}
+      if(!unit)noun=r2;}
+  }
+  if(money&&!unit)unit=CQ_UNITS.dollar;
+  var o={kind:"num",val:(neg?-1:1)*n.val,unit:unit,noun:noun,frac:!!n.frac,mixed:!!n.mixed,dec:n.dec,num:n.num,den:n.den};
+  return o;
+}
+function cqSame(a,b){return Math.abs(a-b)<=1e-9*Math.max(1,Math.abs(a),Math.abs(b));}
+function cqUnitLabel(u){return u?u[2]:"";}
+/* Compare a child's answer with the expected one.
+   Returns {v:"right"|"wrong"|"unit"|"simplify"|"close"|"cant", note} */
+function coachCompare(expRaw,expNum,ansRaw){
+  var a=cqParse(ansRaw);if(!a)return {v:"cant"};
+  var e=expRaw?cqParse(expRaw):null;
+  if(typeof expNum==="number"&&isFinite(expNum)){
+    if(!e||e.kind!=="num")e={kind:"num",val:expNum,unit:null};
+    else if(!cqSame(e.val,expNum)&&!(e.unit&&e.unit[0]==="pct"&&cqSame(e.val/100,expNum)))return {v:"cant",note:"The coach's answer and its number don't agree."};
+  }
+  if(!e)return {v:"cant"};
+  if(e.kind==="multi"||a.kind==="multi"){
+    var ev=(e.kind==="multi"?e.vals:[e]).map(function(x){return x.val;}).sort(function(x,y){return x-y;}),av=(a.kind==="multi"?a.vals:[a]).map(function(x){return x.kind==="num"?x.val:NaN;}).sort(function(x,y){return x-y;});
+    if(ev.length!==av.length)return {v:av.length<ev.length&&av.every(function(x){return ev.some(function(y){return cqSame(x,y);});})?"close":"wrong",note:av.length<ev.length?"There should be "+ev.length+" answers.":""};
+    return {v:ev.every(function(x,i){return cqSame(x,av[i]);})?"right":"wrong"};
+  }
+  if(e.kind==="text"){
+    if(a.kind==="text"&&a.t&&a.t===e.t)return {v:"right"};
+    return {v:"cant"};
+  }
+  if(a.kind!=="num")return {v:"cant"};
+  var eu=e.unit,au=a.unit;
+  /* percent vs plain decimal: 50% == 0.5 */
+  var eVal=e.val,aVal=a.val;
+  if(eu&&eu[0]==="pct"&&!(au&&au[0]==="pct")){
+    if(cqSame(aVal,eVal/100))return {v:"right",note:"(same as "+e.val+"%)"};
+    if(cqSame(aVal,eVal))return {v:"unit",note:"Right number. Don't forget the % sign."};
+    return cqNear(aVal,eVal,a);
+  }
+  if(au&&au[0]==="pct"&&!(eu&&eu[0]==="pct")){
+    if(cqSame(aVal/100,eVal))return {v:"right",note:"(same as "+cqFmt(eVal)+")"};
+    return {v:"wrong"};
+  }
+  if(eu&&au){
+    if(eu[0]!==au[0]){
+      if((eu[0]==="tempf"||eu[0]==="tempc")&&(au[0]==="tempf"||au[0]==="tempc"))return {v:"cant"};
+      return {v:"wrong",note:"Check the units. The answer should be in "+cqUnitLabel(eu)+"."};
+    }
+    var eb=eVal*eu[1],ab=aVal*au[1];
+    if(cqSame(eb,ab))return {v:"right",note:au[2]!==eu[2]?"(same as "+cqFmt(eVal)+" "+eu[2]+")":""};
+    if(cqSame(aVal,eVal)&&au[2]!==eu[2])return {v:"wrong",note:"Right number, wrong unit: "+cqFmt(aVal)+" "+au[2]+" is not the same as "+cqFmt(eVal)+" "+eu[2]+"."};
+    return cqNear(ab,eb,a);
+  }
+  if(eu&&!au){
+    if(eu[0]==="money"&&cqSame(aVal,eVal*eu[1]))return {v:"right"};
+    if(cqSame(aVal,eVal))return {v:"unit",note:"Right number! Add the unit: "+cqUnitLabel(eu)+"."};
+    return cqNear(aVal,eVal,a);
+  }
+  if(!eu&&au){
+    if(au[0]==="money"&&cqSame(aVal*au[1],eVal))return {v:"right"};
+    if(cqSame(aVal,eVal))return {v:"right"};
+    return cqNear(aVal,eVal,a);
+  }
+  if(cqSame(aVal,eVal)){
+    /* equal value: ask to simplify when the expected fraction is in lowest terms and the child's is not */
+    if(e.frac&&a.frac&&a.den&&e.den&&cqGcd(a.num,a.den)>1&&cqGcd(e.num,e.den)===1&&a.den!==e.den)return {v:"simplify",note:"That's equal, but it can be simplified."};
+    if(e.frac&&a.frac&&e.mixed!==a.mixed)return {v:"right",note:"(same as "+cqPrep(expRaw)+")"};
+    return {v:"right"};
+  }
+  return cqNear(aVal,eVal,a);
+}
+function cqNear(a,e,parsed){
+  /* rounded answers: 0.33 for 1/3, 3.14 for pi-based answers */
+  if(parsed&&typeof parsed.dec==="number"&&parsed.dec>=0&&parsed.dec<=4){var f=Math.pow(10,parsed.dec);if(cqSame(Math.round(e*f)/f,a))return {v:"close",note:"That's the answer rounded to "+parsed.dec+" decimal place"+(parsed.dec===1?"":"s")+". It's right if the question asks you to round."};}
+  if(e!==0&&Math.abs(a-e)/Math.abs(e)<0.005)return {v:"close",note:"Very close. Check whether the question wants it rounded."};
+  return {v:"wrong"};
+}
+function cqFmt(x){
+  if(!isFinite(x))return String(x);
+  if(cqSame(x,Math.round(x)))return String(Math.round(x));
+  for(var d=2;d<=1000;d++){var n=x*d;if(Math.abs(n-Math.round(n))<1e-9){var nn=Math.round(n),w=Math.trunc(nn/d),r=Math.abs(nn%d);return nn+"/"+d+(Math.abs(nn)>d?" ("+w+" "+r+"/"+d+")":"");}}
+  return String(+x.toFixed(6));
+}
+/* Own calculator for plain arithmetic questions such as "7 × 8 = ?", "3/4 of 20", "15% of 200", "(2 + 3) × 4".
+   Returns a number, or null when the question is not plain arithmetic. */
+function coachCalc(q){
+  var s=cqPrep(q).toLowerCase();
+  s=s.replace(/^(what\s+is|what's|find|calculate|compute|evaluate|work\s+out|solve|simplify)\s*:?\s*/,"");
+  s=s.replace(/\s*=\s*(\?|_+|\.\.\.|…)?\s*$/,"").replace(/\?+\s*$/,"").replace(/\s*=\s*$/,"").trim();
+  s=s.replace(/^\(?\d{1,2}[.)]\s+/,"").replace(/\$/g,"").trim();
+  if(!s||s.length>120)return null;
+  s=s.replace(/(\d)\s*x\s*(?=[\d(])/g,"$1*").replace(/\)\s*x\s*(?=[\d(])/g,")*");
+  s=s.replace(/(\d+)\s+(\d+)\s*\/\s*(\d+)/g,"($1+$2/$3)");
+  s=s.replace(/(\d)\s*%\s*of\b/g,"$1/100*").replace(/(\d)\s*%/g,"$1/100").replace(/\bof\b/g,"*");
+  s=s.replace(/(\d),(\d{3})(?!\d)/g,"$1$2");
+  if(/[a-z_=<>!]/.test(s))return null;
+  if(!/[\d]/.test(s)||!/[+\-*/^]/.test(s.replace(/^-/,"")))return null;
+  var i=0;
+  function peek(){while(s[i]===" ")i++;return s[i];}
+  function num(){var m=/^\d*\.?\d+/.exec(s.slice(i));if(!m)throw 0;i+=m[0].length;return +m[0];}
+  function atom(){var c=peek();if(c==="("){i++;var v=add();if(peek()!==")")throw 0;i++;return v;}if(c==="-"){i++;return -atom();}if(c==="+"){i++;return atom();}return num();}
+  function pow(){var b=atom();if(peek()==="^"){i++;var ex=unaryPow();return Math.pow(b,ex);}return b;}
+  function unaryPow(){if(peek()==="-"){i++;return -pow();}return pow();}
+  function mul(){var v=pow();for(;;){var c=peek();if(c==="*"){i++;v*=pow();}else if(c==="/"){i++;var d=pow();if(d===0)throw 0;v/=d;}else if(c==="("){v*=pow();}else return v;}}
+  function add(){var v=mul();for(;;){var c=peek();if(c==="+"){i++;v+=mul();}else if(c==="-"){i++;v-=mul();}else return v;}}
+  try{var out=add();if(peek()!==undefined)return null;return isFinite(out)?out:null;}catch(e){return null;}
+}
+/* attach the calculator's check to a cleaned problem */
+function coachVerify(p){
+  var calc=coachCalc(p.question);if(calc===null)return p;
+  var e=p.answer?cqParse(p.answer):null,money=e&&e.kind==="num"&&e.unit&&e.unit[0]==="money"&&e.unit[1]===1;
+  var ev=(e&&e.kind==="num"&&(!e.unit||money))?e.val:((typeof p.answerNum==="number"&&isFinite(p.answerNum))?p.answerNum:null);
+  if(e&&e.kind==="num"&&e.unit&&!money){/* answer carries a real unit the plain calculator cannot judge */return p;}
+  if(ev!==null&&cqSame(ev,calc)){p.verified=true;p.sure=true;return p;}
+  p.coachAnswer=p.answer||"";p.answer=(money?"$":"")+cqFmt(calc).replace(/ \(.*\)$/,"");p.answerNum=calc;p.calcFixed=true;p.sure=true;
+  return p;
+}
+
 function coachCheck(p,ans){
   if(!String(ans||"").trim())return null;
-  var want=(typeof p.answerNum==="number"&&isFinite(p.answerNum))?p.answerNum:coachNum(p.answer),got=coachNum(ans);
-  if(want!==null&&got!==null)return Math.abs(want-got)<=Math.max(1e-6,Math.abs(want)*1e-4);
-  if(!p.answer)return null;
-  return coachNorm(ans)===coachNorm(p.answer);
+  var r=coachCompare(p.answer,p.answerNum,ans);
+  if(!p.sure){if(r.v==="right")return {v:"rightunsure",note:r.note};return {v:"unsure"};}
+  return r;
 }
-function coachClean(r){
+function coachVerdictHtml(v,note,ans,p){
+  var more=CO.hints<p.hints.length?"Try a hint, then try again.":"Look at the hints again, or see how to solve it.";
+  var t={right:["cok","🎉 Yes! "+esc(ans)+" is right. Great thinking!"],
+    rightunsure:["cok","✅ That matches the coach's answer. The coach wasn't completely sure about this one, so check it together."],
+    wrong:["cno","Not quite"+(CO.tries>1?" yet":"")+". "+more],
+    unit:["cnear","Almost!"],simplify:["cnear","Almost!"],close:["cnear","Close!"],
+    unsure:["cnear","The coach isn't sure of the right answer here, so I won't mark it. Compare with the worked solution together."],
+    cant:["cnear","I can't check this kind of answer by myself. Compare it with the worked solution together."]}[v]||["cnear",""];
+  return "<p class='"+t[0]+"' role='status'>"+t[1]+(note?" "+esc(note):"")+"</p>";
+}
+(function(){var st=document.createElement("style");st.textContent="#coach .cnear{font-size:19px;font-weight:600;background:rgba(59,91,219,.14);border-left:6px solid #3b5bdb;border-radius:12px;padding:10px 14px;margin:8px 0}";document.head.appendChild(st);})();
+var COSID=0;
+function coachAbort(){if(CO&&CO.ctl){try{CO.ctl.abort();}catch(e){}CO.ctl=null;}}function coachClean(r){
   var o={readable:r&&r.readable!==false,note:aiClean(r&&r.note,300),problems:[]};
   ((r&&Array.isArray(r.problems))?r.problems:[]).slice(0,6).forEach(function(p){
     if(!p||typeof p!=="object")return;
@@ -5429,6 +5732,7 @@ function coachClean(r){
       answer:aiClean(p.answer,120),answerNum:(typeof p.answerNum==="number"&&isFinite(p.answerNum))?p.answerNum:null,
       steps:(Array.isArray(p.steps)?p.steps:[]).map(function(h){return aiClean(h,400);}).filter(Boolean).slice(0,12),
       checkTip:aiClean(p.checkTip,300),sure:p.sure!==false});
+    coachVerify(o.problems[o.problems.length-1]);
   });
   return o;
 }
@@ -5454,12 +5758,12 @@ function coachCss(){
 }
 function coachKids(){return hwKids();}
 function coachOpen(kid){
-  coachCss();CO={kid:kid||CO.kid||"",busy:false,msg:"",res:null,pi:0,hints:0,tries:0,show:false,last:"",ok:false,img:null};
+  coachCss();coachAbort();CO={sid:++COSID,kid:kid||CO.kid||"",busy:false,msg:"",res:null,pi:0,hints:0,tries:0,show:false,last:"",ok:false,img:null};
   var ks=coachKids();if(!CO.kid&&ks.length===1)CO.kid=ks[0].id;
   if(!CO.kid&&view==="person"&&person(pid)&&person(pid).kid)CO.kid=pid;
   coachDraw();
 }
-function coachClose(){var o=document.getElementById("coach");if(o&&o.parentNode)o.parentNode.removeChild(o);CO.img=null;}
+function coachClose(){coachAbort();COSID++;CO.sid=-1;CO.busy=false;var o=document.getElementById("coach");if(o&&o.parentNode)o.parentNode.removeChild(o);CO.img=null;}
 function coachDraw(){
   var o=document.getElementById("coach");
   if(!o){o=document.createElement("div");o.id="coach";o.setAttribute("role","dialog");o.setAttribute("aria-modal","true");o.setAttribute("aria-label","Homework coach");document.body.appendChild(o);}
@@ -5472,6 +5776,8 @@ function coachDraw(){
     h+="<div class='crow'><button class='btn g' data-co='go'"+(CO.busy?" disabled":"")+">"+(CO.busy?"Reading your homework…":"✨ Help me")+"</button></div>";
     if(CO.msg)h+="<p class='cwarn' role='status'>"+esc(CO.msg)+"</p>";
     h+="<p class='note'>I will give you hints first, so you can figure it out yourself. 💪</p>";
+    var cg=(coachSet().grade||{})[CO.kid]||"";
+    h+="<p class='note'>📤 When you tap <b>Help me</b>, the photo, anything typed above"+(cg?", today's date and the school grade ("+esc(cg)+")":" and today's date")+" are sent through your family's helper to Google's Gemini to be read. Nothing else is sent.</p>";
   }else{
     var r=CO.res;
     if(!r.problems.length){h+="<p class='cwarn'>"+esc(r.note||"I could not find a problem in that picture. Try a closer, brighter photo, or type the problem.")+"</p><div class='crow'><button class='btn g' data-co='again'>Try again</button></div>";}
@@ -5480,15 +5786,15 @@ function coachDraw(){
     }else{
       var p=r.problems[CO.pi];
       h+=(p.topic?"<p class='note'>"+esc(p.topic)+"</p>":"")+"<div class='cq'>"+esc(p.question)+"</div><p class='note'>Is that what your page says? If not, take a clearer photo.</p>";
-      if(!p.sure||r.readable===false)h+="<p class='cwarn'>⚠️ I am not completely sure about this one. Double-check with a parent.</p>";
+      if(p.calcFixed)h+="<p class='cwarn'>⚠️ The coach said the answer is <b>"+esc(p.coachAnswer||"(no answer)")+"</b>, but the calculator gets <b>"+esc(p.answer)+"</b>. Answers are checked against "+esc(p.answer)+". The hints and steps may contain the same mistake, so work through them together.</p>";
+      else if(p.verified)h+="<p class='note'>✓ Answer double-checked with the calculator.</p>";
+      if(!p.calcFixed&&(!p.sure||r.readable===false))h+="<p class='cwarn'>⚠️ The coach isn't sure about this one, so answers won't be marked right or wrong. Work it out together and compare with the worked solution.</p>";
       for(var i=0;i<CO.hints&&i<p.hints.length;i++)h+="<div class='chint'><b>💡 Hint "+(i+1)+":</b> "+esc(p.hints[i])+"</div>";
       if(!CO.ok){
         h+="<label for='coans'><b>Your answer</b></label><input type='text' id='coans' inputmode='text' autocomplete='off' maxlength='80' placeholder='Type your answer'>";
         h+="<div class='crow'><button class='btn g' data-co='check'>✅ Check my answer</button>"+(CO.hints<p.hints.length?"<button class='btn' data-co='hint'>💡 Hint "+(CO.hints+1)+" of "+p.hints.length+"</button>":"")+"</div>";
       }
-      if(CO.verdict===true)h+="<p class='cok' role='status'>🎉 Yes! "+esc(CO.lastAns)+" is right. Great thinking!</p>";
-      else if(CO.verdict===false)h+="<p class='cno' role='status'>Not quite"+(CO.tries>1?" yet":"")+". "+(CO.hints<p.hints.length?"Try a hint, then try again.":"Look at the hints again, or see how to solve it.")+"</p>";
-      else if(CO.verdict==="?")h+="<p class='note' role='status'>I can’t check that kind of answer myself. Compare it with the worked solution, or ask a parent.</p>";
+      if(CO.verdict)h+=coachVerdictHtml(CO.verdict,CO.vnote,CO.lastAns,p);
       var canShow=CO.ok||CO.hints>0||CO.tries>0||devRole()==="parent";
       if(CO.show){
         h+="<h3>How to solve it</h3><ol class='csteps'>"+p.steps.map(function(s){return "<li>"+esc(s)+"</li>";}).join("")+"</ol>"+(p.answer?"<p><b>Answer:</b> "+esc(p.answer)+"</p>":"")+(p.checkTip?"<p class='note'>🔎 Check it: "+esc(p.checkTip)+"</p>":"");
@@ -5508,10 +5814,13 @@ function coachGo(){
   var k=person(CO.kid),g=(coachSet().grade||{})[CO.kid]||"";
   var body={task:"tutor",text:t,today:today()};if(g)body.grade=String(g).slice(0,20);if(CO.img)body.image=CO.img;
   CO.busy=true;CO.msg="";coachDraw();coachCount();
-  aiToken().then(function(tok){return fetch(coachBase()+"/ai",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+tok},body:JSON.stringify(body)});})
+  /* v38.7: a closed or restarted coach ignores late answers, and closing cancels the request where the browser allows */
+  var sid=CO.sid,ctl=(typeof AbortController==="function")?new AbortController():null;CO.ctl=ctl;
+  function live(){return sid===CO.sid&&!!document.getElementById("coach");}
+  aiToken().then(function(tok){if(!live())throw {stale:true};return fetch(coachBase()+"/ai",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+tok},body:JSON.stringify(body),signal:ctl?ctl.signal:undefined});})
   .then(function(r){return r.text().then(function(txt){if(!r.ok)throw new Error(aiErrText(r,txt));var j=JSON.parse(txt);return coachClean(j.result);});})
-  .then(function(res){CO.busy=false;CO.res=res;CO.pi=res.problems.length>1?-1:0;CO.hints=0;CO.tries=0;CO.show=false;CO.ok=false;CO.verdict=null;coachDraw();})
-  .catch(function(e){CO.busy=false;CO.msg=(e&&e.message)||"Something went wrong. Try again.";coachDraw();});
+  .then(function(res){if(!live())return;CO.ctl=null;CO.busy=false;CO.res=res;CO.pi=res.problems.length>1?-1:0;CO.hints=0;CO.tries=0;CO.show=false;CO.ok=false;CO.verdict=null;coachDraw();})
+  .catch(function(e){if(!live()||(e&&(e.stale||e.name==="AbortError")))return;CO.ctl=null;CO.busy=false;CO.msg=(e&&e.message)||"Something went wrong. Try again.";coachDraw();});
 }
 document.addEventListener("change",function(e){
   if(!e.target||e.target.id!=="copic"||!e.target.files||!e.target.files[0])return;
@@ -5533,9 +5842,9 @@ document.addEventListener("click",function(e){
   var p=CO.res&&CO.res.problems[CO.pi];if(!p)return;
   if(a==="hint"){if(CO.hints<p.hints.length)CO.hints++;CO.verdict=null;coachDraw();return;}
   if(a==="show"){CO.show=true;coachDraw();return;}
-  if(a==="check"){var v=((document.getElementById("coans")||{}).value||"").trim();if(!v)return;CO.tries++;CO.lastAns=v;var ok=coachCheck(p,v);
-    CO.verdict=ok===null?"?":ok;if(ok===true){CO.ok=true;try{hwCelebrate("🎉 You got it!");}catch(x){}}coachDraw();
-    if(ok!==true){var inp=document.getElementById("coans");if(inp){inp.value=v;}}return;}
+  if(a==="check"){var v=((document.getElementById("coans")||{}).value||"").trim();if(!v)return;CO.tries++;CO.lastAns=v;var ok=coachCheck(p,v)||{v:"cant"};
+    CO.verdict=ok.v;CO.vnote=ok.note||"";if(ok.v==="right"||ok.v==="rightunsure"){CO.ok=true;if(ok.v==="right"){try{hwCelebrate("🎉 You got it!");}catch(x){}}}coachDraw();
+    if(!CO.ok){var inp=document.getElementById("coans");if(inp){inp.value=v;}}return;}
 });
 /* Parent settings */
 function coachAdminHtml(){
