@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.22";
+var FH_BUILD="v38.23";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -3322,7 +3322,7 @@ function goal(){var g=S.goal;if(!g)return "<h1>Family goal</h1><div class='card'
 var pc=Math.min(100,Math.round(g.p/g.t*100)),done=g.p>=g.t;
 return "<h1>"+esc(g.e)+" "+esc(g.n)+"</h1><div class='card' style='text-align:center'><div class='big' style='min-height:0;padding:10px'>"+g.p+" <span style='font-size:26px'>of "+g.t+" ⭐</span></div>"+gbar()+"<p>"+(done?"🎉 Goal reached! Time to celebrate together.":(g.t-g.p)+" points to go · "+pc+"%")+"</p></div><div class='card'><b>Who helped</b>"+P.filter(function(p){return p.kid}).map(function(p){return "<div class='row'><span class='dot' style='background:"+p.c+"'></span><span class='t'>"+esc(p.n)+"</span><b>"+((g.by||{})[p.id]||0)+" ⭐</b></div>"}).join("")+"</div><p class='note'>Every point earned counts toward the goal, even if it is later spent in the rewards shop.</p>"}
 function goalSet(){var g=S.goal;return "<h2>Family goal</h2><div class='card'>"+(g?"<div class='row'><span class='t'>"+esc(g.e)+" "+esc(g.n)+" · "+g.p+" of "+g.t+" ⭐</span><button class='btn r' data-a='goalclr'>Clear</button></div>":"")+"<input id='gn' placeholder='Goal, for example Family movie night'><input id='gt' type='number' placeholder='Points needed' style='width:130px'><input id='ge' placeholder='Emoji' style='width:80px'><button class='btn' data-a='goalset'>"+(g?"Replace goal":"Set goal")+"</button></div>"}
-function chores(){var h="<h1>Chores and routines</h1><p class='sub'>Pick a person.</p>"+(devRole()==='parent'?"<p><button class='btn g' data-a='go' data-v='mgr' style='min-height:52px'>✏️ Manage chores</button></p>":'')+pcChoresCard()+"<div class='cards'>";P.forEach(function(p){var g=prog(p.id);h+="<div class='cd' data-a='who' data-p='"+p.id+"'><div class='ch' style='background:"+p.c+"'>"+esc(p.e)+" "+esc(p.n)+"<span>"+g[0]+"/"+g[1]+" approved"+(g[2]?" · "+g[2]+" waiting":"")+"</span></div><div class='cb'><div class='bar' style='background:#8aa0b455;height:14px'><i style='width:"+(g[1]?g[0]/g[1]*100:0)+"%;background:"+p.c+"'></i></div><p class='note'>"+(p.kid?"⭐ "+(S.stars[p.id]||0)+" points":"Tap to open")+(mysteryFoundText(p.id)?"<br>🎁 Bonus found: "+esc(mysteryFoundText(p.id)):"")+"</p></div></div>"});return h+"</div>"}
+function chores(){var h="<h1>Chores and routines</h1><p class='sub'>Pick a person.</p>"+(devRole()==='parent'?"<p><button class='btn g' data-a='go' data-v='mgr' style='min-height:52px'>✏️ Manage chores</button></p>":'')+pcChoresCard()+"<div class='cards'>";P.forEach(function(p){var g=prog(p.id);h+="<div class='cd' data-a='who' data-p='"+p.id+"'><div class='ch' style='background:"+p.c+"'>"+esc(p.e)+" "+esc(p.n)+"<span>"+g[0]+"/"+g[1]+(p.pet?" done":" approved")+(g[2]?" · "+g[2]+" waiting":"")+"</span></div><div class='cb'><div class='bar' style='background:#8aa0b455;height:14px'><i style='width:"+(g[1]?g[0]/g[1]*100:0)+"%;background:"+p.c+"'></i></div><p class='note'>"+(p.kid?"⭐ "+(S.stars[p.id]||0)+" points":"Tap to open")+(mysteryFoundText(p.id)?"<br>🎁 Bonus found: "+esc(mysteryFoundText(p.id)):"")+"</p></div></div>"});return h+"</div>"}
 /* v38.1 groceries: trash button + swipe left to delete, Undo, bought items move to "In the cart" */
 var gUndo=null;
 function grocRow(g,i){
@@ -4626,11 +4626,49 @@ function cosmeticAction(b){var id=b.getAttribute('data-p'),item=cosmeticItem(b.g
   S.stars[id]=bal-item.cost;entry.owned.push(item.id);pkey=id+'|'+item.id;sync.cosPending=sync.cosPending||{};sync.cosPending[pkey]=item.cost;}
  entry.equipped[item.type]=entry.equipped[item.type]===item.id?'':item.id;
  if(!save()){rollbackTo(snap);if(pkey&&sync.cosPending)delete sync.cosPending[pkey];render();return;}render();}
+/* ===== v38.23: pet pages follow Pet care (shifts) instead of the old hidden pet chores ===== */
+function pcForPet(id){
+  var m=person(id);if(!m||!m.pet)return null;var sm=pcSummary();if(!sm)return null;
+  var kinds=['bowser','christopher'].filter(function(k){return pcPetId(k)===id;});if(!kinds.length)return null;
+  var t=today(),list=sm.list.filter(function(it){return it.pet===id;}),done=0,open=[];
+  list.forEach(function(it){if((sm.ix[t+'|'+it.id]||[]).length)done++;else open.push(it);});
+  var opt=PC_DEFS.filter(function(x){return x[4]==='opt'&&kinds.indexOf(x[1])>=0;}).map(function(x){return pcMk(t,x[0]);}).filter(Boolean);
+  return {sm:sm,list:list,done:done,total:list.length,open:open,opt:opt,missed:pcMissed(sm.ix).filter(function(it){return it.pet===id;}),kind:kinds[0]};
+}
+(function(){var p0=prog;prog=function(id){var r=p0(id),pc=pcForPet(id);if(!pc)return r;
+  /* pet care jobs count as done as soon as someone records them; any leftover old chores still count too */
+  return [r[0]+r[2]+pc.done,r[1]+pc.total,0,(r[1]-r[0]-r[2])+(pc.total-pc.done)];};})();
+function petSchedule(p){
+  var evs=eventsAhead(today(),7).filter(function(e){return attendees(e).indexOf(p.id)>=0||e.driver===p.id;});
+  return '<section class="card"><h2>📅 Vet visits & plans</h2><p class="note">Next 7 days · Only plans that include '+esc(p.n)+'</p>'+(evs.length?evs.map(function(e){return '<div class="li"><b>'+esc(niceDate(e.d).split(',')[0])+(e.m?' · '+esc(niceTime(e.m)):'')+'</b> '+kindIcon(e.kind)+esc(e.t)+'</div>';}).join(''):'<p class="note">Nothing scheduled for '+esc(p.n)+'. Add '+esc(p.n)+' to a calendar event (like a vet visit) to see it here.</p>')+'</section>';
+}
+function petCareView(p){
+  var pc=pcForPet(p.id);if(!pc)return '';
+  var t=today(),ix=pc.sm.ix,pct=pc.total?Math.round(pc.done/pc.total*100):0,nx=pc.open[0];
+  var h='<section class="personal-hero" style="border-top-color:'+p.c+'"><div class="personal-avatar" style="border-color:'+p.c+'" aria-hidden="true">'+esc(p.e)+'</div><div class="personal-intro"><p class="personal-eyebrow">CARE & ROUTINES</p><h1>'+esc(p.n)+'’s care</h1><p>'+(pc.total&&pc.done>=pc.total?'All of '+esc(p.n)+'’s care is done today. Thank you! 🥰':'Everything to keep '+esc(p.n)+' happy and cared for. Tap ✓ Done when a job is finished.')+'</p></div><div class="personal-progress"><b>'+pc.done+' / '+pc.total+'</b><span>care jobs done today</span><div class="goal-track" role="progressbar" aria-label="Today’s care jobs done" aria-valuemin="0" aria-valuemax="'+Math.max(1,pc.total)+'" aria-valuenow="'+pc.done+'"><i style="width:'+pct+'%;background:'+p.c+'"></i></div></div></section>';
+  var who;
+  if(pc.kind==='bowser')who='<b>☀️ '+esc(pcWhoName(pcKidFor(t,'am','')))+' · 🌙 '+esc(pcWhoName(pcKidFor(t,'pm','')))+'</b><span>Morning · evening shift this week</span>';
+  else who='<b>'+esc(pcWhoName(pcCfg().chOwner))+'</b><span>Looks after '+esc(p.n)+'</span>';
+  h+='<div class="personal-stats"><div><b>'+pc.open.length+'</b><span>Still to do today'+(pc.missed.length?' · ⚠️ '+pc.missed.length+' missed earlier':'')+'</span></div><div>'+who+'</div><div><b>'+(nx?esc(nx.e)+' '+esc(pcWhoName(nx.kid)):'✓')+'</b><span>'+(nx?'Next: '+esc(nx.label):'Nothing left today')+'</span></div></div>';
+  var main='';
+  if(pc.missed.length)main+="<div class='card pc-warn'><h2>⚠️ Still needs doing ("+pc.missed.length+")</h2>"+pc.missed.map(function(it){return pcRowHtml(it.d,it,ix,'missed');}).join('')+"</div>";
+  main+="<h2 id='my-tasks'>Today’s care</h2><div class='card'>";
+  if(pc.kind==='bowser'){
+    [['am','☀️ Morning shift'],['pm','🌙 Evening shift']].forEach(function(g){var l=pc.list.filter(function(it){return it.slot===g[0];});if(!l.length)return;main+="<div class='pc-slot'>"+g[1]+" · "+esc(pcWhoName(pcKidFor(t,g[0],'')))+"</div>"+l.map(function(it){return pcRowHtml(t,it,ix,'today');}).join('');});
+  }else main+=pc.list.map(function(it){return pcRowHtml(t,it,ix,'today');}).join('');
+  main+=pc.opt.map(function(it){return pcRowHtml(t,it,ix,'today');}).join('');
+  if(pc.kind==='christopher'){var ti=pcTankInfo(ix);if(!(ti&&(ti.due||(ix[t+'|ctank']||[]).length)))main+="<p class='note'>"+(ti?'Next tank cleaning: '+esc(niceDate(ti.next))+'.':'Tank cleaning is not scheduled yet. A parent can set it on the Pet care page.')+"</p>";}
+  main+="<p><button class='btn n' style='min-height:52px' data-a='go' data-v='pets'>🐾 Open the full Pet care page</button></p></div>";
+  if(dueTasks(p.id,t).length)main+=personalTasks(p).replace("<h2 id='my-tasks'>Care checklist</h2>","<h2>Other care</h2>");
+  var aside=(showSec(p.id,'schedule')?petSchedule(p):'')+(showSec(p.id,'reminders')?personalReminders(p):'');
+  return h+'<div class="personal-layout"><div class="personal-main">'+main+'</div><aside class="personal-aside">'+aside+'</aside></div>';
+}
 function pers(){
   var p=person(pid);if(!p||p.archived)return '<h1>Member unavailable</h1><button class="btn" data-a="go" data-v="home">Family Home</button>';
   var g=prog(pid),pct=g[1]?Math.round(g[0]/g[1]*100):0,left=g[1]-g[0]-g[2],up=personalEvents(pid,2),next=up.filter(function(e){var n=new Date(),time=p2(n.getHours())+':'+p2(n.getMinutes());return e.d>today()||!e.m||(e.end||e.m)>=time;})[0];
   var h='<div class="personal-switch"><button class="btn n" data-a="go" data-v="home">← Family Home</button><button class="btn n" data-a="nxcustopen" aria-expanded="'+(custOpen?'true':'false')+'">⚙ Customize</button>'+P.map(function(x){return '<button class="member-chip'+(x.id===pid?' selected':'')+'" data-a="who" data-p="'+x.id+'" aria-pressed="'+(x.id===pid?'true':'false')+'" style="border-color:'+x.c+'">'+esc(x.e)+' '+esc(x.n)+'</button>';}).join('')+'</div>';
   if(custOpen)h+=custHtml(p);
+  if(p.pet){var pv=petCareView(p);if(pv){var LP=lookOf(pid);return '<div class="personal-page layout-'+LP.layout+' bg-'+LP.bg+'">'+h+pv+'</div>';}}
   h+='<section class="personal-hero '+cosmeticClass(pid,'glow')+'" style="border-top-color:'+p.c+'"><div class="personal-avatar '+cosmeticClass(pid,'border')+'" style="border-color:'+p.c+'" aria-hidden="true">'+esc(p.e)+'</div><div class="personal-intro"><p class="personal-eyebrow">'+(p.pet?'CARE & ROUTINES':p.kid?'MY SPACE':'MY DAY')+'</p><h1>'+esc(p.n)+(p.pet?'’s care':'’s day')+'</h1><p>'+ (p.pet?'Everything to keep '+esc(p.n)+' happy and cared for.':p.kid?'Your plans, your progress, your next adventure.':'Your schedule and the things that need your attention.')+'</p></div><div class="personal-progress"><b>'+(p.kid?g[0]+g[2]:g[0])+' / '+g[1]+'</b><span>'+ (p.kid?'done'+(g[2]?' · '+g[2]+' waiting for a parent':(g[1]&&g[0]===g[1]?' · all approved 🎉':'')):'tasks done')+'</span><div class="goal-track" role="progressbar" aria-label="Today’s completed tasks" aria-valuemin="0" aria-valuemax="'+Math.max(1,g[1])+'" aria-valuenow="'+(p.kid?g[0]+g[2]:g[0])+'"><i style="width:'+pct+'%;background:'+p.c+'"></i>'+(p.kid&&g[2]&&g[1]?'<i class="wait" style="width:'+Math.round(g[2]/g[1]*100)+'%;background:'+p.c+'"></i>':'')+'</div></div></section>';
   var exH=personExtras(p),kidH='',wxH=showSec(pid,'weather')?wxHtml():'',stH='';
   if(showSec(pid,'stats'))stH='<div class="personal-stats"><div><b>'+left+'</b><span>Still to do</span></div><div><b>'+ (p.kid?g[2]:up.length)+'</b><span>'+(p.kid?'Awaiting approval':'Plans today & tomorrow')+'</span></div><div><b>'+ (p.kid?'⭐ '+(S.stars[pid]||0):next?niceTime(next.m):'—')+'</b><span>'+(p.kid?'My points':next?'Next: '+esc(next.t):'No upcoming plans')+'</span></div></div>';
