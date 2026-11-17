@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.7";
+var FH_BUILD="v38.8";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -5599,7 +5599,7 @@ function cqSame(a,b){return Math.abs(a-b)<=1e-9*Math.max(1,Math.abs(a),Math.abs(
 function cqUnitLabel(u){return u?u[2]:"";}
 /* Compare a child's answer with the expected one.
    Returns {v:"right"|"wrong"|"unit"|"simplify"|"close"|"cant", note} */
-function coachCompare(expRaw,expNum,ansRaw){
+function coachCompareNum(expRaw,expNum,ansRaw){
   var a=cqParse(ansRaw);if(!a)return {v:"cant"};
   var e=expRaw?cqParse(expRaw):null;
   if(typeof expNum==="number"&&isFinite(expNum)){
@@ -5694,7 +5694,7 @@ function coachCalc(q){
   try{var out=add();if(peek()!==undefined)return null;return isFinite(out)?out:null;}catch(e){return null;}
 }
 /* attach the calculator's check to a cleaned problem */
-function coachVerify(p){
+function coachVerifyNum(p){
   var calc=coachCalc(p.question);if(calc===null)return p;
   var e=p.answer?cqParse(p.answer):null,money=e&&e.kind==="num"&&e.unit&&e.unit[0]==="money"&&e.unit[1]===1;
   var ev=(e&&e.kind==="num"&&(!e.unit||money))?e.val:((typeof p.answerNum==="number"&&isFinite(p.answerNum))?p.answerNum:null);
@@ -5704,9 +5704,470 @@ function coachVerify(p){
   return p;
 }
 
+/* ===== v38.8: algebra checking for the Homework coach =====
+   Understands variables (2x + 3, 3xy), powers (x^2, x²), square roots (√, sqrt), π, ±,
+   equations (y = 2x + 3, 2x + 3y = 6), inequalities (x > 3, 1 < x ≤ 5), points (2, 3)
+   and several answers (x = 2 or x = -3, x = 1 ± √2).
+   Two expressions are compared by trying many numbers for the letters.
+   It also re-checks the coach's own answer: it plugs solutions back into the equation,
+   solves linear and quadratic equations and 2-by-2 linear systems itself, and checks
+   simplify / expand / factor answers against the original expression. */
+var CQA_FNS={sqrt:Math.sqrt,cbrt:function(x){return Math.cbrt?Math.cbrt(x):(x<0?-Math.pow(-x,1/3):Math.pow(x,1/3));},abs:Math.abs,sin:Math.sin,cos:Math.cos,tan:Math.tan,ln:Math.log,log:function(x){return Math.log(x)/Math.LN10;},exp:Math.exp};
+var CQA_SUP={"⁰":"0","¹":"1","²":"2","³":"3","⁴":"4","⁵":"5","⁶":"6","⁷":"7","⁸":"8","⁹":"9","⁻":"-"};
+function cqaNorm(raw){
+  var s=cqPrep(raw).toLowerCase();
+  s=s.replace(/^(the\s+)?answers?\s*(is|are|:)\s*/,"").replace(/[.!]+$/,"").trim();
+  s=s.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁻]+/g,function(m){return "^("+m.split("").map(function(c){return CQA_SUP[c];}).join("")+")";});
+  s=s.replace(/\*\*/g,"^").replace(/[·•⋅∙]/g,"*").replace(/[\[{]/g,"(").replace(/[\]}]/g,")");
+  s=s.replace(/\+\s*\/\s*-|\+-/g,"±");
+  s=s.replace(/<=|=<|≦|⩽/g,"≤").replace(/>=|=>|≧|⩾/g,"≥").replace(/!=|=\/=|<>/g,"≠");
+  s=s.replace(/square\s+root\s+of\s*/g,"√");
+  return s.replace(/\s+/g," ").trim();
+}
+/* split at top level (outside brackets) where re (anchored with ^) matches */
+function cqaSplitTop(s,re){
+  var parts=[],d=0,last=0;
+  for(var i=0;i<s.length;i++){
+    var c=s[i];
+    if(c==="(")d++;else if(c===")")d--;
+    else if(d===0){
+      if(c===","&&i>0&&/\d/.test(s[i-1])&&/^\d{3}(\D|$)/.test(s.slice(i+1)))continue;
+      var m=re.exec(s.slice(i));if(m&&m[0].length){parts.push(s.slice(last,i));i+=m[0].length-1;last=i+1;}
+    }
+  }
+  parts.push(s.slice(last));
+  return parts.map(function(x){return x.trim();}).filter(function(x){return x!=="";});
+}
+function cqaLex(s){
+  var t=[],i=0,m;
+  while(i<s.length){
+    var c=s[i];
+    if(c===" "){i++;continue;}
+    if((m=/^\d*\.?\d+/.exec(s.slice(i)))){t.push({k:"n",v:+m[0]});i+=m[0].length;continue;}
+    if((m=/^[a-z]+/.exec(s.slice(i)))){
+      var w=m[0],st=i;i+=w.length;
+      var spaced=(st===0||s[st-1]===" ")&&(i>=s.length||s[i]===" ");
+      var parts=[],j=0;
+      while(j<w.length){
+        var f=null;for(var fn in CQA_FNS)if(w.substr(j,fn.length)===fn&&(!f||fn.length>f.length))f=fn;
+        if(f){parts.push({k:"f",v:f});j+=f.length;continue;}
+        if(w.substr(j,2)==="pi"){parts.push({k:"c",v:Math.PI});j+=2;continue;}
+        parts.push({k:"v",v:w[j]});j++;
+      }
+      var nv=parts.filter(function(p){return p.k==="v";}).length;
+      if(nv>3)return null;
+      if(nv>1&&nv===parts.length&&(spaced||CQ_UNITS[w]))return null; /* a word such as "men" or a unit such as "cm" */
+      t=t.concat(parts);continue;
+    }
+    if(c==="√"){t.push({k:"f",v:"sqrt"});i++;continue;}
+    if(c==="∛"){t.push({k:"f",v:"cbrt"});i++;continue;}
+    if(c==="π"){t.push({k:"c",v:Math.PI});i++;continue;}
+    if("+-*/^()|".indexOf(c)>=0){t.push({k:c});i++;continue;}
+    return null;
+  }
+  return t;
+}
+function cqaExpr(str){
+  var tk=cqaLex(str);if(!tk||!tk.length)return null;
+  var i=0;
+  function pk(){return tk[i];}
+  function starts(t){return t&&(t.k==="v"||t.k==="c"||t.k==="f"||t.k==="(");}
+  function expr(){var l=term();for(;;){var t=pk();if(t&&(t.k==="+"||t.k==="-")){i++;l={o:t.k,l:l,r:term()};}else return l;}}
+  function term(){var l=unary();for(;;){var t=pk();
+    if(t&&(t.k==="*"||t.k==="/")){i++;l={o:t.k,l:l,r:unary()};}
+    else if(starts(t)){l={o:"*",l:l,r:pw(),imp:1};}
+    else return l;}}
+  function unary(){var t=pk();if(t&&t.k==="-"){i++;return {o:"neg",a:unary()};}if(t&&t.k==="+"){i++;return unary();}return pw();}
+  function pw(){var b=atom();var t=pk();if(t&&t.k==="^"){i++;return {o:"^",l:b,r:unary()};}return b;}
+  function atom(){var t=pk();if(!t)throw 0;i++;
+    if(t.k==="n")return {o:"n",v:t.v};
+    if(t.k==="v")return {o:"v",n:t.v};
+    if(t.k==="c")return {o:"n",v:t.v,pi:1};
+    if(t.k==="("){var e=expr();if(!pk()||pk().k!==")")throw 0;i++;return {o:"p",a:e};}
+    if(t.k==="|"){var e2=expr();if(!pk()||pk().k!=="|")throw 0;i++;return {o:"f",f:"abs",a:e2};}
+    if(t.k==="f")return {o:"f",f:t.v,a:atom()};
+    throw 0;}
+  try{var e=expr();if(i!==tk.length)return null;return e;}catch(x){return null;}
+}
+function cqaEval(n,env){
+  switch(n.o){
+    case "n":return n.v;
+    case "v":return env[n.n];
+    case "p":return cqaEval(n.a,env);
+    case "neg":return -cqaEval(n.a,env);
+    case "+":return cqaEval(n.l,env)+cqaEval(n.r,env);
+    case "-":return cqaEval(n.l,env)-cqaEval(n.r,env);
+    case "*":return cqaEval(n.l,env)*cqaEval(n.r,env);
+    case "/":return cqaEval(n.l,env)/cqaEval(n.r,env);
+    case "^":return Math.pow(cqaEval(n.l,env),cqaEval(n.r,env));
+    case "f":return CQA_FNS[n.f](cqaEval(n.a,env));
+  }
+  return NaN;
+}
+function cqaVars(n,o){o=o||{};if(!n)return o;if(n.o==="v")o[n.n]=1;["a","l","r"].forEach(function(k){if(n[k])cqaVars(n[k],o);});return o;}
+function cqaHasVar(n){return Object.keys(cqaVars(n)).length>0;}
+function cqaVarList(list){var o={};list.forEach(function(n){cqaVars(n,o);});return Object.keys(o).sort();}
+function cqaClose(x,y){return Math.abs(x-y)<=1e-7*Math.max(1,Math.abs(x),Math.abs(y));}
+/* one answer item: expression, "name = expression", equation, inequality chain, point, or ± pair */
+function cqaItem(s){
+  s=s.trim();if(!s)return null;
+  s=s.replace(/^([a-z])\s*\(\s*[a-z]\s*\)\s*=/,"$1 =");
+  if(s.indexOf("±")>=0){
+    var a=cqaItem(s.replace("±","+")),b=cqaItem(s.replace("±","-"));
+    if(!a||!b)return null;
+    var it=[].concat(a.t==="set"?a.items:[a],b.t==="set"?b.items:[b]);
+    if(!it.every(function(x){return x.t==="ex";}))return null;
+    return {t:"set",items:it};
+  }
+  if(s[0]==="("&&s[s.length-1]===")"){
+    var d=0,wraps=true;for(var i=0;i<s.length-1;i++){if(s[i]==="(")d++;else if(s[i]===")")d--;if(d===0){wraps=false;break;}}
+    if(wraps){var comps=cqaSplitTop(s.slice(1,-1),/^\s*,\s*/);
+      if(comps.length>1){var cs=comps.map(cqaExpr);if(cs.every(Boolean))return {t:"pt",comps:cs};return null;}}
+  }
+  var xs=[],ops=[],d2=0,last=0;
+  for(var k=0;k<s.length;k++){var c=s[k];if(c==="(")d2++;else if(c===")")d2--;else if(d2===0&&"=<>≤≥≠".indexOf(c)>=0){xs.push(s.slice(last,k));ops.push(c);last=k+1;}}
+  xs.push(s.slice(last));
+  var es=xs.map(function(x){return cqaExpr(x.trim());});
+  if(!es.every(Boolean))return null;
+  if(!ops.length)return {t:"ex",a:es[0]};
+  if(ops.indexOf("≠")>=0)return null;
+  if(ops.length===1&&ops[0]==="="){
+    var L=es[0],R=es[1];
+    if(L.o==="v"&&!cqaVars(R)[L.n])return {t:"ex",a:R,name:L.n};
+    if(R.o==="v"&&!cqaVars(L)[R.n])return {t:"ex",a:L,name:R.n};
+    return {t:"eq",l:L,r:R};
+  }
+  if(ops.indexOf("=")>=0)return null;
+  return {t:"in",xs:es,ops:ops};
+}
+function cqaParse(raw){
+  var s=cqaNorm(raw);if(!s)return null;
+  var parts=cqaSplitTop(s,/^(\s*[,;]\s*|\s+or\s+|\s+and\s+)/);
+  if(parts.length>1){
+    var items=[];
+    for(var i=0;i<parts.length;i++){var it=cqaItem(parts[i]);if(!it)return null;
+      if(it.t==="set")items=items.concat(it.items);else if(it.t==="ex")items.push(it);else return null;}
+    return {t:"set",items:items};
+  }
+  return cqaItem(s);
+}
+/* does this look like algebra (rather than a plain number, unit or word answer)? */
+function cqaLooks(raw){
+  var s=cqaNorm(raw);if(!s)return false;
+  if(/[√∛π±≤≥<>≠^|]/.test(s)||/sqrt|\bpi\b/.test(s))return true;
+  if(/^\(.*,.*\)$/.test(s))return true;
+  var s2=s.replace(/^[a-z]\s*=\s*/,"");
+  if(/=/.test(s2)&&/[a-z]/.test(s2))return true;
+  var names=s.match(/(^|[,;]|\bor\b|\band\b)\s*[a-z]\s*=/g)||[];
+  var nm={};names.forEach(function(x){nm[x.replace(/[^a-z=]|or|and/g,"").replace("=","")]=1;});
+  if(Object.keys(nm).length>1)return true;
+  var p=cqParse(raw);if(p&&p.kind==="num"&&p.unit&&!p.noun)return false;
+  var re=/[a-z]+/g,m;
+  while((m=re.exec(s2))){
+    var w=m[0];if(CQA_FNS[w])return true;
+    var b=s2[m.index-1],a=s2[m.index+w.length];
+    var tight=(b!==undefined&&/[\d+\-*/^()]/.test(b))||(a!==undefined&&/[\d+\-*/^()]/.test(a));
+    if(w.length===1&&(tight||s2===w))return true;
+    if(w.length<=3&&tight)return true;
+  }
+  return false;
+}
+function cqaStrip(n){while(n&&n.o==="p")n=n.a;return n;}
+function cqaTerms(n){n=cqaStrip(n);if(n.o==="+"||n.o==="-")return cqaTerms(n.l)+cqaTerms(n.r);return 1;}
+function cqaIsProd(n){n=cqaStrip(n);if(n.o==="neg")return cqaIsProd(n.a);
+  if(n.o==="*")return true;if(n.o==="^")return cqaHasVar(n.l)&&cqaTerms(n.l)>1;return false;}
+function cqaVF(n){ /* number of factors that are sums with letters, e.g. (x+2)(x+3) -> 2 */
+  n=cqaStrip(n);if(n.o==="neg")return cqaVF(n.a);
+  if(n.o==="*")return cqaVF(n.l)+cqaVF(n.r);
+  if(n.o==="^"&&n.r.o==="n"&&n.r.v===Math.round(n.r.v)&&n.r.v>0&&n.r.v<10)return (cqaHasVar(n.l)&&cqaTerms(n.l)>1)?n.r.v:0;
+  return (cqaHasVar(n)&&cqaTerms(n)>1)?1:0;
+}
+function cqaVFTop(n){n=cqaStrip(n);if(n.o==="neg")return cqaVFTop(n.a);return (n.o==="*"||n.o==="^")?cqaVF(n):0;}
+function cqaProdOfSum(n){ /* a bracket that still needs multiplying out */
+  if(!n)return false;
+  if(n.o==="*"){var l=cqaStrip(n.l),r=cqaStrip(n.r);if((cqaTerms(l)>1&&cqaHasVar(n))||(cqaTerms(r)>1&&cqaHasVar(n)))return true;}
+  if(n.o==="^"&&cqaTerms(n.l)>1&&cqaHasVar(n.l))return true;
+  if(n.o==="neg"&&cqaTerms(n.a)>1)return true;
+  if(n.o==="-"&&cqaStrip(n.r).o!==n.r.o&&cqaTerms(n.r)>1)return true;
+  return ["a","l","r"].some(function(k){return n[k]&&cqaProdOfSum(n[k]);});
+}
+function cqaRand(t){var r=Math.random();return (t%2)?(-4+8*r):(0.3+9*r);}
+/* true / false / null (could not tell) */
+function cqaEquiv(a,b){
+  var vs=cqaVarList([a,b]),good=0;
+  for(var t=1;t<=80&&good<10;t++){
+    var env={};vs.forEach(function(v){env[v]=cqaRand(t);});
+    var x=cqaEval(a,env),y=cqaEval(b,env);
+    if(!isFinite(x)||!isFinite(y))continue;
+    if(!cqaClose(x,y))return false;good++;
+    if(!vs.length)break;
+  }
+  return good>=(vs.length?5:1)?true:null;
+}
+function cqaG(X){return X.t==="eq"?{o:"-",l:X.l,r:{o:"p",a:X.r}}:{o:"-",l:{o:"v",n:X.name},r:{o:"p",a:X.a}};}
+function cqaPropEq(g1,g2){
+  var vs=cqaVarList([g1,g2]),r=null,good=0;
+  for(var t=1;t<=80&&good<10;t++){
+    var env={};vs.forEach(function(v){env[v]=cqaRand(t);});
+    var x=cqaEval(g1,env),y=cqaEval(g2,env);
+    if(!isFinite(x)||!isFinite(y))continue;
+    var zx=Math.abs(x)<1e-9,zy=Math.abs(y)<1e-9;
+    if(zx&&zy)continue;if(zx!==zy)return false;
+    var q=x/y;if(r===null)r=q;else if(!cqaClose(q,r))return false;good++;
+  }
+  return good>=5?true:null;
+}
+function cqaTruth(it,env){
+  for(var k=0;k<it.ops.length;k++){
+    var a=cqaEval(it.xs[k],env),b=cqaEval(it.xs[k+1],env);if(!isFinite(a)||!isFinite(b))return null;
+    var op=it.ops[k],ok;
+    if(Math.abs(a-b)<1e-9*Math.max(1,Math.abs(a)))ok=(op==="≤"||op==="≥");
+    else ok=op==="<"?a<b:op===">"?a>b:op==="≤"?a<=b:a>=b;
+    if(!ok)return false;
+  }
+  return true;
+}
+function cqaOnEdge(it,env){for(var k=0;k<it.ops.length;k++){var a=cqaEval(it.xs[k],env),b=cqaEval(it.xs[k+1],env);if(Math.abs(a-b)<1e-9*Math.max(1,Math.abs(a)))return true;}return false;}
+function cqaIneqCompare(E,A){
+  var vs=cqaVarList(E.xs.concat(A.xs));if(!vs.length)return {v:"cant"};
+  var envs=[];
+  if(vs.length===1){for(var x=-40;x<=40;x+=0.25){var o={};o[vs[0]]=x;envs.push(o);}for(var r=0;r<60;r++){var o2={};o2[vs[0]]=(Math.random()-0.5)*200;envs.push(o2);}}
+  else for(var j=0;j<600;j++){var o3={};vs.forEach(function(v){o3[v]=Math.round(Math.random()*80-40)/4;});envs.push(o3);}
+  var n=0,mis=0,edgeOnly=true;
+  envs.forEach(function(env){var te=cqaTruth(E,env),ta=cqaTruth(A,env);if(te===null||ta===null)return;n++;
+    if(te!==ta){mis++;if(!cqaOnEdge(E,env)&&!cqaOnEdge(A,env))edgeOnly=false;}});
+  if(n<10)return {v:"cant"};
+  if(!mis)return {v:"right"};
+  if(edgeOnly)return {v:"close",note:"Check the end point: should it be < or ≤ (> or ≥)?"};
+  return {v:"wrong"};
+}
+function cqaRadSq(s){var re=/(?:√|sqrt)\s*\(?\s*(\d+)/g,m;while((m=re.exec(s))){var n=+m[1];for(var k=2;k*k<=n;k++)if(n%(k*k)===0)return true;}return false;}
+function cqaRadDen(s){return /\/\s*\(?\s*\d*\s*(√|sqrt)/.test(s);}
+function cqaConstCompare(eVal,aVal,expRaw,ansRaw){
+  var es=cqaNorm(expRaw),as=cqaNorm(ansRaw);
+  if(cqSame(eVal,aVal)||cqaClose(eVal,aVal)){
+    if(cqaRadSq(as)&&!cqaRadSq(es))return {v:"simplify",note:"That's equal, but the square root can be simplified (like √8 = 2√2)."};
+    if(cqaRadDen(as)&&!cqaRadDen(es))return {v:"simplify",note:"That's equal, but usually the square root is moved out of the bottom of the fraction."};
+    return {v:"right"};
+  }
+  var n=cqNumPrefix(as);
+  if(n&&n.len===as.length&&typeof n.dec==="number")return cqNear(aVal,eVal,{dec:n.dec});
+  return {v:"wrong"};
+}
+function cqaItems(X){if(!X)return null;if(X.t==="set")return X.items;if(X.t==="ex")return [X];return null;}
+function cqaSetCompare(E,A,expRaw,ansRaw){
+  function vals(items){return items.map(function(it){return {n:it.name||"",v:cqaHasVar(it.a)?NaN:cqaEval(it.a,{})};});}
+  if(E.t==="pt"||A.t==="pt"){
+    function ptVals(X){
+      if(X.t==="pt")return X.comps.map(function(c){return cqaHasVar(c)?NaN:cqaEval(c,{});});
+      var its=cqaItems(X);if(!its)return null;var vv=vals(its);
+      if(!vv.every(function(x){return x.n;}))return null;
+      return vv.sort(function(a,b){return a.n<b.n?-1:1;}).map(function(x){return x.v;});}
+    var ep=ptVals(E),ap=ptVals(A);
+    if(!ep||!ap||ep.some(isNaN)||ap.some(isNaN))return {v:"cant"};
+    if(ep.length!==ap.length)return {v:"wrong"};
+    if(ep.every(function(x,i){return cqaClose(x,ap[i]);}))return {v:"right"};
+    if(ep.length===2&&cqaClose(ep[0],ap[1])&&cqaClose(ep[1],ap[0]))return {v:"close",note:"Check the order: x comes first, then y."};
+    return {v:"wrong"};
+  }
+  var ei=cqaItems(E),ai=cqaItems(A);if(!ei||!ai)return {v:"cant"};
+  var ev=vals(ei),av=vals(ai);
+  if(ev.some(function(x){return isNaN(x.v);})||av.some(function(x){return isNaN(x.v);}))return null;
+  if(ev.length===1&&av.length===1)return cqaConstCompare(ev[0].v,av[0].v,expRaw,ansRaw);
+  function named(v){var o={};return v.every(function(x){if(!x.n||o[x.n])return false;o[x.n]=1;return true;});}
+  if(ev.length>1&&named(ev)&&named(av)){
+    if(ev.length!==av.length)return {v:"wrong",note:"There should be "+ev.length+" answers."};
+    var am={};av.forEach(function(x){am[x.n]=x.v;});
+    if(ev.every(function(x){return am[x.n]!==undefined&&cqaClose(x.v,am[x.n]);}))return {v:"right"};
+    return {v:"wrong"};
+  }
+  /* list of values, any order; repeated roots count once */
+  function uniq(v){var o=[];v.forEach(function(x){if(!o.some(function(y){return cqaClose(x.v,y);}))o.push(x.v);});return o.sort(function(a,b){return a-b;});}
+  var eu=uniq(ev),au=uniq(av);
+  if(au.length<eu.length&&au.every(function(x){return eu.some(function(y){return cqaClose(x,y);});}))return {v:"close",note:"There should be "+eu.length+" answers."};
+  if(au.length!==eu.length)return {v:"wrong"};
+  return {v:eu.every(function(x,i){return cqaClose(x,au[i]);})?"right":"wrong"};
+}
+function cqaForm(q,E,A,expRaw,ansRaw){
+  q=String(q||"").toLowerCase();var e=E.a,a=A.a;
+  if(/\bfactori?[sz]?e?\b|\bfactor\b/.test(q)&&!/\bfactor\s+of\b|\bscale factor\b/.test(q)){
+    if(!cqaIsProd(a))return {v:"simplify",note:"That's equal, but the question asks you to factor it."};
+    if(cqaVFTop(a)<cqaVFTop(e))return {v:"simplify",note:"Good start! It can be factored more."};
+    return {v:"right"};
+  }
+  if(/\b(expand|multiply out|distribute|foil)\b|^multiply\b/.test(q)){
+    if(cqaProdOfSum(a)&&!cqaProdOfSum(e))return {v:"simplify",note:"That's equal, but the question asks you to multiply it out (expand) fully."};
+    return {v:"right"};
+  }
+  var simp=/\b(simplify|combine|collect)\b/.test(q);
+  if(!cqaVFTop(e)&&!cqaVFTop(a)&&cqaTerms(a)>cqaTerms(e))return {v:"simplify",note:"That's equal, but it can be simplified more (combine like terms)."};
+  if(simp&&cqaProdOfSum(a)&&!cqaProdOfSum(e)&&!cqaIsProd(e))return {v:"simplify",note:"That's equal, but it can be simplified more."};
+  return {v:"right"};
+}
+/* compare the child's answer with the expected one; null = not algebra, use the number checker */
+function cqAlgCompare(expRaw,ansRaw,q){
+  if(!expRaw||!String(ansRaw||"").trim())return null;
+  var el=cqaLooks(expRaw),al=cqaLooks(ansRaw);
+  if(!el&&!al)return null;
+  var E=cqaParse(expRaw),A=cqaParse(ansRaw);
+  if(!E||!A)return al?{v:"cant"}:null;
+  if(E.t==="in"||A.t==="in"){
+    if(E.t==="in"&&A.t==="in")return cqaIneqCompare(E,A);
+    if(E.t==="in")return {v:"wrong",note:"The answer should be an inequality (using <, >, ≤ or ≥)."};
+    return {v:"wrong"};
+  }
+  if(E.t==="pt"||A.t==="pt"||E.t==="set"||A.t==="set")return cqaSetCompare(E,A,expRaw,ansRaw)||{v:"cant"};
+  var Eeq=E.t==="eq"||(E.t==="ex"&&E.name&&cqaHasVar(E.a)),Aeq=A.t==="eq"||(A.t==="ex"&&A.name&&cqaHasVar(A.a));
+  if(E.t==="eq"||A.t==="eq"){
+    if(!(Eeq&&Aeq))return {v:E.t==="eq"?"wrong":"cant",note:E.t==="eq"?"The answer should be an equation (with an = sign).":""};
+    var pr=cqaPropEq(cqaG(E),cqaG(A));
+    return pr===null?{v:"cant"}:{v:pr?"right":"wrong"};
+  }
+  /* both are expressions (maybe "y = ...") */
+  var ec=!cqaHasVar(E.a),ac=!cqaHasVar(A.a);
+  if(ec&&ac){var ev=cqaEval(E.a,{}),av=cqaEval(A.a,{});if(!isFinite(ev)||!isFinite(av))return {v:"cant"};return cqaConstCompare(ev,av,expRaw,ansRaw);}
+  var eq=cqaEquiv(E.a,A.a);
+  if(eq===null)return {v:"cant"};
+  if(!eq)return {v:"wrong"};
+  return cqaForm(q,E,A,expRaw,ansRaw);
+}
+/* ---- checking the coach's own answer ---- */
+function cqaNice(v){return isFinite(v)&&(cqSame(v,Math.round(v))||/^-?\d+\/\d+/.test(cqFmt(v)));}
+function cqaFmt(v){return cqFmt(v).replace(/ \(.*\)$/,"");}
+function cqaFix(p,ans,num){p.coachAnswer=p.answer||"";p.answer=ans;p.answerNum=(typeof num==="number"&&isFinite(num))?num:null;p.calcFixed=true;p.sure=true;return p;}
+function cqaDoubt(p,why){p.algDoubt=why;p.sure=false;return p;}
+function cqaOk(p){p.verified=true;p.algVerified=true;return p;}
+function cqaSegments(q){
+  var s=cqaNorm(q).replace(/\?+/g," ").replace(/\s+/g," ").trim();
+  var lead=/^(solve|find|for|the|value|values|of|what|is|are|calculate|evaluate|simplify|expand|factor|factorise|factorize|multiply|work|out|equation|equations|system|each|let|given|if)\b\s*[:.,]?\s*/;
+  return cqaSplitTop(s,/^(\s*;\s*|\s*,\s+|\s+and\s+|\.\s+)/).map(function(x){
+    for(var k=0;k<12;k++){var y=x.replace(lead,"").replace(/^[a-z]\s*[:]\s*/,"");if(y===x)break;x=y;}
+    return x.replace(/\s+for\s+[a-z](\s*(,|and)\s*[a-z])?\s*$/,"").replace(/[.:]+$/,"").trim();
+  }).filter(Boolean);
+}
+function cqaAnsVals(p,vname){
+  var A=cqaParse(p.answer||"");var its=cqaItems(A);if(!its)return null;
+  var out=[];for(var i=0;i<its.length;i++){var it=its[i];if(cqaHasVar(it.a))return null;if(it.name&&vname&&it.name!==vname)return null;out.push(cqaEval(it.a,{}));}
+  return out.every(isFinite)?out:null;
+}
+function cqaSat(eq,env){var l=cqaEval(eq.l,env),r=cqaEval(eq.r,env);return isFinite(l)&&isFinite(r)&&Math.abs(l-r)<=1e-7*Math.max(1,Math.abs(l),Math.abs(r));}
+function coachAlgVerify(p){
+  var q=p.question||"";if(!q||!p.answer)return p;
+  var low=cqaNorm(q).replace(/\?+\s*$/,"").trim();
+  /* 1. evaluate an expression for given values: "evaluate 3x + 2 when x = 4" */
+  var m=/^(?:evaluate|find(?: the value of)?|what is|calculate|work out|simplify)?\s*:?\s*(.+?)\s*,?\s+(?:when|if|for|where|given(?: that)?)\s+(.+)$/.exec(low);
+  if(m){
+    var X=cqaParse(m[1]),S=cqaParse(m[2]),env={},ok=X&&X.t==="ex"&&!!S;
+    var its=ok?cqaItems(S):null;
+    if(its&&its.every(function(it){return it.name&&!cqaHasVar(it.a);})){
+      its.forEach(function(it){env[it.name]=cqaEval(it.a,{});});
+      var need=Object.keys(cqaVars(X.a));
+      if(need.length&&need.every(function(v){return env[v]!==undefined;})){
+        var val=cqaEval(X.a,env);if(!isFinite(val))return p;
+        var av=cqaAnsVals(p,null);if(!av){var cp=cqParse(p.answer);if(cp&&cp.kind==="num"&&!cp.unit)av=[cp.val];}
+        if(av&&av.length===1&&cqaClose(av[0],val))return cqaOk(p);
+        if(cqaNice(val))return cqaFix(p,cqaFmt(val),val);
+        return cqaDoubt(p,"the app's own check gets about "+(+val.toFixed(4)));
+      }
+    }
+  }
+  /* 2. simplify / expand / factor an expression */
+  var sm=/^(simplify|expand|factori?[sz]e|factor|multiply out|multiply|distribute|combine like terms|collect like terms|rewrite)\b\s*(?:the\s+expression\s*)?:?\s*(.+)$/.exec(low);
+  if(sm&&sm[2].indexOf("=")<0){
+    var Q=cqaParse(sm[2]),A=cqaParse(p.answer);
+    if(Q&&Q.t==="ex"&&A&&A.t==="ex"&&!A.name){
+      if(!cqaHasVar(Q.a)&&!cqaHasVar(A.a)){var qv=cqaEval(Q.a,{}),aw=cqaEval(A.a,{});if(!isFinite(qv))return p;
+        if(cqaClose(qv,aw))return cqaOk(p);
+        if(cqaNice(qv))return cqaFix(p,cqaFmt(qv),qv);
+        return cqaDoubt(p,"the coach's answer doesn't equal the starting expression");}
+      var e=cqaEquiv(Q.a,A.a);
+      if(e===true)return cqaOk(p);
+      if(e===false)return cqaDoubt(p,"the coach's answer doesn't equal the starting expression");
+    }
+    return p;
+  }
+  /* 3. equations, systems and inequalities */
+  var segs=cqaSegments(q),eqs=[],ins=[];
+  for(var i=0;i<segs.length;i++){
+    var hasRel=/[=<>≤≥]/.test(segs[i]);if(!hasRel)continue;
+    var it=cqaItem(segs[i]);if(!it)return p; /* a relation we cannot read: do not guess */
+    if(it.t==="eq")eqs.push(it);
+    else if(it.t==="ex"&&it.name&&cqaHasVar(it.a))eqs.push({t:"eq",l:{o:"v",n:it.name},r:it.a});
+    else if(it.t==="in")ins.push(it);
+    else return p;
+  }
+  if(ins.length===1&&!eqs.length){
+    var Ai=cqaParse(p.answer);if(!Ai||Ai.t!=="in")return p;
+    var vs0=cqaVarList(ins[0].xs);if(vs0.length!==1)return p;
+    var r=cqaIneqCompare(ins[0],Ai);
+    if(r.v==="right")return cqaOk(p);
+    if(r.v==="cant")return p;
+    return cqaDoubt(p,"when the app tries numbers in the inequality, it gets a different answer");
+  }
+  if(!eqs.length||ins.length)return p;
+  var vs=cqaVarList([].concat.apply([],eqs.map(function(e){return [e.l,e.r];})));
+  if(vs.length===1&&eqs.length===1){
+    var v=vs[0],eqn=eqs[0],g=function(t){var o={};o[v]=t;return cqaEval(eqn.l,o)-cqaEval(eqn.r,o);};
+    var vals=cqaAnsVals(p,v);if(!vals)return p;
+    var allSat=vals.every(function(x){var o={};o[v]=x;return cqaSat(eqn,o);});
+    /* is it linear or quadratic? fit through x = -1, 0, 1 and test other points */
+    var g0=g(0),g1=g(1),gm=g(-1),roots=null;
+    if([g0,g1,gm].every(isFinite)){
+      var A2=(g1+gm-2*g0)/2,B=(g1-gm)/2,C=g0,fits=true;
+      [2,3,-2,0.5,-3.5,7].forEach(function(t){var y=g(t),f=A2*t*t+B*t+C;if(!isFinite(y)||Math.abs(y-f)>1e-7*Math.max(1,Math.abs(y)))fits=false;});
+      if(fits){
+        if(Math.abs(A2)<1e-12){if(Math.abs(B)>1e-12)roots=[-C/B];}
+        else{var D=B*B-4*A2*C;if(D<-1e-12)roots=[];else if(Math.abs(D)<1e-12)roots=[-B/(2*A2)];else roots=[(-B-Math.sqrt(D))/(2*A2),(-B+Math.sqrt(D))/(2*A2)];}
+      }
+    }
+    if(allSat){
+      if(roots&&roots.length>vals.length){var missing=roots.filter(function(r){return !vals.some(function(x){return cqaClose(x,r);});});
+        if(missing.length)p.algMore=missing.map(function(r){return v+" = "+(cqaNice(r)?cqaFmt(r):(+r.toFixed(4)));}).join(" or ");}
+      return cqaOk(p);
+    }
+    if(roots){
+      if(!roots.length)return cqaDoubt(p,"the app's own check finds no real-number solution");
+      if(roots.every(cqaNice))return cqaFix(p,roots.map(function(r){return v+" = "+cqaFmt(r);}).join(" or "),roots.length===1?roots[0]:null);
+      return cqaDoubt(p,"the app's own check gets "+roots.map(function(r){return v+" ≈ "+(+r.toFixed(4));}).join(" or "));
+    }
+    return cqaDoubt(p,"the coach's answer doesn't work when the app puts it back into the equation");
+  }
+  if(vs.length===2&&eqs.length===2){
+    var Ans=cqaParse(p.answer),env2=null;
+    if(Ans&&Ans.t==="pt"&&Ans.comps.length===2&&!Ans.comps.some(cqaHasVar)){env2={};env2[vs[0]]=cqaEval(Ans.comps[0],{});env2[vs[1]]=cqaEval(Ans.comps[1],{});}
+    else{var its2=cqaItems(Ans);if(its2&&its2.length===2&&its2.every(function(x){return x.name&&!cqaHasVar(x.a);})){env2={};its2.forEach(function(x){env2[x.name]=cqaEval(x.a,{});});}}
+    if(!env2||env2[vs[0]]===undefined||env2[vs[1]]===undefined)return p;
+    if(eqs.every(function(e){return cqaSat(e,env2);}))return cqaOk(p);
+    /* solve a linear 2-by-2 system ourselves */
+    var co=eqs.map(function(e){
+      function h(a,b){var o={};o[vs[0]]=a;o[vs[1]]=b;return cqaEval(e.l,o)-cqaEval(e.r,o);}
+      var c0=h(0,0),ca=h(1,0)-c0,cb=h(0,1)-c0;
+      var lin=[[2,3],[-1.5,4],[5,-2]].every(function(pt){var y=h(pt[0],pt[1]),f=c0+ca*pt[0]+cb*pt[1];return isFinite(y)&&Math.abs(y-f)<=1e-7*Math.max(1,Math.abs(y));});
+      return lin?[ca,cb,-c0]:null;});
+    if(co[0]&&co[1]){
+      var det=co[0][0]*co[1][1]-co[0][1]*co[1][0];
+      if(Math.abs(det)<1e-12)return cqaDoubt(p,"the app's own check finds no single solution for this system");
+      var sx=(co[0][2]*co[1][1]-co[0][1]*co[1][2])/det,sy=(co[0][0]*co[1][2]-co[0][2]*co[1][0])/det;
+      if(cqaNice(sx)&&cqaNice(sy))return cqaFix(p,vs[0]+" = "+cqaFmt(sx)+", "+vs[1]+" = "+cqaFmt(sy),null);
+      return cqaDoubt(p,"the app's own check gets "+vs[0]+" ≈ "+(+sx.toFixed(4))+", "+vs[1]+" ≈ "+(+sy.toFixed(4)));
+    }
+    return cqaDoubt(p,"the coach's answer doesn't work when the app puts it back into the equations");
+  }
+  return p;
+}
+
+/* v38.8: algebra answers go to the algebra checker first; plain numbers keep the number checker */
+function coachCompare(expRaw,expNum,ansRaw,q){var r=null;try{r=cqAlgCompare(expRaw,ansRaw,q);}catch(e){r=null;}return r||coachCompareNum(expRaw,expNum,ansRaw);}
+function coachVerify(p){if(coachCalc(p.question)!==null)return coachVerifyNum(p);try{return coachAlgVerify(p);}catch(e){return p;}}
+document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e.target.closest("[data-cs]"):null;if(!b)return;e.preventDefault();var inp=document.getElementById("coans");if(!inp)return;
+  var c=b.getAttribute("data-cs"),s=inp.selectionStart==null?inp.value.length:inp.selectionStart,en=inp.selectionEnd==null?s:inp.selectionEnd;
+  if(inp.value.length-(en-s)+c.length>inp.maxLength&&inp.maxLength>0)return;
+  inp.value=inp.value.slice(0,s)+c+inp.value.slice(en);var np=s+c.length;try{inp.focus();inp.setSelectionRange(np,np);}catch(x){}});
+document.addEventListener("mousedown",function(e){if(e.target&&e.target.closest&&e.target.closest("[data-cs]"))e.preventDefault();});
+(function(){var st=document.createElement("style");st.textContent="#coach .csym{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}#coach .csym .btn{min-width:46px;min-height:44px;padding:4px 10px;font-size:20px;margin:0}";document.head.appendChild(st);})();
 function coachCheck(p,ans){
   if(!String(ans||"").trim())return null;
-  var r=coachCompare(p.answer,p.answerNum,ans);
+  var r=coachCompare(p.answer,p.answerNum,ans,p.question);
   if(!p.sure){if(r.v==="right")return {v:"rightunsure",note:r.note};return {v:"unsure"};}
   return r;
 }
@@ -5786,12 +6247,15 @@ function coachDraw(){
     }else{
       var p=r.problems[CO.pi];
       h+=(p.topic?"<p class='note'>"+esc(p.topic)+"</p>":"")+"<div class='cq'>"+esc(p.question)+"</div><p class='note'>Is that what your page says? If not, take a clearer photo.</p>";
-      if(p.calcFixed)h+="<p class='cwarn'>⚠️ The coach said the answer is <b>"+esc(p.coachAnswer||"(no answer)")+"</b>, but the calculator gets <b>"+esc(p.answer)+"</b>. Answers are checked against "+esc(p.answer)+". The hints and steps may contain the same mistake, so work through them together.</p>";
+      if(p.calcFixed)h+="<p class='cwarn'>⚠️ The coach said the answer is <b>"+esc(p.coachAnswer||"(no answer)")+"</b>, but the app's own math check gets <b>"+esc(p.answer)+"</b>. Answers are checked against "+esc(p.answer)+". The hints and steps may contain the same mistake, so work through them together.</p>";
+      else if(p.algVerified)h+="<p class='note'>✓ Answer double-checked by the app's own math check.</p>"+(p.algMore?"<p class='cwarn'>The app also found "+esc(p.algMore)+". Check whether the question wants every answer.</p>":"");
       else if(p.verified)h+="<p class='note'>✓ Answer double-checked with the calculator.</p>";
-      if(!p.calcFixed&&(!p.sure||r.readable===false))h+="<p class='cwarn'>⚠️ The coach isn't sure about this one, so answers won't be marked right or wrong. Work it out together and compare with the worked solution.</p>";
+      if(p.algDoubt)h+="<p class='cwarn'>⚠️ The coach says the answer is <b>"+esc(p.answer||"(no answer)")+"</b>, but "+esc(p.algDoubt)+". Answers won't be marked right or wrong. Work through it together, and check with a grown-up.</p>";
+      else if(!p.calcFixed&&(!p.sure||r.readable===false))h+="<p class='cwarn'>⚠️ The coach isn't sure about this one, so answers won't be marked right or wrong. Work it out together and compare with the worked solution.</p>";
       for(var i=0;i<CO.hints&&i<p.hints.length;i++)h+="<div class='chint'><b>💡 Hint "+(i+1)+":</b> "+esc(p.hints[i])+"</div>";
       if(!CO.ok){
         h+="<label for='coans'><b>Your answer</b></label><input type='text' id='coans' inputmode='text' autocomplete='off' maxlength='80' placeholder='Type your answer'>";
+        h+="<div class='csym' aria-label='Math symbols'>"+["x","y","²","^","√","π","(",")","/","±","≤","≥"].map(function(c){return "<button type='button' class='btn n' data-cs='"+c+"' aria-label='Type "+c+"'>"+c+"</button>";}).join("")+"</div>";
         h+="<div class='crow'><button class='btn g' data-co='check'>✅ Check my answer</button>"+(CO.hints<p.hints.length?"<button class='btn' data-co='hint'>💡 Hint "+(CO.hints+1)+" of "+p.hints.length+"</button>":"")+"</div>";
       }
       if(CO.verdict)h+=coachVerdictHtml(CO.verdict,CO.vnote,CO.lastAns,p);
