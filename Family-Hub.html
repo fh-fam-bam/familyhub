@@ -624,7 +624,7 @@ function mealIdeasHtml(){
 }
 function reminderCardHtml(){
   var items=hhSorted().filter(function(x){return !x.completed&&x.type!=='contact'&&hhDayCount(x.date)<=3;}).slice(0,4);
-  var b=items.length?items.map(function(x){var lock=(x.type==='medicine'||x.type==='bill');return "<div class='li'><b>"+esc(x.title)+"</b>"+(lock?"<span class='lockbadge'>🔒 Parent</span>":"")+"<div class='note'>"+esc(hhDateText(x))+"</div></div>";}).join(''):"<span class='note'>No reminders in the next three days.</span>";
+  var b=items.length?items.map(function(x){var lock=(x.type==='bill');return "<div class='li'><b>"+esc(x.title)+"</b>"+(lock?"<span class='lockbadge'>🔒 Parent</span>":"")+"<div class='note'>"+esc(hhDateText(x))+"</div></div>";}).join(''):"<span class='note'>No reminders in the next three days.</span>";
   return hcard("🏡 Household Reminders",b+"<button class='btn' data-a='go' data-v='house' style='margin-top:8px'>Open Household</button>",'');
 }
 function winsCardHtml(){
@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.12";
+var FH_BUILD="v38.13";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -2790,8 +2790,8 @@ render=function(){
     }else{wallClass(false);_renderV24();}
   }catch(e){
     try{console.error("render failed",e);}catch(x){}
-    errNote(e);
-    try{document.getElementById("app").innerHTML="<div class='card' role='alert'><h2>Something went wrong</h2><p>Your data is safe. Tap the button to go back to the dashboard.</p><button class='btn g' data-a='nxwallreset'>Back to dashboard</button></div>";}catch(x){}
+    errNote(e);var pqEm="";try{pqEm=pqErrSave(e,view);}catch(x){}
+    try{document.getElementById("app").innerHTML="<div class='card' role='alert'><h2>Something went wrong</h2><p>Your data is safe. Tap the button to go back to the dashboard.</p><p class='note'>Details: "+esc(pqEm)+"</p><button class='btn g' data-a='nxwallreset'>Back to dashboard</button></div>";}catch(x){}
   }
 };
 function errNote(e){
@@ -3313,16 +3313,26 @@ function parentSections(html){
   if(items.length<3)return html;
   var firstRun=!Object.keys(secOpen).length&&!secInit;secInit=true;
   items.forEach(function(it){if(it.count>0&&secOpen[it.key]===undefined)secOpen[it.key]=true;});
-  var f=secFilter.toLowerCase(),out=head+"<div class='secbar'><label for='secq' class='sr'>Find a setting</label><input id='secq' type='search' placeholder='Find a setting…' value='"+esc(secFilter)+"' autocomplete='off'>"+
+  var f=secFilter.toLowerCase(),out=head;
+  /* v38.13: Needs-you tiles, quick actions and four folders */
+  var PQ_GROUPS=[["✅ Approvals",/approv|request|waiting|updates|note/i],["⭐ Chores & rewards",/chore|task|reward|bount|goal|challenge|trial|pet care|shift/i],["👪 Family & devices",/people|pet|device|pin|sync|feed|ai helper|kids|account|coach/i],["🖥️ Screen & backups",/./]];
+  var gOf={},cnt={};items.forEach(function(it){cnt[it.key]=it.count;var pl=it.title.replace(/<[^>]*>/g,"");for(var gi=0;gi<PQ_GROUPS.length;gi++)if(PQ_GROUPS[gi][1].test(pl)){gOf[it.key]=gi;break;}});
+  window.pqGroupOf=gOf;var pf=pqFolder();
+  out+=pqTilesHtml(cnt)+pqQuickHtml(items);
+  out+="<div class='secbar'><label for='secq' class='sr'>Find a setting</label><input id='secq' type='search' placeholder='Find a setting…' value='"+esc(secFilter)+"' autocomplete='off'>"+
     "<button class='btn n' data-a='secnone'>Close all</button></div>";
+  out+="<div class='pqfolders' role='tablist' aria-label='Parent settings folders'>"+PQ_GROUPS.map(function(g,gi){var c=0;items.forEach(function(it){if(gOf[it.key]===gi)c+=it.count;});return "<button class='pqf"+(pf===gi&&!f?" on":"")+"' role='tab' aria-selected='"+(pf===gi&&!f?"true":"false")+"' data-pq='folder' data-g='"+gi+"'>"+g[0]+(c?" <b class='secbadge'>"+c+"</b>":"")+"</button>";}).join("")+"</div>";
+  if(f)out+="<p class='note'>Showing matches from every folder.</p>";
+  if(false){
   /* v38.1: one grouped "Go to" menu instead of a chip per section; chips only for sections that need you */
   var SEC_GROUPS=[["Approvals & requests",/approv|request|waiting|updates|note/i],["Chores, rewards & goals",/chore|task|reward|bount|goal|challenge|trial|people|pet/i],["Devices, sync & AI",/device|pin|sync|feed|ai helper|backup/i],["Screen & settings",/./]],grp=SEC_GROUPS.map(function(){return [];});
   items.forEach(function(it){var pl=it.title.replace(/<[^>]*>/g,"");for(var gi=0;gi<SEC_GROUPS.length;gi++)if(SEC_GROUPS[gi][1].test(pl)){grp[gi].push(it);break;}});
   out+="<div class='secpickrow'><label for='secpick' class='sr'>Go to a section</label><select id='secpick'><option value=''>☰ Go to a section…</option>"+SEC_GROUPS.map(function(g,gi){return grp[gi].length?"<optgroup label='"+esc(g[0])+"'>"+grp[gi].map(function(it){return "<option value='"+it.key+"'>"+it.title.replace(/<[^>]*>/g,"")+(it.count?" ("+it.count+" waiting)":"")+"</option>";}).join("")+"</optgroup>":"";}).join("")+"</select></div>";
   var need=items.filter(function(it){return it.count>0;});
   if(need.length)out+="<div class='secjump' role='navigation' aria-label='Sections that need you'><span class='note'>Needs you:</span>"+need.map(function(it){return "<button class='chip' data-a='secjump' data-k='"+it.key+"'>"+it.title.replace(/<[^>]*>/g,"")+" <b class='secbadge'>"+it.count+"</b></button>";}).join("")+"</div>";
+  }
   items.forEach(function(it){
-    var plain=it.title.replace(/<[^>]*>/g,""),show=!f||plain.toLowerCase().indexOf(f)>=0||it.body.replace(/<[^>]*>/g," ").toLowerCase().indexOf(f)>=0;
+    var plain=it.title.replace(/<[^>]*>/g,""),show=!f?(gOf[it.key]===pf):(plain.toLowerCase().indexOf(f)>=0||it.body.replace(/<[^>]*>/g," ").toLowerCase().indexOf(f)>=0);
     var open=!!secOpen[it.key]||(!!f&&show);
     out+="<section class='sec"+(open?" open":"")+"' id='sec-"+it.key+"'"+(show?"":" hidden")+"><h2 class='sech-h'><button class='sech' data-a='sectog' data-k='"+it.key+"' aria-expanded='"+(open?"true":"false")+"' aria-controls='secb-"+it.key+"'><span class='sect'>"+plain+"</span>"+(it.count?"<b class='secbadge'>"+it.count+" waiting</b>":"")+"<span class='secchev' aria-hidden='true'>▸</span></button></h2><div class='secb' id='secb-"+it.key+"'"+(open?"":" hidden")+">"+it.body+"</div></section>";
   });
@@ -6482,6 +6492,111 @@ function hhReconcile(){
   return ch;
 }
 (function(){var r0=render;render=function(){var c=false;try{c=hhReconcile();}catch(e){c=false;}if(c){try{save();}catch(e){}}return r0.apply(this,arguments);};})();
+/* ===== v38.13: quicker Parent area ===== */
+function pqFolder(){var g=0;try{g=parseInt(localStorage.getItem("familyhub-pfolder")||"0",10);}catch(e){}return (g>=0&&g<=3)?g:0;}
+function pqSetFolder(g){try{localStorage.setItem("familyhub-pfolder",String(g));}catch(e){}}
+function pqMedDue(){
+  var n=0;try{(S.household||[]).forEach(function(x){if(x&&x.type==='medicine'&&!x.completed&&x.date&&x.date<=today()&&!(typeof hhKidTaken==='function'&&hhKidTaken(x)))n++;});}catch(e){}
+  return n;
+}
+function pqTilesHtml(cnt){
+  var T=[["waiting-for-approval","✅","Chores to approve",1],["reward-requests","🎁","Reward requests",1],["calendar-change-requests","📅","Calendar requests",1],["family-board-requests","📌","Board requests",0],["updates-between-parents","✉️","Notes from the other parent",1],["waiting-for-your-approval","✨","AI suggestions",0]];
+  var tiles=T.filter(function(t){return cnt[t[0]]!==undefined&&(cnt[t[0]]>0||t[3]);}),med=pqMedDue(),any=med>0;
+  tiles.forEach(function(t){if(cnt[t[0]]>0)any=true;});
+  var h=any?"":"<p class='pqclear'>All caught up ✅</p>";
+  h+="<div class='pqtiles' role='navigation' aria-label='Needs you'>";
+  tiles.forEach(function(t){var c=cnt[t[0]]||0;
+    h+="<div class='pqt"+(c?" hot":"")+"'><button class='pqtb' data-pq='focus' data-k='"+t[0]+"'><span class='pqi' aria-hidden='true'>"+t[1]+"</span><b class='pqn'>"+c+"</b><span class='pql'>"+t[2]+"</span></button>"+(t[0]==="waiting-for-approval"&&c>1?"<button class='btn g pqall' data-pq='apprall'>Approve all "+c+"</button>":"")+"</div>";});
+  h+="<div class='pqt"+(med?" hot":"")+"'><button class='pqtb' data-pq='med'><span class='pqi' aria-hidden='true'>💊</span><b class='pqn'>"+med+"</b><span class='pql'>Medicine due</span></button></div>";
+  return h+"</div>";
+}
+function pqQuickHtml(items){
+  var has={},body={};items.forEach(function(it){has[it.key]=1;body[it.key]=it.body;});
+  var q=[];
+  if(has["add-a-chore-or-task"])q.push("<button class='btn' data-pq='quick' data-k='add-a-chore-or-task' data-f='tt'>➕ Add a chore</button>");
+  q.push("<button class='btn' data-a='nxhnnewev'>📅 Add an event</button>");
+  if(has["rewards-trial"]&&/id='wl-amt'/.test(body["rewards-trial"]))q.push("<button class='btn' data-pq='quick' data-k='rewards-trial' data-f='wl-amt'>⭐ Give or take points</button>");
+  if(has["updates-between-parents"])q.push("<button class='btn' data-pq='quick' data-k='updates-between-parents' data-f='pntext'>✍️ Note to the other parent</button>");
+  return "<div class='pqquick' aria-label='Quick actions'>"+q.join("")+"</div>";
+}
+function pqFocus(k,fid){
+  var g=(window.pqGroupOf||{})[k];if(g!==undefined)pqSetFolder(g);
+  secFilter="";view="par";render();
+  secAction("secjump",{getAttribute:function(){return k;}});
+  if(fid)setTimeout(function(){var el=document.getElementById(fid);if(el)try{el.focus();}catch(e){}},350);
+}
+function pqApproveAll(){
+  if(!unlocked)return;
+  var list=[];
+  Object.keys(S.done).forEach(function(k){if(S.done[k]!=="p")return;if((S.petClaims||{})[k]&&S.petClaims[k].zero)return;var a=k.split("|"),p=person(a[1]),t=(S.tasks[a[1]]||[]).filter(function(x){return x.id===a[2];})[0]||petClaimTask(k);if(!p||!p.kid||!t)return;list.push({k:k,pts:pendingChorePoints(k,p.id,t)});});
+  if(!list.length)return;
+  if(!confirm("Approve all "+list.length+" chores with the points shown for each?"))return;
+  var snap=JSON.stringify(S),n=0;
+  list.forEach(function(x){if(approveChore(x.k,String(x.pts)))n++;});
+  if(!commitOr(snap))return;render();statusMessage("Approved "+n+" chore"+(n===1?"":"s")+".");
+}
+function pqVerHtml(){
+  var le=null;try{le=JSON.parse(localStorage.getItem("familyhub-lasterr")||"null");}catch(e){}
+  return "<div class='pqver'><span>Family Hub <b>"+esc(FH_BUILD)+"</b></span> <button class='btn n' data-pq='update'>Check for update</button> <span id='pqvmsg' role='status'></span>"+
+    (le&&le.msg?"<p class='note'>Last problem on this device ("+esc(String(le.at||"").slice(0,16).replace("T"," "))+", "+esc(le.view||"")+", "+esc(le.build||"")+"): "+esc(le.msg)+" <button class='btn n' data-pq='clrerr'>Clear</button></p>":"")+"</div>";
+}
+function pqCheckUpdate(){
+  var m=document.getElementById("pqvmsg");if(m)m.textContent="Checking…";
+  if(!window.fetch){if(m)m.textContent="Can't check on this device.";return;}
+  var u=location.href.split("#")[0].split("?")[0];
+  fetch(u+"?_="+Date.now(),{cache:"no-store"}).then(function(r){return r.text();}).then(function(t){
+    var b=/var FH_BUILD="([^"]+)"/.exec(t);var mm=document.getElementById("pqvmsg");
+    if(!b){if(mm)mm.textContent="Could not read the newest version.";return;}
+    if(b[1]===FH_BUILD){if(mm)mm.textContent="✓ This is the newest version.";return;}
+    if(mm)mm.textContent="Updating to "+b[1]+"…";
+    setTimeout(function(){location.replace(u+"?b="+encodeURIComponent(b[1]));},600);
+  }).catch(function(){var mm=document.getElementById("pqvmsg");if(mm)mm.textContent="Could not check. Is the internet on?";});
+}
+function pqErrSave(e,v){
+  var msg=String((e&&e.message)||e||"unknown").slice(0,200),st=String((e&&e.stack)||"").split("\n").slice(0,3).join(" / ").slice(0,400);
+  try{localStorage.setItem("familyhub-lasterr",JSON.stringify({at:new Date().toISOString(),view:v||"",build:FH_BUILD,msg:msg,stack:st}));}catch(x){}
+  return msg;
+}
+function pqBadgeCount(){
+  if(devRole()!=="parent")return 0;
+  var n=0;
+  try{Object.keys(S.done).forEach(function(k){if(S.done[k]!=="p")return;if((S.petClaims||{})[k]&&S.petClaims[k].zero)return;var a=k.split("|"),p=person(a[1]),t=(S.tasks[a[1]]||[]).filter(function(x){return x.id===a[2];})[0]||petClaimTask(k);if(p&&t)n++;});}catch(e){}
+  function m(fn,re){try{var s=fn();var r=String(s).match(re);return r?r.length:0;}catch(e){return 0;}}
+  n+=m(function(){return reqHtml();},/data-a='rok'/g);
+  n+=m(function(){return eventReqHtml();},/data-a='nxevapprove'/g);
+  n+=m(function(){return boardReqHtml();},/data-a='bqapprove'/g);
+  n+=m(function(){return parentNotesHtml();},/data-a='nxnoteack'/g);
+  n+=pqMedDue();
+  return n;
+}
+(function(){
+  var n0=nav;nav=function(){n0.apply(this,arguments);try{var b=document.querySelector("#side [data-v='par']");if(!b)return;var c=pqBadgeCount();if(c>0){b.insertAdjacentHTML("beforeend","<b class='pqbadge' aria-label='"+c+" waiting'>"+(c>99?"99+":c)+"</b>");b.setAttribute("aria-label","Parent, "+c+" waiting");}}catch(e){}};
+  var p0=parent;parent=function(){return p0.apply(this,arguments)+pqVerHtml();};
+  var st=document.createElement("style");
+  st.textContent="#side button{position:relative}.pqbadge{position:absolute;top:4px;right:8px;min-width:24px;height:24px;padding:0 6px;border-radius:12px;background:#d63939;color:#fff;font-size:14px;line-height:24px;font-style:normal;text-align:center;font-weight:800}"+
+  ".pqclear{font-size:20px;font-weight:700;margin:6px 0 10px}"+
+  ".pqtiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:8px 0 12px}"+
+  ".pqt{display:flex;flex-direction:column;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:8px;opacity:.75}.pqt.hot{opacity:1;border:2px solid #d9822b}"+
+  ".pqtb{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;align-items:center;column-gap:10px;background:transparent;border:0;color:var(--ink);text-align:left;padding:6px;min-height:72px;cursor:pointer;font:inherit}"+
+  ".pqi{grid-row:1 / 3;font-size:34px}.pqn{font-size:30px;line-height:1}.pql{font-size:15px;line-height:1.2}.pqall{margin:0;min-height:44px}"+
+  ".pqquick{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}.pqquick .btn{margin:0;min-height:48px}"+
+  ".pqfolders{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin:10px 0}"+
+  ".pqf{min-height:56px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-weight:700;font-size:17px;cursor:pointer;padding:6px 10px}.pqf.on{background:#3b5bdb;color:#fff;border-color:#3b5bdb}"+
+  ".pqver{margin:18px 0 8px;padding:10px 0;border-top:1px solid var(--line);color:var(--mute);display:flex;flex-wrap:wrap;align-items:center;gap:8px}.pqver p{flex-basis:100%;margin:0}";
+  document.head.appendChild(st);
+})();
+document.addEventListener("click",function(e){
+  var b=e.target&&e.target.closest?e.target.closest("[data-pq]"):null;if(!b)return;
+  e.preventDefault();var a=b.getAttribute("data-pq");
+  if(a==="update"){pqCheckUpdate();return;}
+  if(a==="clrerr"){try{localStorage.removeItem("familyhub-lasterr");}catch(x){}render();return;}
+  if(a==="folder"){pqSetFolder(+b.getAttribute("data-g"));secFilter="";render();return;}
+  if(a==="focus"){pqFocus(b.getAttribute("data-k"));return;}
+  if(a==="quick"){pqFocus(b.getAttribute("data-k"),b.getAttribute("data-f"));return;}
+  if(a==="med"){view="house";try{hhFilter="medicine";hhEdit="";}catch(x){}render();try{window.scrollTo(0,0);}catch(x){}return;}
+  if(a==="apprall"){pqApproveAll();return;}
+});
 </script>
+
 </body>
 </html>
