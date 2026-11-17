@@ -635,7 +635,7 @@ function winsCardHtml(){
     body+="<div class='wins-sec'><div class='wins-top'><div class='wins-emoji' aria-hidden='true'>"+pk.ladder[lv.i]+"</div><div class='wins-name'><b>"+esc(k.n)+"</b><span>"+esc(pk.names[lv.i])+" · Level "+(lv.i+1)+"</span></div><button class='btn' data-a='who' data-p='"+k.id+"' aria-label='Open "+esc(k.n)+"’s page'>Open</button></div>";
     body+="<div class='stat-blocks'><div class='stat-block'><b>"+lv.w+"</b><span>wins</span></div><div class='stat-block'><b>"+pts+"</b><span>⭐ points</span></div></div>";
     body+="<div class='wbar' role='progressbar' aria-label='"+esc(k.n)+" progress to next level' aria-valuemin='0' aria-valuemax='100' aria-valuenow='"+pct+"'><i style='width:"+pct+"%'></i></div>";
-    if(r)body+="<div class='note'>Reward goal: "+esc(r.e)+" "+esc(r.n)+" · "+pts+" of "+r.c+" ⭐</div><div class='wbar goal' role='progressbar' aria-label='"+esc(k.n)+" progress to "+esc(r.n)+"' aria-valuemin='0' aria-valuemax='100' aria-valuenow='"+rp+"'><i style='width:"+rp+"%'></i></div>";
+    if(r)body+="<div class='note'>Reward goal: "+esc(r.e)+" "+esc(r.n)+" · "+(pts>=r.c?(rewardRequested(k.id,r.id)?"✓ Asked a parent":"🎉 Ready! Ask a parent"):pts+" of "+r.c+" ⭐")+"</div><div class='wbar goal' role='progressbar' aria-label='"+esc(k.n)+" progress to "+esc(r.n)+"' aria-valuemin='0' aria-valuemax='100' aria-valuenow='"+rp+"'><i style='width:"+rp+"%'></i></div>";
     body+="</div>";
   });
   if(!kids.length)body="<span class='note'>No children in the family list.</span>";
@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.18";
+var FH_BUILD="v38.19";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -3158,10 +3158,42 @@ function rewardTarget(p){
   if(selected)return selected;
   return S.rewards.filter(function(r){return !r.for||r.for.indexOf(p)>=0;}).sort(function(a,b){return a.c-b.c;})[0]||null;
 }
+/* ===== v38.19: kids' pages, phase 1 ===== */
+function rewardRequested(pidX,rid){return (S.req||[]).some(function(q){return q.p===pidX&&q.r===rid;});}
+function cosApproveReq(i){
+  var rq=S.req[i];if(!rq||String(rq.r).indexOf("cos_")!==0)return false;
+  var item=cosmeticItem(String(rq.r).slice(4)),p=person(rq.p);if(!item||!p){S.req.splice(i,1);return true;}
+  var c=S.cosmetics=S.cosmetics||{},entry=c[p.id]=c[p.id]||{owned:[],equipped:{}};
+  if(!Array.isArray(entry.owned))entry.owned=[];if(!entry.equipped||typeof entry.equipped!=="object")entry.equipped={};
+  if(entry.owned.indexOf(item.id)<0){var bal=Number(S.stars[p.id])||0;if(bal<item.cost){alert(p.n+" needs "+(item.cost-bal)+" more points for "+item.name+".");return false;}
+    S.stars[p.id]=bal-item.cost;entry.owned.push(item.id);sync.cosPending=sync.cosPending||{};sync.cosPending[p.id+"|"+item.id]=item.cost;}
+  entry.equipped[item.type]=item.id;S.req.splice(i,1);
+  try{wlog("redeem",p.id,-item.cost,item.name);}catch(e){}
+  return true;
+}
+document.addEventListener("click",function(e){
+  var b=e.target&&e.target.closest?e.target.closest("[data-kq]"):null;if(!b)return;
+  e.preventDefault();var a=b.getAttribute("data-kq"),pp=b.getAttribute("data-p"),p=person(pp);if(!p||!p.kid)return;
+  if(a==="cosask"){
+    var item=cosmeticItem(b.getAttribute("data-item"));if(!item)return;var rid="cos_"+item.id;
+    if(rewardRequested(pp,rid)){alert("You already asked for "+item.name+". A parent will see it in Reward requests.");return;}
+    var bal=Number(S.stars[pp])||0;if(bal<item.cost){alert("Earn "+(item.cost-bal)+" more points first.");return;}
+    var snap=JSON.stringify(S);S.req=S.req||[];S.req.push({p:pp,r:rid});if(!commitOr(snap))return;render();
+    statusMessage("Asked a parent for "+item.name+".");return;
+  }
+  if(a==="equip"){
+    var it=cosmeticItem(b.getAttribute("data-item"));if(!it)return;var cs=cosmeticState(pp);if(cs.owned.indexOf(it.id)<0)return;
+    if(devRole()!=="parent"){alert("Change this on a parent's phone or tablet so it shows on every screen.");return;}
+    var snap2=JSON.stringify(S),c=S.cosmetics=S.cosmetics||{},en=c[pp]=c[pp]||{owned:[],equipped:{}};en.equipped=en.equipped||{};
+    en.equipped[it.type]=en.equipped[it.type]===it.id?"":it.id;if(!commitOr(snap2))return;render();
+  }
+});
+(function(){var st=document.createElement("style");st.textContent=".personal-page.kidpage .note{font-size:18px;line-height:1.35}.personal-page.kidpage .personal-progress span{font-size:17px}.personal-progress .goal-track{display:flex}.personal-progress .goal-track i{flex:none}.goal-track i.wait{opacity:.55;background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.35) 0 6px,rgba(255,255,255,0) 6px 12px)}.kid-goal .btn{min-height:56px;font-size:20px}";document.head.appendChild(st);})();
+
 function kidGoalHtml(p){
   var r=rewardTarget(p.id);if(!r)return '';
   var points=S.stars[p.id]||0,pc=Math.max(0,Math.min(100,Math.round(points/r.c*100))),ready=points>=r.c;
-  return "<div class='card kid-goal' style='border:3px solid "+p.c+"'><div style='font-size:42px' aria-hidden='true'>"+esc(ready?'🏆':r.e)+"</div><h2 style='margin-top:4px'>"+(ready?'You reached your reward!':'My next reward')+"</h2><b>"+esc(r.n)+"</b><div class='goal-track' role='progressbar' aria-label='Reward progress' aria-valuemin='0' aria-valuemax='"+r.c+"' aria-valuenow='"+Math.max(0,Math.min(points,r.c))+"'><i style='width:"+pc+'%;background:'+p.c+"'></i></div><p>⭐ "+points+' / '+r.c+' points · '+(ready?'Ready to request below':(r.c-points)+' to go')+"</p><p class='note'>Choose a goal in the rewards shop above. Rewards still need parent approval.</p></div>";
+  return "<div class='card kid-goal' style='border:3px solid "+p.c+"'><div style='font-size:42px' aria-hidden='true'>"+esc(ready?'🏆':r.e)+"</div><h2 style='margin-top:4px'>"+(ready?'You reached your reward!':'My next reward')+"</h2><b>"+esc(r.n)+"</b><div class='goal-track' role='progressbar' aria-label='Reward progress' aria-valuemin='0' aria-valuemax='"+r.c+"' aria-valuenow='"+Math.max(0,Math.min(points,r.c))+"'><i style='width:"+pc+'%;background:'+p.c+"'></i></div><p>⭐ "+points+' / '+r.c+' points · '+(ready?'Ready! 🎉':(r.c-points)+' to go')+"</p>"+(ready?(rewardRequested(p.id,r.id)?"<p><b>✓ You asked for it.</b> A parent will say yes or no.</p>":"<button class='btn g' data-a='rq' data-p='"+p.id+"' data-r='"+r.id+"'>🎉 Ask a parent for it</button>"):"")+"<p class='note'>Pick a different goal in My rewards shop. Rewards still need a parent to say yes.</p></div>";
 }
 function recordPointParty(p,n,before,goalBefore){
   if(n<=0)return;
@@ -3530,11 +3562,12 @@ else if(a==="rq"){var r=S.rewards.filter(function(x){return x.id===d("r")})[0],p
 else if(a==="rok"){
   if(!unlocked)return;
   var rq=S.req[+d("i")];if(!rq)return;
+  if(String(rq.r).indexOf("cos_")===0){if(!cosApproveReq(+d("i")))return;}else{
   var r2=S.rewards.filter(function(x){return x.id===rq.r})[0];
   if(!r2||!validRewardCost(r2.c)){alert("This reward has an invalid price. Remove it and add a positive price in Parent.");return;}
   if((S.stars[rq.p]||0)<r2.c){alert("There are not enough points for this reward yet.");return;}
   S.stars[rq.p]=(S.stars[rq.p]||0)-r2.c;S.req.splice(+d("i"),1);wlog('redeem',rq.p,-r2.c,r2.n);
-}
+}}
 else if(a==="rno"){S.req.splice(+d("i"),1)}
 else if(a==="addr"){if(!v("rn")||!validRewardCost(v("rc"))){alert("Enter a reward name and a positive price in half-point steps.");return;}S.rewards.push({id:"r"+Date.now(),e:"🎁",n:v("rn"),c:Number(v("rc"))});}
 else if(a==="delr"){S.rewards=S.rewards.filter(function(x){return x.id!==d("r")})}
@@ -3584,7 +3617,9 @@ else if(a==="addt"){
 else if(a==="delt"){S.tasks[d("p")]=S.tasks[d("p")].filter(function(t){return t.id!==d("t")})}
 else if(a==="setpin"){if(v("np").length>=4){S.pin=v("np");alert("PIN changed.")}else alert("Use at least 4 digits.")}
 if(JSON.stringify(S)!==beforeState&&!save())rollbackTo(beforeState);render()});
-function reqHtml(){var h="<h2>Reward requests</h2><div class='card'>";S.req.forEach(function(q,i){var r=S.rewards.filter(function(x){return x.id===q.r})[0],p=person(q.p);if(!r)return;h+="<div class='row'><span class='dot' style='background:"+p.c+"'></span><span class='t'>"+esc(p.n)+" wants: "+esc(r.n)+" <span class='note'>"+r.c+" ⭐</span></span><button class='btn g' data-a='rok' data-i='"+i+"'>Approve</button><button class='btn r' data-a='rno' data-i='"+i+"'>Decline</button></div>"});if(!S.req.length)h+="<span class='note'>No requests.</span>";return h+"</div>"}
+function reqHtml(){var h="<h2>Reward requests</h2><div class='card'>";S.req.forEach(function(q,i){var r=S.rewards.filter(function(x){return x.id===q.r})[0],p=person(q.p);
+if(!r&&p&&String(q.r).indexOf("cos_")===0){var ci=cosmeticItem(String(q.r).slice(4));if(ci){h+="<div class='row'><span class='dot' style='background:"+p.c+"'></span><span class='t'>"+esc(p.n)+" wants: "+ci.icon+" "+esc(ci.name)+" <span class='note'>theme shop · "+ci.cost+" ⭐ · has "+(S.stars[p.id]||0)+"</span></span><button class='btn g' data-a='rok' data-i='"+i+"'>Approve</button><button class='btn r' data-a='rno' data-i='"+i+"'>Decline</button></div>";}return;}
+if(!r)return;h+="<div class='row'><span class='dot' style='background:"+p.c+"'></span><span class='t'>"+esc(p.n)+" wants: "+esc(r.n)+" <span class='note'>"+r.c+" ⭐</span></span><button class='btn g' data-a='rok' data-i='"+i+"'>Approve</button><button class='btn r' data-a='rno' data-i='"+i+"'>Decline</button></div>"});if(!S.req.length)h+="<span class='note'>No requests.</span>";return h+"</div>"}
 function setHtml(){var h=goalSet()+"<h2>Rewards</h2><div class='card'>";S.rewards.forEach(function(r){h+="<div class='row'><span class='t'>"+esc(r.e)+" "+esc(r.n)+" <span class='note'>"+r.c+" ⭐</span></span><button class='btn n' data-a='delr' data-r='"+r.id+"'>Remove</button></div>"});
 h+="<input id='rn' placeholder='New reward'><input id='rc' type='number' placeholder='Points' style='width:100px'><button class='btn' data-a='addr'>Add reward</button></div><h2>Photo frame</h2><div class='card'>"+photoFrameBody()+"</div>";return h}
 function photos(){try{return JSON.parse(localStorage.getItem(KEY2))||[]}catch(x){return[]}}
@@ -4441,9 +4476,10 @@ function cosmeticState(id){var all=S.cosmetics||{},c=all[id];return c&&typeof c=
 function cosmeticItem(id){return COSMETIC_ITEMS.filter(function(x){return x.id===id;})[0];}
 function cosmeticShop(p){var c=cosmeticState(p.id),balance=Number(S.stars[p.id])||0;
  var h='<section class="card cosmetic-shop"><h2>✨ Avatar & Theme Shop</h2><p class="note">Spend approved points on decorations. Your levels and achievements stay intact. ⭐ '+balance+' available.</p>';
- h+='<p class="note">A parent must unlock purchases so points and items can sync safely.</p><div class="cosmetic-grid">';
+ var parentBuy=unlocked&&devRole()==='parent';
+ h+='<p class="note">'+(parentBuy?'Parent mode: buying here spends '+esc(p.n)+'’s points right away.':'Tap “Ask a parent”. When a parent says yes, the points are spent and it shows up on your page.')+'</p><div class="cosmetic-grid">';
  COSMETIC_ITEMS.forEach(function(x){var owned=c.owned.indexOf(x.id)>=0,equipped=c.equipped[x.type]===x.id;
- h+='<div class="cosmetic-item"><div style="font-size:30px">'+x.icon+'</div><b>'+esc(x.name)+'</b><div class="note">'+x.cost+' ⭐</div><button class="btn '+(equipped?'g':'n')+'" data-a="p3cosmetic" data-p="'+p.id+'" data-item="'+x.id+'">'+(equipped?'Equipped ✓':owned?'Equip': 'Buy · '+x.cost+' ⭐')+'</button></div>';});
+ h+='<div class="cosmetic-item"><div style="font-size:30px">'+x.icon+'</div><b>'+esc(x.name)+'</b><div class="note">'+x.cost+' ⭐</div>'+(parentBuy?'<button class="btn '+(equipped?'g':'n')+'" data-a="p3cosmetic" data-p="'+p.id+'" data-item="'+x.id+'">'+(equipped?'Equipped ✓':owned?'Equip': 'Buy · '+x.cost+' ⭐')+'</button>':owned?'<button class="btn '+(equipped?'g':'n')+'" data-kq="equip" data-p="'+p.id+'" data-item="'+x.id+'">'+(equipped?'Using it ✓':'Use it')+'</button>':rewardRequested(p.id,'cos_'+x.id)?'<span class="note"><b>✓ Asked a parent</b></span>':'<button class="btn '+(balance>=x.cost?'g':'n')+'" data-kq="cosask" data-p="'+p.id+'" data-item="'+x.id+'">'+(balance>=x.cost?'Ask a parent':'Need '+(x.cost-balance)+' more ⭐')+'</button>')+'</div>';});
  h+='</div></section>';return h;}
 function cosmeticClass(id,type){var c=cosmeticState(id),v=c.equipped[type];return cosmeticItem(v)&&c.owned.indexOf(v)>=0?v:'';}
 function cosmeticAction(b){var id=b.getAttribute('data-p'),item=cosmeticItem(b.getAttribute('data-item')),p=person(id);
@@ -4461,13 +4497,13 @@ function pers(){
   var p=person(pid);if(!p||p.archived)return '<h1>Member unavailable</h1><button class="btn" data-a="go" data-v="home">Family Home</button>';
   var g=prog(pid),pct=g[1]?Math.round(g[0]/g[1]*100):0,left=g[1]-g[0]-g[2],up=personalEvents(pid,2),next=up.filter(function(e){var n=new Date(),time=p2(n.getHours())+':'+p2(n.getMinutes());return e.d>today()||!e.m||(e.end||e.m)>=time;})[0];
   var h='<div class="personal-switch"><button class="btn n" data-a="go" data-v="home">← Family Home</button><button class="btn n" data-a="nxcustopen" aria-expanded="'+(custOpen?'true':'false')+'">⚙ Customize</button>'+P.map(function(x){return '<button class="member-chip'+(x.id===pid?' selected':'')+'" data-a="who" data-p="'+x.id+'" aria-pressed="'+(x.id===pid?'true':'false')+'" style="border-color:'+x.c+'">'+esc(x.e)+' '+esc(x.n)+'</button>';}).join('')+'</div>';
-  h+='<section class="personal-hero '+cosmeticClass(pid,'glow')+'" style="border-top-color:'+p.c+'"><div class="personal-avatar '+cosmeticClass(pid,'border')+'" style="border-color:'+p.c+'" aria-hidden="true">'+esc(p.e)+'</div><div class="personal-intro"><p class="personal-eyebrow">'+(p.pet?'CARE & ROUTINES':p.kid?'MY SPACE':'MY DAY')+'</p><h1>'+esc(p.n)+(p.pet?'’s care':'’s day')+'</h1><p>'+ (p.pet?'Everything to keep '+esc(p.n)+' happy and cared for.':p.kid?'Your plans, your progress, your next adventure.':'Your schedule and the things that need your attention.')+'</p></div><div class="personal-progress"><b>'+g[0]+' / '+g[1]+'</b><span>'+ (p.kid?'tasks approved':'tasks done')+'</span><div class="goal-track" role="progressbar" aria-label="Today’s completed tasks" aria-valuemin="0" aria-valuemax="'+Math.max(1,g[1])+'" aria-valuenow="'+g[0]+'"><i style="width:'+pct+'%;background:'+p.c+'"></i></div></div></section>';
-  h+=personExtras(p);if(p.kid)h+=walletHtml(p)+helperHtml(p)+cosmeticShop(p);
   if(custOpen)h+=custHtml(p);
-  if(showSec(pid,'weather'))h+=wxHtml();
-  if(showSec(pid,'stats'))h+='<div class="personal-stats"><div><b>'+left+'</b><span>Still to do</span></div><div><b>'+ (p.kid?g[2]:up.length)+'</b><span>'+(p.kid?'Awaiting approval':'Plans today & tomorrow')+'</span></div><div><b>'+ (p.kid?'⭐ '+(S.stars[pid]||0):next?niceTime(next.m):'—')+'</b><span>'+(p.kid?'My points':next?'Next: '+esc(next.t):'No upcoming plans')+'</span></div></div>';
-  h+='<div class="personal-layout"><div class="personal-main">'+pcBanner(p)+personalTasks(p)+(p.kid&&showSec(pid,'shop')?'<details class="card personal-shop"><summary>🎁 My rewards shop</summary>'+rewardsHtml(p)+'</details>':'')+'</div><aside class="personal-aside">'+(p.kid?(showSec(pid,'goal')?kidGoalHtml(p):'')+petClaimsHtml(p):'')+(showSec(pid,'schedule')?personalSchedule(p):'')+(showSec(pid,'reminders')?personalReminders(p):'')+(!p.pet&&showSec(pid,'food')?foodHtml(p):'')+'</aside></div>';
-  var LK=lookOf(pid);return '<div class="personal-page layout-'+LK.layout+' bg-'+LK.bg+'">'+h+'</div>';
+  h+='<section class="personal-hero '+cosmeticClass(pid,'glow')+'" style="border-top-color:'+p.c+'"><div class="personal-avatar '+cosmeticClass(pid,'border')+'" style="border-color:'+p.c+'" aria-hidden="true">'+esc(p.e)+'</div><div class="personal-intro"><p class="personal-eyebrow">'+(p.pet?'CARE & ROUTINES':p.kid?'MY SPACE':'MY DAY')+'</p><h1>'+esc(p.n)+(p.pet?'’s care':'’s day')+'</h1><p>'+ (p.pet?'Everything to keep '+esc(p.n)+' happy and cared for.':p.kid?'Your plans, your progress, your next adventure.':'Your schedule and the things that need your attention.')+'</p></div><div class="personal-progress"><b>'+(p.kid?g[0]+g[2]:g[0])+' / '+g[1]+'</b><span>'+ (p.kid?'done'+(g[2]?' · '+g[2]+' waiting for a parent':(g[1]&&g[0]===g[1]?' · all approved 🎉':'')):'tasks done')+'</span><div class="goal-track" role="progressbar" aria-label="Today’s completed tasks" aria-valuemin="0" aria-valuemax="'+Math.max(1,g[1])+'" aria-valuenow="'+(p.kid?g[0]+g[2]:g[0])+'"><i style="width:'+pct+'%;background:'+p.c+'"></i>'+(p.kid&&g[2]&&g[1]?'<i class="wait" style="width:'+Math.round(g[2]/g[1]*100)+'%;background:'+p.c+'"></i>':'')+'</div></div></section>';
+  var exH=personExtras(p),kidH=p.kid?walletHtml(p)+helperHtml(p)+cosmeticShop(p):'',wxH=showSec(pid,'weather')?wxHtml():'',stH='';
+  if(showSec(pid,'stats'))stH='<div class="personal-stats"><div><b>'+left+'</b><span>Still to do</span></div><div><b>'+ (p.kid?g[2]:up.length)+'</b><span>'+(p.kid?'Awaiting approval':'Plans today & tomorrow')+'</span></div><div><b>'+ (p.kid?'⭐ '+(S.stars[pid]||0):next?niceTime(next.m):'—')+'</b><span>'+(p.kid?'My points':next?'Next: '+esc(next.t):'No upcoming plans')+'</span></div></div>';
+  var layH='<div class="personal-layout"><div class="personal-main">'+pcBanner(p)+personalTasks(p)+(p.kid&&showSec(pid,'shop')?'<details class="card personal-shop"><summary>🎁 My rewards shop</summary>'+rewardsHtml(p)+'</details>':'')+'</div><aside class="personal-aside">'+(p.kid?(showSec(pid,'goal')?kidGoalHtml(p):'')+petClaimsHtml(p):'')+(showSec(pid,'schedule')?personalSchedule(p):'')+(showSec(pid,'reminders')?personalReminders(p):'')+(!p.pet&&showSec(pid,'food')?foodHtml(p):'')+'</aside></div>';
+  if(p.kid)h+=layH+exH+stH+kidH+wxH;else h+=exH+kidH+wxH+stH+layH;
+  var LK=lookOf(pid);return '<div class="personal-page'+(p.kid?' kidpage':'')+' layout-'+LK.layout+' bg-'+LK.bg+'">'+h+'</div>';
 }
 function personalEvents(id,days){return eventsAhead(today(),days).filter(function(e){return !attendees(e).length||attendees(e).indexOf(id)>=0||e.driver===id;});}
 function personalSchedule(p){
@@ -4544,7 +4580,7 @@ function nxAction(a,b){
   if(a==='nxingsave'){ingSave();return;}
   if(a==='nxingcancel'){closeIngredients();return;}
   if(a==='nxcustfrom'){if(person(d('p'))){pid=d('p');view='person';custOpen=true;render();var cpn=document.getElementById('cust-panel');if(cpn&&cpn.scrollIntoView)cpn.scrollIntoView();}return;}
-  if(a==='nxcustopen'){custOpen=!custOpen;render();var cp=document.getElementById(custOpen?'cust-panel':'');return;}
+  if(a==='nxcustopen'){custOpen=!custOpen;render();var cp=document.getElementById('cust-panel');if(cp&&cp.scrollIntoView)try{cp.scrollIntoView({block:'start'});}catch(x){cp.scrollIntoView();}return;}
   if(a==='nxwxsearch'){if(!unlocked)return;var q=v('wxcity');wxCity=q;if(q.length<2){wxMsg='Type at least 2 letters.';render();return;}wxMsg='Searching…';wxResults=[];render();
     wxGet('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(q)+'&count=5&language=en&format=json',function(r){wxResults=(r.results||[]).filter(function(x){return typeof x.latitude==='number'&&typeof x.longitude==='number'&&x.name;}).slice(0,5);wxMsg=wxResults.length?'Pick your city:':'No match. Try a nearby city.';if(unlocked&&view==='par')render();},function(){wxMsg='Could not search. Check the internet connection.';if(unlocked&&view==='par')render();});return;}
   if(a==='nxwxpick'){if(!unlocked)return;var r0=wxResults[+d('i')];if(!r0)return;var u0=document.getElementById('wxunits');S.weather={name:String(r0.name+(r0.admin1?', '+r0.admin1:'')).slice(0,80),lat:Math.round(r0.latitude*1000)/1000,lon:Math.round(r0.longitude*1000)/1000,units:u0&&u0.value==='c'?'c':'f'};wxResults=[];wxMsg='Saved.';save();render();wxRefresh(true);return;}
