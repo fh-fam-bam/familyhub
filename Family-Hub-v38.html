@@ -713,7 +713,7 @@ function khHw(p){
     hwCss();var hg=hwGroups(p.id),rows=hg.over.concat(hg.today,hg.tom),pr=hwProgress(p.id);
     h+="<h3>📚 My homework"+(rows.length?" · "+pr.done+" of "+pr.total+" done":"")+"</h3>";
     h+=rows.length?rows.map(function(r){return hwCard(r).replace(/<button type="button" class="hw-more"[\s\S]*?<\/button>/,"");}).join(""):"<p class='note'>No homework due today or tomorrow. 🎉</p>";
-    h+="<div class='kh-hwgo'><button class='btn g' data-a='go' data-v='hw'>📚 Open Homework page</button></div>";
+    h+="<div class='kh-hwgo'><button class='btn g' data-a='go' data-v='hw'>📚 Open Homework page</button> "+(typeof coachBtn==='function'?coachBtn(p.id,''):'')+"</div>";
   }
   h+="<h3>⏱️ Focus timer</h3><div class='kh-timer' role='timer' aria-live='off'><div id='kh-time' class='kh-big'>"+(t.run?khFmt(left):(t.msg||'Focus timer'))+"</div>";
   if(t.run)h+="<button class='btn r' data-a='khstop'>Stop</button>";
@@ -1444,7 +1444,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.1";
+var FH_BUILD="v38.2";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -1644,7 +1644,7 @@ function syncDoneKey(id){var a=String(id).split("__");return a.length===3&&a[0]&
 function syncInWindow(c,id){if(c==="done")return String(id).slice(0,10)>=syncCut(-14);if(c==="meals")return id>=syncCut(-14)&&id<=syncCut(120);return true;}
 var SYNC_MAX=90000,SYNC_KID_COLLS=["done","eventRequests","req","groc","boardreq","hw"];
 var SYNC_AUX=[["pp","pendingPoints"],["sb","submissions"],["pc","petClaims"],["db","doneBy"],["bo","bonus"]];
-var SYNC_BLOBS=["prefs","challenge","spin","awards","parentNotes","fridgeNotes","bounties","packed","mealIngredients","foodPrefs","rewardTargets","returnNotes","household","pointNews","petLog","approvalReversals","kidsAccount","recipes","cosmetics","trial","walletLog","petCare"];
+var SYNC_BLOBS=["prefs","challenge","spin","awards","parentNotes","fridgeNotes","bounties","packed","mealIngredients","foodPrefs","rewardTargets","returnNotes","household","pointNews","petLog","approvalReversals","kidsAccount","recipes","cosmetics","trial","walletLog","petCare","coach"];
 var SYNC_ID_RE=/^[A-Za-z0-9_-]{1,120}$/;
 function syncEnsureIds(){var ch=false;[S.groc,S.req].forEach(function(l){(l||[]).forEach(function(it){if(it&&typeof it==="object"&&typeof it.id!=="string"){it.id=syncNewId();ch=true;}});});return ch;}
 function syncList(c){
@@ -1678,7 +1678,7 @@ function syncValidItem(c,o,id){
       if(id==="blob_fridgeNotes")return Array.isArray(v)&&v.length<=60&&v.every(function(n){return n&&typeof n==="object"&&typeof n.id==="string"&&typeof n.text==="string"&&n.text.length<=300&&typeof n.from==="string";});
       if(id==="blob_bounties")return Array.isArray(v)&&v.length<=100&&v.every(function(b){return b&&typeof b==="object"&&typeof b.id==="string"&&typeof b.title==="string"&&["open","claimed","removed"].indexOf(b.status)>=0&&isFinite(Number(b.points));});
       if(id==="blob_walletLog")return Array.isArray(v)&&v.length<=400&&v.every(function(e){return e&&typeof e==="object"&&typeof e.id==="string"&&typeof e.p==="string"&&isFinite(e.d)&&typeof e.t==="string";});
-      if(id==="blob_trial")return !Array.isArray(v)&&isFinite(v.cap)&&isFinite(v.rate)&&typeof v.start==="string";
+      if(id==="blob_coach")return !Array.isArray(v)&&typeof v.on==="boolean"&&typeof v.url==="string"&&v.url.length<=200&&(v.grade===undefined||(v.grade&&typeof v.grade==="object"&&!Array.isArray(v.grade)));if(id==="blob_trial")return !Array.isArray(v)&&isFinite(v.cap)&&isFinite(v.rate)&&typeof v.start==="string";
       if(id==="blob_cosmetics")return !Array.isArray(v)&&Object.keys(v).every(function(k){var c=v[k];return c&&typeof c==="object"&&Array.isArray(c.owned)&&c.owned.length<=30&&c.equipped&&typeof c.equipped==="object";});
       if(id==="blob_pins"){return Object.keys(v).every(function(k){return typeof v[k]==="string"&&v[k].length<=120;});}return true;}
     if(id.indexOf("tasks_")===0)return Array.isArray(v)&&v.length<=300&&v.every(function(t){return t&&typeof t==="object"&&typeof t.id==="string"&&typeof t.t==="string";});
@@ -3331,7 +3331,7 @@ Object.keys(S.done).forEach(function(k){if(S.done[k]!=="p")return;if((S.petClaim
 h+=approvalRow(k,p,t,a[0]);});
 if(!n)h+="<span class='note'>Nothing waiting.</span>";
 h+="</div><p class='note'>Accept the amount shown, tap Half or +1, or type any amount in 0.5-point steps (you can give more than the listed value). Approving 0 marks the chore complete without points; Send back returns it for more work.</p>"+awardHistoryHtml()+reqHtml()+trialHtml()+eventReqHtml()+boardReqHtml()+parentNotesHtml()+phase2ParentHtml()+"<h2>Add a chore or task</h2><div class='card'><select id='tp' aria-label='Who is this task for'>"+P.map(function(p){return "<option value='"+p.id+"'>"+esc(p.n)+"</option>"}).join("")+"</select><input id='tg' placeholder='Group (Morning, After school…)'><input id='tt' placeholder='Chore or task'><label class='timedchk' for='ntimed'><input type='checkbox' id='ntimed'> Timed (shows a countdown)</label><span id='ntwrap' style='display:none'><input id='tm' type='number' min='1' max='240' step='1' placeholder='Minutes' value='5' style='width:110px' aria-label='Minutes for the countdown'></span><label for='tpoints'>Points (children and pet chores)</label><input id='tpoints' type='number' min='0' max='1000' step='1' value='1' style='width:100px'><button class='btn' data-a='addt'>Add task</button><p class='note'>New tasks appear every day. Use Edit name / schedule below to choose weekdays and a due time.</p></div>";
-h+=deviceAdminHtml();h+=syncAdminHtml();h+=feedAdminHtml();h+=aiAdminHtml();h+=displayFxHtml();h+=challengeAdminHtml();h+=manageTasksHtml();
+h+=deviceAdminHtml();h+=syncAdminHtml();h+=feedAdminHtml();h+=aiAdminHtml();if(typeof coachAdminHtml==="function")h+=coachAdminHtml();h+=displayFxHtml();h+=challengeAdminHtml();h+=manageTasksHtml();
 h+=wxSettingsHtml()+setHtml()+hhBackupHtml()+"<h2>Settings</h2><div class='card'><label for='hubtheme'>Appearance</label><select id='hubtheme'><option value='auto'>Automatic</option><option value='light'>Light</option><option value='dark'>Dark</option></select><br><input id='np' type='password' inputmode='numeric' placeholder='New PIN'><button class='btn' data-a='setpin'>Change PIN</button> <button class='btn n' data-a='lock'>Lock</button></div>";return h}
 function v(id){var e=document.getElementById(id);return e?e.value.trim():""}
 document.addEventListener("click",function(e){var b=e.target.closest("[data-a]");if(!b)return;var a=b.getAttribute("data-a"),d=function(k){return b.getAttribute("data-"+k)};
@@ -5109,7 +5109,7 @@ function hwCss(){
 function hwHtml(){
   hwCss();hwTidy();
   var kids=hwKids(),h="<h1>📚 Homework</h1>";
-  h+="<div class='hw-bar'><button class='btn' type='button' data-hw='voice'>🎤 Say it</button><button class='btn' type='button' data-hw='photo'>📷 Photo</button><button class='btn' type='button' data-hw='new'>＋ Type it</button></div>";
+  h+="<div class='hw-bar'><button class='btn' type='button' data-hw='voice'>🎤 Say it</button><button class='btn' type='button' data-hw='photo'>📷 Photo</button><button class='btn' type='button' data-hw='new'>＋ Type it</button></div>"+(typeof coachBtn==='function'&&coachBtn(hwUI.kid||'','g')?"<div class='hw-bar'>"+coachBtn(hwUI.kid||'','g')+"</div>":"");
   if(hwUI.msg)h+="<p class='hw-msg' role='status'>"+esc(hwUI.msg)+"</p>";
   if(hwUI.photo)h+=hwPhotoHtml();
   if(hwUI.props.length)h+=hwPropsHtml();
@@ -5372,6 +5372,173 @@ document.addEventListener("click",function(e){
     setTimeout(function(){var gi=document.getElementById("gi");if(gi)gi.focus();},30);
   });
 })();
+</script>
+<script>
+/* ===== v38.2: Homework coach (hint-first AI help from a photo or screenshot) ===== */
+var CO={kid:"",busy:false,msg:"",res:null,pi:0,hints:0,tries:0,show:false,last:"",ok:false};
+var CO_DAY_MAX=25;
+function coachSet(){var c=S.coach;return c&&typeof c==="object"&&!Array.isArray(c)?c:{};}
+function coachBase(){
+  var a=aiBase();if(a)return a;
+  var c=coachSet(),u=String(c.url||"").trim().replace(/\/+$/,"");
+  return c.on&&/^https:\/\/[A-Za-z0-9.\-]+(:\d+)?$/.test(u)?u:"";
+}
+function coachReady(){return !!coachBase();}
+function coachUsed(){try{var o=JSON.parse(localStorage.getItem("familyhub-coach-day")||"{}");return o.d===today()?(+o.n||0):0;}catch(e){return 0;}}
+function coachCount(){try{localStorage.setItem("familyhub-coach-day",JSON.stringify({d:today(),n:coachUsed()+1}));}catch(e){}}
+function coachBtn(kid,cls){return coachReady()?"<button class='btn "+(cls||"")+"' data-co='open'"+(kid?" data-k='"+esc(kid)+"'":"")+">🧑‍🏫 Help me with a problem</button>":"";}
+/* answer checking: numbers, fractions, mixed numbers, "x = 5", units */
+function coachNum(s){
+  s=String(s||"").toLowerCase().replace(/[,$\s]/g,"").replace(/^[a-z]=/,"").replace(/(cm|mm|km|m|kg|g|lb|lbs|oz|in|ft|yd|mi|l|ml|°|degrees|units?|sq|cubic|%)+$/,"");
+  var m;
+  if((m=/^(-?\d+)(?:and|\+)?(\d+)\/(\d+)$/.exec(s))&&+m[3])return (+m[1]<0?-1:1)*(Math.abs(+m[1])+(+m[2])/(+m[3]));
+  if((m=/^(-?\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)$/.exec(s))&&+m[2])return (+m[1])/(+m[2]);
+  if(/^-?\d*\.?\d+$/.test(s))return +s;
+  return null;
+}
+function coachNorm(s){return String(s||"").toLowerCase().replace(/^\s*[a-z]\s*=\s*/,"").replace(/[^a-z0-9./-]/g,"");}
+function coachCheck(p,ans){
+  if(!String(ans||"").trim())return null;
+  var want=(typeof p.answerNum==="number"&&isFinite(p.answerNum))?p.answerNum:coachNum(p.answer),got=coachNum(ans);
+  if(want!==null&&got!==null)return Math.abs(want-got)<=Math.max(1e-6,Math.abs(want)*1e-4);
+  if(!p.answer)return null;
+  return coachNorm(ans)===coachNorm(p.answer);
+}
+function coachClean(r){
+  var o={readable:r&&r.readable!==false,note:aiClean(r&&r.note,300),problems:[]};
+  ((r&&Array.isArray(r.problems))?r.problems:[]).slice(0,6).forEach(function(p){
+    if(!p||typeof p!=="object")return;
+    var q=aiClean(p.question,600);if(!q)return;
+    o.problems.push({question:q,topic:aiClean(p.topic,60),
+      hints:(Array.isArray(p.hints)?p.hints:[]).map(function(h){return aiClean(h,400);}).filter(Boolean).slice(0,4),
+      answer:aiClean(p.answer,120),answerNum:(typeof p.answerNum==="number"&&isFinite(p.answerNum))?p.answerNum:null,
+      steps:(Array.isArray(p.steps)?p.steps:[]).map(function(h){return aiClean(h,400);}).filter(Boolean).slice(0,12),
+      checkTip:aiClean(p.checkTip,300),sure:p.sure!==false});
+  });
+  return o;
+}
+function coachCss(){
+  if(document.getElementById("coach-css"))return;
+  var st=document.createElement("style");st.id="coach-css";
+  st.textContent=
+  "#coach{position:fixed;inset:0;z-index:9000;background:rgba(10,14,30,.6);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:16px}"+
+  "#coach .cbox{background:var(--card-solid,#1e293b);color:var(--ink,#eef);border-radius:24px;max-width:640px;width:100%;padding:18px 18px 22px;box-shadow:0 20px 50px rgba(0,0,0,.45);margin:auto 0}"+
+  "#coach h2{margin:0 0 6px;font-size:26px}#coach .ctop{display:flex;align-items:center;gap:10px}#coach .ctop h2{flex:1}"+
+  "#coach .btn{min-height:52px;font-size:18px}#coach textarea,#coach input[type=text]{width:100%;font-size:20px;min-height:52px}"+
+  "#coach .cq{font-size:24px;font-weight:700;line-height:1.35;white-space:pre-wrap;overflow-wrap:anywhere;background:rgba(59,91,219,.14);border-radius:16px;padding:14px 16px;margin:10px 0}"+
+  "#coach .chint{background:rgba(245,197,24,.16);border-left:6px solid #f5c518;border-radius:12px;padding:10px 14px;margin:8px 0;font-size:19px}"+
+  "#coach .cwarn{background:rgba(217,130,43,.18);border-left:6px solid #d9822b;border-radius:12px;padding:10px 14px;margin:8px 0}"+
+  "#coach .cok{font-size:22px;font-weight:800;color:#2e9d5b;margin:8px 0}#coach .cno{font-size:20px;font-weight:700;color:#d9822b;margin:8px 0}"+
+  "#coach .csteps{margin:8px 0 0 0;padding-left:26px;font-size:19px}#coach .csteps li{margin:6px 0}"+
+  "#coach .cpick{display:flex;flex-direction:column;gap:8px;margin:8px 0}#coach .cpick .btn{text-align:left;white-space:normal;overflow-wrap:anywhere}"+
+  "#coach .crow{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}#coach .crow .btn{flex:1 1 160px}"+
+  "#coach .cfile{display:block;text-align:center;padding:22px;border:3px dashed var(--line,#556);border-radius:18px;font-size:20px;font-weight:700;cursor:pointer;margin:10px 0}"+
+  "#coach .cfile img{max-width:100%;max-height:220px;border-radius:12px;display:block;margin:0 auto 8px}"+
+  "#coach .cfoot{font-size:14px;opacity:.75;margin-top:14px}";
+  document.head.appendChild(st);
+}
+function coachKids(){return hwKids();}
+function coachOpen(kid){
+  coachCss();CO={kid:kid||CO.kid||"",busy:false,msg:"",res:null,pi:0,hints:0,tries:0,show:false,last:"",ok:false,img:null};
+  var ks=coachKids();if(!CO.kid&&ks.length===1)CO.kid=ks[0].id;
+  if(!CO.kid&&view==="person"&&person(pid)&&person(pid).kid)CO.kid=pid;
+  coachDraw();
+}
+function coachClose(){var o=document.getElementById("coach");if(o&&o.parentNode)o.parentNode.removeChild(o);CO.img=null;}
+function coachDraw(){
+  var o=document.getElementById("coach");
+  if(!o){o=document.createElement("div");o.id="coach";o.setAttribute("role","dialog");o.setAttribute("aria-modal","true");o.setAttribute("aria-label","Homework coach");document.body.appendChild(o);}
+  var h="<div class='cbox'><div class='ctop'><h2>🧑‍🏫 Homework coach</h2><button class='btn n' data-co='close' aria-label='Close'>✕</button></div>";
+  if(!CO.res){
+    var ks=coachKids();
+    if(ks.length>1){h+="<p><b>Who needs help?</b></p><div class='hw-chips'>"+ks.map(function(k){return "<button class='hw-chip"+(CO.kid===k.id?" on":"")+"' data-co='kid' data-k='"+esc(k.id)+"'>"+esc(k.e||"")+" "+esc(k.n)+"</button>";}).join("")+"</div>";}
+    h+="<label class='cfile' for='copic'>"+(CO.img?"<img src='data:"+CO.img.mime+";base64,"+CO.img.data+"' alt='Your homework photo'>Tap to choose a different picture":"📷 Take a photo or pick a screenshot of the problem")+"</label><input type='file' id='copic' accept='image/*' style='display:none'>";
+    h+="<label for='cotext'>Or type the problem, or what you are stuck on (optional)</label><textarea id='cotext' rows='2' maxlength='600' placeholder='Example: number 4, I don’t get how to start'>"+esc(CO.last||"")+"</textarea>";
+    h+="<div class='crow'><button class='btn g' data-co='go'"+(CO.busy?" disabled":"")+">"+(CO.busy?"Reading your homework…":"✨ Help me")+"</button></div>";
+    if(CO.msg)h+="<p class='cwarn' role='status'>"+esc(CO.msg)+"</p>";
+    h+="<p class='note'>I will give you hints first, so you can figure it out yourself. 💪</p>";
+  }else{
+    var r=CO.res;
+    if(!r.problems.length){h+="<p class='cwarn'>"+esc(r.note||"I could not find a problem in that picture. Try a closer, brighter photo, or type the problem.")+"</p><div class='crow'><button class='btn g' data-co='again'>Try again</button></div>";}
+    else if(CO.pi<0){
+      h+="<p><b>I found "+r.problems.length+" problems. Which one do you need help with?</b></p><div class='cpick'>"+r.problems.map(function(p,i){return "<button class='btn n' data-co='pick' data-i='"+i+"'>"+(i+1)+". "+esc(p.question.length>110?p.question.slice(0,110)+"…":p.question)+"</button>";}).join("")+"</div><div class='crow'><button class='btn' data-co='again'>📷 New problem</button></div>";
+    }else{
+      var p=r.problems[CO.pi];
+      h+=(p.topic?"<p class='note'>"+esc(p.topic)+"</p>":"")+"<div class='cq'>"+esc(p.question)+"</div><p class='note'>Is that what your page says? If not, take a clearer photo.</p>";
+      if(!p.sure||r.readable===false)h+="<p class='cwarn'>⚠️ I am not completely sure about this one. Double-check with a parent.</p>";
+      for(var i=0;i<CO.hints&&i<p.hints.length;i++)h+="<div class='chint'><b>💡 Hint "+(i+1)+":</b> "+esc(p.hints[i])+"</div>";
+      if(!CO.ok){
+        h+="<label for='coans'><b>Your answer</b></label><input type='text' id='coans' inputmode='text' autocomplete='off' maxlength='80' placeholder='Type your answer'>";
+        h+="<div class='crow'><button class='btn g' data-co='check'>✅ Check my answer</button>"+(CO.hints<p.hints.length?"<button class='btn' data-co='hint'>💡 Hint "+(CO.hints+1)+" of "+p.hints.length+"</button>":"")+"</div>";
+      }
+      if(CO.verdict===true)h+="<p class='cok' role='status'>🎉 Yes! "+esc(CO.lastAns)+" is right. Great thinking!</p>";
+      else if(CO.verdict===false)h+="<p class='cno' role='status'>Not quite"+(CO.tries>1?" yet":"")+". "+(CO.hints<p.hints.length?"Try a hint, then try again.":"Look at the hints again, or see how to solve it.")+"</p>";
+      else if(CO.verdict==="?")h+="<p class='note' role='status'>I can’t check that kind of answer myself. Compare it with the worked solution, or ask a parent.</p>";
+      var canShow=CO.ok||CO.hints>0||CO.tries>0||devRole()==="parent";
+      if(CO.show){
+        h+="<h3>How to solve it</h3><ol class='csteps'>"+p.steps.map(function(s){return "<li>"+esc(s)+"</li>";}).join("")+"</ol>"+(p.answer?"<p><b>Answer:</b> "+esc(p.answer)+"</p>":"")+(p.checkTip?"<p class='note'>🔎 Check it: "+esc(p.checkTip)+"</p>":"");
+      }else if(p.steps.length)h+="<div class='crow'><button class='btn n' data-co='show'"+(canShow?"":" disabled")+">📖 Show me how to solve it</button></div>"+(canShow?"":"<p class='note'>Try a hint or an answer first. You can do it!</p>");
+      h+="<div class='crow'>"+(r.problems.length>1?"<button class='btn n' data-co='list'>Other problems</button>":"")+"<button class='btn' data-co='again'>📷 New problem</button></div>";
+    }
+  }
+  h+="<p class='cfoot'>The AI can make mistakes, and your photo is sent to Google’s Gemini to be read. If something looks wrong, ask a parent. "+Math.max(0,CO_DAY_MAX-coachUsed())+" helps left today on this device.</p></div>";
+  o.innerHTML=h;
+}
+function coachGo(){
+  if(CO.busy)return;
+  var t=((document.getElementById("cotext")||{}).value||"").trim();CO.last=t;
+  if(!CO.img&&!t){CO.msg="Add a photo of the problem, or type it.";coachDraw();return;}
+  if(!coachBase()){CO.msg="The homework coach is not turned on. Ask a parent (Parent area > Homework coach).";coachDraw();return;}
+  if(coachUsed()>=CO_DAY_MAX){CO.msg="That’s all the AI help for today on this device. Ask a parent, or try again tomorrow.";coachDraw();return;}
+  var k=person(CO.kid),g=(coachSet().grade||{})[CO.kid]||"";
+  var body={task:"tutor",text:t,today:today()};if(g)body.grade=String(g).slice(0,20);if(CO.img)body.image=CO.img;
+  CO.busy=true;CO.msg="";coachDraw();coachCount();
+  aiToken().then(function(tok){return fetch(coachBase()+"/ai",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+tok},body:JSON.stringify(body)});})
+  .then(function(r){return r.text().then(function(txt){if(!r.ok)throw new Error(aiErrText(r,txt));var j=JSON.parse(txt);return coachClean(j.result);});})
+  .then(function(res){CO.busy=false;CO.res=res;CO.pi=res.problems.length>1?-1:0;CO.hints=0;CO.tries=0;CO.show=false;CO.ok=false;CO.verdict=null;coachDraw();})
+  .catch(function(e){CO.busy=false;CO.msg=(e&&e.message)||"Something went wrong. Try again.";coachDraw();});
+}
+document.addEventListener("change",function(e){
+  if(!e.target||e.target.id!=="copic"||!e.target.files||!e.target.files[0])return;
+  var t=document.getElementById("cotext");if(t)CO.last=t.value;
+  CO.msg="Getting the picture ready…";coachDraw();
+  aiShrink(e.target.files[0]).then(function(img){CO.img=img;CO.msg="";coachDraw();}).catch(function(x){CO.msg=x.message;coachDraw();});
+});
+document.addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target&&e.target.id==="coans"){e.preventDefault();var b=document.querySelector("[data-co='check']");if(b)b.click();}if(e.key==="Escape"&&document.getElementById("coach"))coachClose();});
+document.addEventListener("click",function(e){
+  var b=e.target&&e.target.closest?e.target.closest("[data-co]"):null;if(!b)return;
+  e.preventDefault();var a=b.getAttribute("data-co");
+  if(a==="open"){coachOpen(b.getAttribute("data-k"));return;}
+  if(a==="close"){coachClose();return;}
+  if(a==="kid"){var t=document.getElementById("cotext");if(t)CO.last=t.value;CO.kid=b.getAttribute("data-k");coachDraw();return;}
+  if(a==="go"){coachGo();return;}
+  if(a==="again"){CO.res=null;CO.img=null;CO.last="";CO.msg="";coachDraw();return;}
+  if(a==="list"){CO.pi=-1;coachDraw();return;}
+  if(a==="pick"){CO.pi=+b.getAttribute("data-i");CO.hints=0;CO.tries=0;CO.show=false;CO.ok=false;CO.verdict=null;coachDraw();return;}
+  var p=CO.res&&CO.res.problems[CO.pi];if(!p)return;
+  if(a==="hint"){if(CO.hints<p.hints.length)CO.hints++;CO.verdict=null;coachDraw();return;}
+  if(a==="show"){CO.show=true;coachDraw();return;}
+  if(a==="check"){var v=((document.getElementById("coans")||{}).value||"").trim();if(!v)return;CO.tries++;CO.lastAns=v;var ok=coachCheck(p,v);
+    CO.verdict=ok===null?"?":ok;if(ok===true){CO.ok=true;try{hwCelebrate("🎉 You got it!");}catch(x){}}coachDraw();
+    if(ok!==true){var inp=document.getElementById("coans");if(inp){inp.value=v;}}return;}
+});
+/* Parent settings */
+function coachAdminHtml(){
+  var c=coachSet(),has=!!aiBase(),h="<h2>Homework coach</h2><div class='card'>";
+  h+="<p class='note'>Kids photograph or type a problem and get step-by-step hints, then can check their answer. The full solution only appears after they try. Uses the AI helper (Gemini), so the photo goes to Google, and the AI can make mistakes.</p>";
+  if(!has)return h+"<p>Set up the AI helper first (section above).</p></div>";
+  h+="<label class='timedchk'><input type='checkbox' id='coon'"+(c.on?" checked":"")+"> Allow the homework coach on kids’ devices</label>";
+  h+="<p class='note'>This shares only the helper’s web address with the kids’ devices. The helper must also list the kids’ account in KID_UIDS (helper version 2), which lets that account use the coach and nothing else.</p>";
+  h+="<p><b>School grade (helps the AI explain at the right level)</b></p>"+hwKids().map(function(k){return "<label>"+esc(k.n)+" <input id='cog-"+esc(k.id)+"' data-k='"+esc(k.id)+"' class='cograde' maxlength='12' style='width:90px' value='"+esc(((c.grade||{})[k.id])||"")+"' placeholder='e.g. 4'></label> ";}).join("");
+  h+="<div><button class='btn g' data-co='psave'>Save coach settings</button> "+coachBtn("","n")+"</div></div>";
+  return h;
+}
+document.addEventListener("click",function(e){
+  var b=e.target&&e.target.closest?e.target.closest("[data-co='psave']"):null;if(!b||!unlocked)return;
+  var on=!!(document.getElementById("coon")||{}).checked,g={};
+  Array.prototype.forEach.call(document.querySelectorAll(".cograde"),function(i){var v=String(i.value||"").trim().slice(0,12);if(v&&/^[A-Za-z0-9 -]+$/.test(v))g[i.getAttribute("data-k")]=v;});
+  S.coach={on:on,url:on?aiBase():"",grade:g};if(!save())return;render();statusMessage(on?"Homework coach is on for kids’ devices.":"Homework coach settings saved.");
+});
 </script>
 </body>
 </html>
