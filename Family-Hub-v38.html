@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.14";
+var FH_BUILD="v38.15";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -4191,7 +4191,7 @@ function palHtml(){
   var sm=typeof pcSummary==='function'?pcSummary():null,t0=today();
   function openFor(pet){return sm?sm.list.filter(function(it){return it.pet===pet&&!(sm.ix[t0+'|'+it.id]||[]).length;}):[];}
   var bOpen=openFor(bow.id),say=mood.face+' '+esc(bow.n)+': '+esc(mood.say);
-  if(sm&&bOpen.length){var nx=bOpen[0];say=esc(nx.e)+' '+esc(bow.n)+': '+esc(palAsk(nx))+(nx.kid&&person(nx.kid)?' <b>'+esc(person(nx.kid).n)+'</b>, that’s you!':'');}
+  if(sm&&bOpen.length){var nx=bOpen[0];say=esc(nx.e)+' '+esc(bow.n)+': '+esc(typeof palAsk==='function'?palAsk(nx):('Can someone help with: '+(nx.label||'my care')+'?'))+(nx.kid&&person(nx.kid)?' <b>'+esc(person(nx.kid).n)+'</b>, that’s you!':'');}
   else if(sm&&sm.list.some(function(it){return it.pet===bow.id;}))say='🥰 '+esc(bow.n)+': All my care is done today. Best family ever!';
   var h='<section class="card pal-card"><h2>🐾 Family pals</h2><div class="pal"><button class="pal-emoji pal-tap" data-pal="pet" data-p="'+esc(bow.id)+'" aria-label="Pet '+esc(bow.n)+'" title="Tap to pet '+esc(bow.n)+'">'+esc(bow.e)+'</button><div><div class="bubble" id="pal-bubble">'+say+'</div><p class="note">'+esc(bow.n)+'’s mood follows everyone’s chores today: '+mood.pc+'%. Tap '+esc(bow.n)+' to give a pat.</p></div></div><div class="chips">';
   pets.forEach(function(m){
