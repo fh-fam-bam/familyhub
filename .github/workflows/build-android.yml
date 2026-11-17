@@ -18,10 +18,15 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
-
+      # GitHub's Ubuntu runners already include the Android SDK (ANDROID_HOME).
+      # (android-actions/setup-android@v3 was removed: it tries to install the
+      # retired 'tools' package and fails.)
       - name: Install Android build parts
-        run: yes | sdkmanager "platforms;android-34" "build-tools;34.0.0"
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKM" ]; then SDKM="$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -n 1)"; fi
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "platforms;android-34" "build-tools;34.0.0"
 
       - uses: gradle/actions/setup-gradle@v4
         with:
