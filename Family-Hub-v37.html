@@ -479,17 +479,36 @@ html:not(.lite) .card,html:not(.lite) .cd{box-shadow:0 1px 2px rgba(25,35,70,.06
        webkitSpeechRecognition but it does not work there, so do not step aside for it. */
     var N=window.FHNative;
     if(!N||typeof N.isAvailable!=="function"||!N.isAvailable())return;
-    var cur=null;
+    /* v37.1: keep listening through pauses. Android's recognizer stops at the first short pause,
+       so after each finished phrase we start it again and add the next phrase to the earlier ones.
+       Listening ends when the person taps the mic again, after a few seconds of silence, or after 60 s. */
+    var cur=null,MAXMS=60000;
     function Shim(){this.lang="en-US";this.interimResults=false;this.continuous=false;this.maxAlternatives=1;this.onresult=null;this.onerror=null;this.onend=null;}
-    Shim.prototype.start=function(){if(cur&&cur!==this){var o=cur;cur=null;try{if(o.onend)o.onend();}catch(e){}}cur=this;N.start(this.lang||"en-US");};
-    Shim.prototype.stop=function(){try{N.stop();}catch(e){}};
-    Shim.prototype.abort=function(){try{N.cancel();}catch(e){}};
+    function deliver(r,extra){var a=[];for(var i=0;i<r._segs.length;i++)a.push([{transcript:r._segs[i]}]);if(extra)a.push([{transcript:extra}]);if(a.length&&r.onresult)r.onresult({results:a});}
+    function finish(r){if(cur===r)cur=null;r._again=false;try{if(r.onend)r.onend();}catch(e){}}
+    Shim.prototype.start=function(){if(cur&&cur!==this){var o=cur;o._stopping=true;finish(o);}cur=this;this._segs=[];this._stopping=false;this._again=false;this._t0=Date.now();N.start(this.lang||"en-US");};
+    Shim.prototype.stop=function(){this._stopping=true;try{N.stop();}catch(e){}};
+    Shim.prototype.abort=function(){this._stopping=true;try{N.cancel();}catch(e){}};
     window.__fhSpeech=function(kind,text){
       var r=cur;if(!r)return;
       try{
-        if(kind==="partial"||kind==="final"){if(r.onresult)r.onresult({results:[[{transcript:String(text||"")}]]});}
-        else if(kind==="error"){if(r.onerror)r.onerror({error:String(text||"other")});}
-        else if(kind==="end"){cur=null;if(r.onend)r.onend();}
+        text=String(text||"");
+        if(kind==="partial"){if(text)deliver(r,text);}
+        else if(kind==="final"){
+          if(text)r._segs.push(text);
+          deliver(r,"");
+          r._again=!r._stopping&&(Date.now()-r._t0<MAXMS);
+        }
+        else if(kind==="error"){
+          r._again=false;
+          if(!r._segs.length&&r.onerror)r.onerror({error:text||"other"});
+        }
+        else if(kind==="end"){
+          if(r._again){
+            r._again=false;
+            setTimeout(function(){if(cur!==r)return;if(r._stopping){finish(r);return;}try{N.start(r.lang||"en-US");}catch(e){finish(r);}},60);
+          }else{finish(r);}
+        }
       }catch(e){}
     };
     window.webkitSpeechRecognition=Shim;
@@ -1420,7 +1439,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v37.0";
+var FH_BUILD="v37.1";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -4765,6 +4784,70 @@ function sfApplyVoice(text){
   sfSummaries();
   var bits=[];bits.push('✔ '+(r.title||'Event'));bits.push(niceDate(r.date)+(r.dateFound?'':' (date not heard: today)'));bits.push(r.allday?'All day':(r.start?niceTime(r.start)+(r.end?'–'+niceTime(r.end):''):'no time heard'));
   sfSay('Heard: “'+text+'”. Filled in: '+bits.join(' · ')+'. Check it, then tap Save.');
+  sfReview(r,text);
+}
+/* ---- v37.1: "Did I get this right?" review card after Talk to Add ---- */
+function sfReviewClose(){var o=document.getElementById('sfrev');if(o&&o.parentNode)o.parentNode.removeChild(o);document.removeEventListener('keydown',sfReviewKey,true);}
+function sfReviewKey(e){if(e.key==='Escape'){e.preventDefault();sfReviewAct('edit');}}
+function sfReviewCss(){
+  if(document.getElementById('sfrev-css'))return;
+  var st=document.createElement('style');st.id='sfrev-css';
+  st.textContent='#sfrev{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(10,15,30,.55)}'+
+  '#sfrev .rv{width:100%;max-width:640px;max-height:calc(100vh - 32px);overflow:auto;background:var(--card,#fff);color:var(--ink,#26304a);border:1px solid var(--line,#e0dcf0);border-radius:24px;padding:22px 24px;box-shadow:0 18px 48px rgba(0,0,0,.35)}'+
+  '#sfrev h2{margin:0 0 4px;font-size:24px}#sfrev .rv-heard{margin:0 0 14px;color:var(--mute,#5a6479);font-size:15px}'+
+  '#sfrev .rv-t{font-size:28px;font-weight:700;margin:0 0 10px;line-height:1.2}'+
+  '#sfrev .rv-row{display:flex;gap:12px;align-items:flex-start;font-size:20px;padding:10px 0;border-top:1px solid var(--line,#e0dcf0)}#sfrev .rv-row b{min-width:28px}'+
+  '#sfrev .rv-warn{color:#b35c00;font-weight:600}#sfrev .rv-warn::before{content:"⚠️ "}'+
+  '#sfrev label{display:block;font-weight:700;margin:12px 0 6px}#sfrev select{font-size:18px;min-height:48px;width:100%}'+
+  '#sfrev .rv-btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}#sfrev .rv-btns button{flex:1 1 150px;min-height:60px;font-size:19px;font-weight:700;border:0;border-radius:16px;color:#fff;cursor:pointer;padding:10px 14px}'+
+  '#sfrev .rv-save{background:#207544}#sfrev .rv-edit{background:#53657a}#sfrev .rv-again{background:#3b5bdb}#sfrev .rv-msg{color:#b00020;font-weight:600;margin:10px 0 0;min-height:1em}';
+  document.head.appendChild(st);
+}
+function sfReview(r,text){
+  sfReviewClose();sfReviewCss();
+  var whoIds=[],cbs=document.querySelectorAll('#event-editor input[id^="ep-"]');
+  for(var i=0;i<cbs.length;i++)if(cbs[i].checked)whoIds.push(cbs[i].id.slice(3));
+  var whoTxt=whoIds.length?whoIds.map(function(id){var p=person(id);return p?p.n:id;}).join(', '):'Whole family';
+  var title=(document.getElementById('et')||{}).value||'';
+  var rows=[];
+  rows.push('<div class="rv-row"><b>📅</b><span>'+esc(niceDate(r.date))+(r.dateFound?'':' <span class="rv-warn">Date not heard, so it is set to today</span>')+'</span></div>');
+  var tm=r.allday?'All day':(r.start?niceTime(r.start)+(r.end?' – '+niceTime(r.end):''):'');
+  rows.push('<div class="rv-row"><b>🕒</b><span>'+(tm?esc(tm):'<span class="rv-warn">No time heard, so it will be all day</span>')+'</span></div>');
+  rows.push('<div class="rv-row"><b>👤</b><span>'+esc(whoTxt)+'</span></div>');
+  if(r.repeat)rows.push('<div class="rv-row"><b>🔁</b><span>'+(r.repeat==='weekly'?'Every week':r.repeat==='daily'?'Every day':esc(r.repeat))+'</span></div>');
+  var kidSel='',by=document.getElementById('ebyk');
+  if(by){kidSel='<label for="sfrev-by">Who is suggesting this?</label><select id="sfrev-by">'+by.innerHTML+'</select>';}
+  var saveBtn=document.querySelector('#event-editor [data-a=nxsaveevent]');
+  var saveTxt=saveBtn?saveBtn.textContent:'Save event';
+  var o=document.createElement('div');o.id='sfrev';o.setAttribute('role','dialog');o.setAttribute('aria-modal','true');o.setAttribute('aria-labelledby','sfrev-h');
+  o.innerHTML='<div class="rv"><h2 id="sfrev-h">Did I get this right?</h2><p class="rv-heard">I heard: “'+esc(text)+'”</p>'+
+    '<div class="rv-t">'+(title?esc(title):'<span class="rv-warn">No event name heard</span>')+'</div>'+rows.join('')+kidSel+
+    '<p class="rv-msg" id="sfrev-msg" role="alert"></p>'+
+    '<div class="rv-btns"><button type="button" class="rv-save" data-rv="save">✔ '+esc(saveTxt)+'</button><button type="button" class="rv-edit" data-rv="edit">✏️ Edit</button><button type="button" class="rv-again" data-rv="again">🎤 Say it again</button></div></div>';
+  if(by){var s2=o.querySelector('#sfrev-by');if(s2)s2.value=by.value;}
+  o.addEventListener('click',function(e){
+    var b=e.target&&e.target.closest?e.target.closest('[data-rv]'):null;
+    if(b){e.stopPropagation();sfReviewAct(b.getAttribute('data-rv'));return;}
+    if(e.target===o){e.stopPropagation();sfReviewAct('edit');}
+  });
+  document.body.appendChild(o);
+  document.addEventListener('keydown',sfReviewKey,true);
+  var first=o.querySelector(title?'.rv-save':'.rv-edit');if(first)first.focus();
+}
+function sfReviewAct(a){
+  if(a==='save'){
+    var title=(document.getElementById('et')||{}).value||'',msg=document.getElementById('sfrev-msg');
+    if(!title.trim()){if(msg)msg.textContent='Add an event name first: tap Edit.';return;}
+    var s2=document.getElementById('sfrev-by'),by=document.getElementById('ebyk');
+    if(s2&&by){if(!s2.value){if(msg)msg.textContent='Choose your name first.';s2.focus();return;}by.value=s2.value;}
+    var sb=document.querySelector('#event-editor [data-a=nxsaveevent]');
+    sfReviewClose();
+    if(sb)sb.click();
+    return;
+  }
+  sfReviewClose();
+  if(a==='again'){sfStartVoice();return;}
+  var et=document.getElementById('et');if(et){try{et.scrollIntoView({block:'center'});}catch(e){}et.focus();}
 }
 function sfStartVoice(){
   var C=sfSpeechCtor();
@@ -4772,7 +4855,7 @@ function sfStartVoice(){
   if(sfRec){try{sfRec.stop();}catch(e){}return;}
   var r=new C(),finalText='';
   try{r.lang=navigator.language||'en-US';r.interimResults=true;r.continuous=false;r.maxAlternatives=1;}catch(e){}
-  r.onresult=function(ev){var t='';for(var i=0;i<ev.results.length;i++){t+=ev.results[i][0].transcript+' ';}finalText=t.replace(/\s+/g,' ').trim();sfSay('Heard: “'+finalText+'”');};
+  r.onresult=function(ev){var t='';for(var i=0;i<ev.results.length;i++){t+=ev.results[i][0].transcript+' ';}finalText=t.replace(/\s+/g,' ').trim();sfSay('Heard: “'+finalText+'”'+(window.FHNative?' · Keep talking, or tap the 🎤 when you are done.':''));};
   r.onerror=function(ev){var er=ev&&ev.error;sfSetMic(false);sfSay((er==='not-allowed'||er==='service-not-allowed')?'The microphone is blocked. Allow microphone access for this page in the browser settings, then try again.':er==='no-speech'?'I did not hear anything. Tap the microphone and try again.':'Voice input did not work here. You can still type the event.');};
   r.onend=function(){sfRec=null;sfSetMic(false);if(finalText)sfApplyVoice(finalText);};
   sfRec=r;sfSetMic(true);sfSay('Listening… say something like “Soccer practice tomorrow at 4 pm for Julian”.');
