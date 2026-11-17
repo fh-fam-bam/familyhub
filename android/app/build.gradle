@@ -1,0 +1,43 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.fhfambam.familyhub'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.fhfambam.familyhub"
+        minSdk 28          // Fire HD 10 (2019) runs Android 9 = API 28
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    signingConfigs {
+        release {
+            // Filled in by the GitHub build only when the signing secrets exist.
+            def ks = System.getenv("FH_KS_FILE")
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv("FH_KS_PASS")
+                keyAlias System.getenv("FH_KEY_ALIAS")
+                keyPassword System.getenv("FH_KEY_PASS")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (System.getenv("FH_KS_FILE")) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

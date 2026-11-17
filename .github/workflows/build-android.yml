@@ -1,0 +1,56 @@
+name: Build Android app (Fire tablets)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'android/**'
+      - '.github/workflows/build-android.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android build parts
+        run: yes | sdkmanager "platforms;android-34" "build-tools;34.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Pack the current Family-Hub.html inside the app (offline fallback)
+        run: |
+          mkdir -p android/app/src/main/assets
+          cp Family-Hub.html android/app/src/main/assets/Family-Hub.html
+
+      - name: Build (signed if your signing secrets exist, otherwise debug-signed)
+        env:
+          KS_B64: ${{ secrets.FH_KEYSTORE_B64 }}
+          FH_KS_PASS: ${{ secrets.FH_KEYSTORE_PASSWORD }}
+          FH_KEY_ALIAS: ${{ secrets.FH_KEY_ALIAS }}
+          FH_KEY_PASS: ${{ secrets.FH_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/fh.keystore"
+            export FH_KS_FILE="$RUNNER_TEMP/fh.keystore"
+            gradle -p android assembleRelease
+            cp android/app/build/outputs/apk/release/app-release.apk FamilyHub.apk
+          else
+            echo "No signing secrets found: building a debug-signed APK (reinstall needs uninstall first)."
+            gradle -p android assembleDebug
+            cp android/app/build/outputs/apk/debug/app-debug.apk FamilyHub.apk
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FamilyHub-apk
+          path: FamilyHub.apk
