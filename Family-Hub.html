@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.8";
+var FH_BUILD="v38.9";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -2767,7 +2767,7 @@ function wallHome(){
   h+="<section class='w-col w-side' aria-label='Around the house'>";
   h+="<button class='w-box' data-a='go' data-v='meals'><h2>🍽️ Tonight</h2><div class='w-big'>"+esc(m.d||"Not planned yet")+"</div></button>";
   h+="<button class='w-box' data-a='go' data-v='groc'><h2>🛒 Shopping · "+gl.length+"</h2><div class='w-small'>"+(gl.length?gl.slice(0,4).map(function(g){return esc(g.t);}).join(" · ")+(gl.length>4?" …":""):"Nothing needed")+"</div></button>";
-  h+="<button class='w-box' data-a='go' data-v='house'><h2>🏡 Reminders</h2><div class='w-small'>"+(rem.length?rem.map(function(x){return "<b>"+esc(x.title)+"</b> "+esc(hhDateText(x));}).join("<br>"):"None in the next 3 days")+"</div></button>";
+  h+="<button class='w-box' data-a='go' data-v='house'><h2>🏡 Reminders</h2><div class='w-small'>"+(rem.length?rem.map(function(x){return "<b>"+esc(x.title)+"</b> · "+esc(String(hhDateText(x)).split(" · ")[0]);}).join("<br>"):"None in the next 3 days")+"</div></button>";
   var rw="";kids.forEach(function(p){var r=rewardTarget(p.id);if(r)rw+="<div>"+esc(p.e)+" "+esc(p.n)+": <b>"+(S.stars[p.id]||0)+"</b>/"+r.c+" ⭐ "+esc(r.e||"")+"</div>";});
   if(S.goal){var gg=S.goal;rw+="<div>"+esc(gg.e||"🎯")+" "+esc(gg.n)+": <b>"+gg.p+"</b>/"+gg.t+"</div>";}
   var wn=(Array.isArray(S.fridgeNotes)?S.fridgeNotes:[]).filter(fnShow).slice(-2).reverse(),wb=(Array.isArray(S.bounties)?S.bounties:[]).filter(function(x){return x&&x.status==='open';});
@@ -4001,12 +4001,12 @@ function wxInner(){
 function wxHtml(){return S.weather?"<section class='card weather-card' aria-label='Weather'>"+wxInner()+"</section>":'';}
 function wxPaint(){var els=document.querySelectorAll('.weather-card');for(var i=0;i<els.length;i++)els[i].innerHTML=wxInner();}
 function wxRefresh(force){
-  var w=S.weather;if(!w||!document.querySelector('.weather-card')||wxBusy)return;
+  var w=S.weather,wallOn=typeof wallActive==='function'&&wallActive();if(!w||(!document.querySelector('.weather-card')&&!wallOn)||wxBusy)return;
   var c=wxCache(),key=w.lat+','+w.lon+','+w.units;
   if(!force&&c&&c.key===key&&wxValid(c.data)&&Date.now()-c.t<1800000)return;
   if(Date.now()-wxLastTry<60000&&!force)return;
   wxLastTry=Date.now();wxBusy=true;wxPaint();
-  wxGet(wxUrl(w),function(d){wxBusy=false;if(wxValid(d)&&S.weather&&(S.weather.lat+','+S.weather.lon+','+S.weather.units)===key)wxSaveCache({key:key,t:Date.now(),data:d});wxPaint();},function(){wxBusy=false;wxPaint();});
+  wxGet(wxUrl(w),function(d){wxBusy=false;if(wxValid(d)&&S.weather&&(S.weather.lat+','+S.weather.lon+','+S.weather.units)===key)wxSaveCache({key:key,t:Date.now(),data:d});wxPaint();try{if(typeof wallActive==='function'&&wallActive()&&!syncUiBusy()&&!wheelBusy&&!document.getElementById('party'))render();}catch(e){}},function(){wxBusy=false;wxPaint();});
 }
 function wxSettingsHtml(){
   var w=S.weather,h="<h2>Weather</h2><div class='card'>";
