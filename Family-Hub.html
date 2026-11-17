@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.13";
+var FH_BUILD="v38.14";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -2790,7 +2790,9 @@ render=function(){
     }else{wallClass(false);_renderV24();}
   }catch(e){
     try{console.error("render failed",e);}catch(x){}
-    errNote(e);var pqEm="";try{pqEm=pqErrSave(e,view);}catch(x){}
+    errNote(e);var pqEm=String((e&&e.message)||e||"unknown").slice(0,200);
+    try{localStorage.setItem("familyhub-lasterr",JSON.stringify({at:new Date().toISOString(),view:view,build:FH_BUILD,msg:pqEm,stack:String((e&&e.stack)||"").split("\n").slice(0,3).join(" / ").slice(0,400),early:!window.FH_READY}));}catch(x){}
+    if(!window.FH_READY){if(!window.FH_RETRY){window.FH_RETRY=1;window.addEventListener("load",function(){setTimeout(function(){try{render();}catch(x){}},50);});}try{document.getElementById("app").innerHTML="<div class='card' role='status'><p>Loading…</p></div>";}catch(x){}return;}
     try{document.getElementById("app").innerHTML="<div class='card' role='alert'><h2>Something went wrong</h2><p>Your data is safe. Tap the button to go back to the dashboard.</p><p class='note'>Details: "+esc(pqEm)+"</p><button class='btn g' data-a='nxwallreset'>Back to dashboard</button></div>";}catch(x){}
   }
 };
@@ -6538,7 +6540,7 @@ function pqApproveAll(){
 function pqVerHtml(){
   var le=null;try{le=JSON.parse(localStorage.getItem("familyhub-lasterr")||"null");}catch(e){}
   return "<div class='pqver'><span>Family Hub <b>"+esc(FH_BUILD)+"</b></span> <button class='btn n' data-pq='update'>Check for update</button> <span id='pqvmsg' role='status'></span>"+
-    (le&&le.msg?"<p class='note'>Last problem on this device ("+esc(String(le.at||"").slice(0,16).replace("T"," "))+", "+esc(le.view||"")+", "+esc(le.build||"")+"): "+esc(le.msg)+" <button class='btn n' data-pq='clrerr'>Clear</button></p>":"")+"</div>";
+    (le&&le.msg?"<p class='note'>Last problem on this device ("+esc(String(le.at||"").slice(0,16).replace("T"," "))+", "+esc(le.view||"")+", "+esc(le.build||"")+"): "+esc(le.msg)+(le.early?" (while the app was starting)":"")+(le.stack?" <span class='note'>["+esc(le.stack)+"]</span>":"")+" <button class='btn n' data-pq='clrerr'>Clear</button></p>":"")+"</div>";
 }
 function pqCheckUpdate(){
   var m=document.getElementById("pqvmsg");if(m)m.textContent="Checking…";
@@ -6596,6 +6598,7 @@ document.addEventListener("click",function(e){
   if(a==="med"){view="house";try{hhFilter="medicine";hhEdit="";}catch(x){}render();try{window.scrollTo(0,0);}catch(x){}return;}
   if(a==="apprall"){pqApproveAll();return;}
 });
+window.FH_READY=true;
 </script>
 
 </body>
