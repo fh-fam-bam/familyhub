@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.10";
+var FH_BUILD="v38.11";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -2752,7 +2752,8 @@ function wallHome(){
     h+="<button class='w-kid' data-a='who' data-p='"+p.id+"' aria-label='Open "+esc(p.n)+"’s page, "+g[0]+" of "+g[1]+" approved'><span class='w-kh'><span class='w-av' style='border-color:"+p.c+"' aria-hidden='true'>"+esc(p.e)+"</span><b>"+esc(p.n)+"</b><span class='w-pts'>⭐ "+(S.stars[p.id]||0)+"</span><span class='w-frac'>"+g[0]+"/"+g[1]+"</span></span><span class='w-bar' aria-hidden='true'><i style='width:"+pc+"%;background:"+p.c+"'></i></span>";
     if(!g[1])h+="<span class='w-note'>No chores today</span>";
     else if(!left.length)h+="<span class='w-note'>All done! 🎉</span>";
-    else h+="<span class='w-tasks'>"+left.slice(0,3).map(function(t){return (st(p.id,t.id)==="p"?"⏳ ":"⬜ ")+esc(t.e||"")+" "+esc(t.t);}).join("<br>")+(left.length>3?"<br><i>+"+(left.length-3)+" more</i>":"")+"</span>";
+    else var wn=mysteryFoundText(p.id)?2:3;h+="<span class='w-tasks'>"+left.slice(0,wn).map(function(t){return (st(p.id,t.id)==="p"?"⏳ ":"⬜ ")+esc(t.e||"")+" "+esc(t.t);}).join("<br>")+(left.length>wn?"<br><i>+"+(left.length-wn)+" more</i>":"")+"</span>";
+    if(mysteryFoundText(p.id))h+="<span class='w-note' style='display:block;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'>🎁 Bonus: "+esc(mysteryFoundText(p.id))+"</span>";
     h+="</button>";
   });
   if(!kids.length)h+="<div class='w-empty'>No kids added yet</div>";
@@ -3119,7 +3120,7 @@ function goal(){var g=S.goal;if(!g)return "<h1>Family goal</h1><div class='card'
 var pc=Math.min(100,Math.round(g.p/g.t*100)),done=g.p>=g.t;
 return "<h1>"+esc(g.e)+" "+esc(g.n)+"</h1><div class='card' style='text-align:center'><div class='big' style='min-height:0;padding:10px'>"+g.p+" <span style='font-size:26px'>of "+g.t+" ⭐</span></div>"+gbar()+"<p>"+(done?"🎉 Goal reached! Time to celebrate together.":(g.t-g.p)+" points to go · "+pc+"%")+"</p></div><div class='card'><b>Who helped</b>"+P.filter(function(p){return p.kid}).map(function(p){return "<div class='row'><span class='dot' style='background:"+p.c+"'></span><span class='t'>"+esc(p.n)+"</span><b>"+((g.by||{})[p.id]||0)+" ⭐</b></div>"}).join("")+"</div><p class='note'>Every point earned counts toward the goal, even if it is later spent in the rewards shop.</p>"}
 function goalSet(){var g=S.goal;return "<h2>Family goal</h2><div class='card'>"+(g?"<div class='row'><span class='t'>"+esc(g.e)+" "+esc(g.n)+" · "+g.p+" of "+g.t+" ⭐</span><button class='btn r' data-a='goalclr'>Clear</button></div>":"")+"<input id='gn' placeholder='Goal, for example Family movie night'><input id='gt' type='number' placeholder='Points needed' style='width:130px'><input id='ge' placeholder='Emoji' style='width:80px'><button class='btn' data-a='goalset'>"+(g?"Replace goal":"Set goal")+"</button></div>"}
-function chores(){var h="<h1>Chores and routines</h1><p class='sub'>Pick a person.</p>"+(devRole()==='parent'?"<p><button class='btn g' data-a='go' data-v='mgr' style='min-height:52px'>✏️ Manage chores</button></p>":'')+pcChoresCard()+"<div class='cards'>";P.forEach(function(p){var g=prog(p.id);h+="<div class='cd' data-a='who' data-p='"+p.id+"'><div class='ch' style='background:"+p.c+"'>"+esc(p.e)+" "+esc(p.n)+"<span>"+g[0]+"/"+g[1]+" approved"+(g[2]?" · "+g[2]+" waiting":"")+"</span></div><div class='cb'><div class='bar' style='background:#8aa0b455;height:14px'><i style='width:"+(g[1]?g[0]/g[1]*100:0)+"%;background:"+p.c+"'></i></div><p class='note'>"+(p.kid?"⭐ "+(S.stars[p.id]||0)+" points":"Tap to open")+"</p></div></div>"});return h+"</div>"}
+function chores(){var h="<h1>Chores and routines</h1><p class='sub'>Pick a person.</p>"+(devRole()==='parent'?"<p><button class='btn g' data-a='go' data-v='mgr' style='min-height:52px'>✏️ Manage chores</button></p>":'')+pcChoresCard()+"<div class='cards'>";P.forEach(function(p){var g=prog(p.id);h+="<div class='cd' data-a='who' data-p='"+p.id+"'><div class='ch' style='background:"+p.c+"'>"+esc(p.e)+" "+esc(p.n)+"<span>"+g[0]+"/"+g[1]+" approved"+(g[2]?" · "+g[2]+" waiting":"")+"</span></div><div class='cb'><div class='bar' style='background:#8aa0b455;height:14px'><i style='width:"+(g[1]?g[0]/g[1]*100:0)+"%;background:"+p.c+"'></i></div><p class='note'>"+(p.kid?"⭐ "+(S.stars[p.id]||0)+" points":"Tap to open")+(mysteryFoundText(p.id)?"<br>🎁 Bonus found: "+esc(mysteryFoundText(p.id)):"")+"</p></div></div>"});return h+"</div>"}
 /* v38.1 groceries: trash button + swipe left to delete, Undo, bought items move to "In the cart" */
 var gUndo=null;
 function grocRow(g,i){
@@ -4119,9 +4120,11 @@ function dailyFun(id){
   var f=pool[hstr(today()+id)%pool.length];return f[0]==='joke'?'😄 '+f[1]:'💡 '+f[1];
 }
 function mysteryTask(id,ds){var m=person(id);if(!m||m.pet)return '';var t=dueTasks(id,ds);if(t.length<2)return '';return t[hstr(ds+id)%t.length].id;}
+function mysteryFound(id,ds){ds=ds||today();var mt=mysteryTask(id,ds);if(!mt)return null;var k=ds+'|'+id+'|'+mt;if(!(S.bonus||{})[k]||!S.done[k])return null;return dueTasks(id,ds).filter(function(x){return x.id===mt;})[0]||null;}
+function mysteryFoundText(id){var t=mysteryFound(id);return t?((t.e?t.e+' ':'')+t.t):'';}
 function mysteryHtml(p){
   var mt=mysteryTask(p.id,today());if(!mt)return '';var k=today()+'|'+p.id+'|'+mt,hit=!!(S.bonus||{})[k]&&!!S.done[k];
-  return '<section class="mystery" aria-label="Mystery bonus">'+(hit?'✅ <b>Mystery bonus found!</b> '+(p.kid?'+1 bonus point.':'+1 toward the family challenge.'):'🎁 <b>Mystery bonus:</b> one of today’s tasks hides a +1 '+(p.kid?'bonus point':'bonus for the family challenge')+'. Which one is it?')+'</section>';
+  return '<section class="mystery" aria-label="Mystery bonus">'+(hit?'✅ <b>Mystery bonus found!</b> '+(mysteryFoundText(p.id)?'It was <b>'+esc(mysteryFoundText(p.id))+'</b>. ':'')+(p.kid?'+1 bonus point.':'+1 toward the family challenge.'):'🎁 <b>Mystery bonus:</b> one of today’s tasks hides a +1 '+(p.kid?'bonus point':'bonus for the family challenge')+'. Which one is it?')+'</section>';
 }
 function seasonNow(){var n=new Date(),md=p2(n.getMonth()+1)+'-'+p2(n.getDate());for(var i=0;i<SEASONS.length;i++)if(md>=SEASONS[i][0]&&md<=SEASONS[i][1])return SEASONS[i];return null;}
 function seasonHtml(){var s=seasonNow();return s?'<div class="season"><i aria-hidden="true">'+s[2]+'</i><b>'+esc(s[3])+'</b></div>':'';}
