@@ -475,7 +475,8 @@ html:not(.lite) .card,html:not(.lite) .cd{box-shadow:0 1px 2px rgba(25,35,70,.06
    and the browser has no speech recognition of its own. Presents the same interface the page already uses. */
 (function(){
   try{
-    if(window.SpeechRecognition||window.webkitSpeechRecognition)return;
+    /* v36.1: inside the app, always use the native bridge. Android WebView defines
+       webkitSpeechRecognition but it does not work there, so do not step aside for it. */
     var N=window.FHNative;
     if(!N||typeof N.isAvailable!=="function"||!N.isAvailable())return;
     var cur=null;
@@ -492,6 +493,7 @@ html:not(.lite) .card,html:not(.lite) .cd{box-shadow:0 1px 2px rgba(25,35,70,.06
       }catch(e){}
     };
     window.webkitSpeechRecognition=Shim;
+    window.SpeechRecognition=Shim;
   }catch(e){}
 })();
 </script>
