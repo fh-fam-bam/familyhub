@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.21";
+var FH_BUILD="v38.22";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -1649,7 +1649,7 @@ function syncDoneKey(id){var a=String(id).split("__");return a.length===3&&a[0]&
 function syncInWindow(c,id){if(c==="done")return String(id).slice(0,10)>=syncCut(-14);if(c==="meals")return id>=syncCut(-14)&&id<=syncCut(120);return true;}
 var SYNC_MAX=90000,SYNC_KID_COLLS=["done","eventRequests","req","groc","boardreq","hw"];
 var SYNC_AUX=[["pp","pendingPoints"],["sb","submissions"],["pc","petClaims"],["db","doneBy"],["bo","bonus"],["at","approvalTag"]];
-var SYNC_BLOBS=["prefs","challenge","spin","awards","parentNotes","fridgeNotes","bounties","packed","mealIngredients","foodPrefs","rewardTargets","returnNotes","household","pointNews","petLog","approvalReversals","kidsAccount","recipes","cosmetics","trial","walletLog","petCare","coach"];
+var SYNC_BLOBS=["prefs","team","challenge","spin","awards","parentNotes","fridgeNotes","bounties","packed","mealIngredients","foodPrefs","rewardTargets","returnNotes","household","pointNews","petLog","approvalReversals","kidsAccount","recipes","cosmetics","trial","walletLog","petCare","coach"];
 var SYNC_ID_RE=/^[A-Za-z0-9_-]{1,120}$/;
 function syncEnsureIds(){var ch=false;[S.groc,S.req].forEach(function(l){(l||[]).forEach(function(it){if(it&&typeof it==="object"&&typeof it.id!=="string"){it.id=syncNewId();ch=true;}});});return ch;}
 function syncList(c){
@@ -2769,7 +2769,7 @@ function wallHome(){
   h+="<button class='w-box' data-a='go' data-v='meals'><h2>🍽️ Tonight</h2><div class='w-big'>"+esc(m.d||"Not planned yet")+"</div></button>";
   h+="<button class='w-box' data-a='go' data-v='groc'><h2>🛒 Shopping · "+gl.length+"</h2><div class='w-small'>"+(gl.length?gl.slice(0,4).map(function(g){return esc(g.t);}).join(" · ")+(gl.length>4?" …":""):"Nothing needed")+"</div></button>";
   h+="<button class='w-box' data-a='go' data-v='house'><h2>🏡 Reminders"+(remMore?" · +"+remMore+" more":"")+"</h2><div class='w-small'>"+(rem.length?rem.map(function(x){return "<b>"+esc(x.title)+"</b> · "+esc(String(hhDateText(x)).split(" · ")[0]);}).join("<br>"):"None in the next 3 days")+"</div></button>";
-  var rw="";kids.forEach(function(p){var r=rewardTarget(p.id);if(r)rw+="<div>"+esc(p.e)+" "+esc(p.n)+": <b>"+(S.stars[p.id]||0)+"</b>/"+r.c+" ⭐ "+esc(r.e||"")+"</div>";});
+  var rw="";kids.forEach(function(p){var r=rewardTarget(p.id);if(r){var rpts=S.stars[p.id]||0;rw+="<div>"+esc(p.e)+" "+esc(p.n)+": "+(rpts>=r.c?"<b>🎉 Ready</b> "+esc(r.e||"")+(rewardRequested(p.id,r.id)?" · asked a parent":" · ask a parent"):"<b>"+rpts+"</b>/"+r.c+" ⭐ "+esc(r.e||""))+"</div>";}});
   if(S.goal){var gg=S.goal;rw+="<div>"+esc(gg.e||"🎯")+" "+esc(gg.n)+": <b>"+gg.p+"</b>/"+gg.t+"</div>";}
   var wn=(Array.isArray(S.fridgeNotes)?S.fridgeNotes:[]).filter(fnShow).slice(-2).reverse(),wb=(Array.isArray(S.bounties)?S.bounties:[]).filter(function(x){return x&&x.status==='open';});
   if(wn.length||wb.length)h+="<button class='w-box' data-a='nxwallfull'><h2>📝 Notes · 🏆 "+wb.length+" bounties</h2><div class='w-small'>"+wn.map(function(n){return "<b>"+esc((person(n.from)||{}).n||'Family')+":</b> "+esc(String(n.text).slice(0,60));}).join("<br>")+(wb.length?(wn.length?"<br>":"")+wb.slice(0,2).map(function(x){return "⭐ "+esc(String(p2Pts(x)))+" "+esc(x.title);}).join(" · "):"")+"</div></button>";
@@ -3190,6 +3190,80 @@ document.addEventListener("click",function(e){
 });
 (function(){var st=document.createElement("style");st.textContent=".personal-page.kidpage .note{font-size:18px;line-height:1.35}.personal-page.kidpage .personal-progress span{font-size:17px}.personal-progress .goal-track{display:flex}.personal-progress .goal-track i{flex:none}.goal-track i.wait{opacity:.55;background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.35) 0 6px,rgba(255,255,255,0) 6px 12px)}.kid-goal .btn{min-height:56px;font-size:20px}";document.head.appendChild(st);})();
 
+/* ===== v38.22: kids' pages, phase 3 (mission, recap, my week, team challenge) ===== */
+function kidsList(){return P.filter(function(p){return p.kid&&!p.archived;});}
+function moodGet(id){try{var o=JSON.parse(localStorage.getItem("familyhub-mood-"+id)||"{}");return o&&typeof o==="object"?o:{};}catch(e){return {};}}
+function moodSet(id,ds,v){var o=moodGet(id);o[ds]=v;var ks=Object.keys(o).sort();while(ks.length>60){delete o[ks.shift()];}try{localStorage.setItem("familyhub-mood-"+id,JSON.stringify(o));}catch(e){}}
+function pointsOn(id,ds){var n=0;Object.keys(S.awards||{}).forEach(function(k){var a=S.awards[k];if(a&&!a.reversedAt&&a.person===id&&a.date===ds)n+=Number(a.points)||0;});return n;}
+function dayCounts(id,ds){var list=dueTasks(id,ds),d=0,w=0;list.forEach(function(t){var v=S.done[ds+"|"+id+"|"+t.id];if(v==="a")d++;else if(v==="p")w++;});return {total:list.length,approved:d,waiting:w};}
+/* morning: today's mission (older kids; younger kids already have the big next-task card) */
+function missionHtml(p){
+  if(periodNow()!=="morning")return "";
+  var todo=dueTasks(p.id,today()).filter(function(t){return !st(p.id,t.id);}).slice(0,3);if(!todo.length)return "";
+  var s=streakOf(p.id);
+  return "<section class='card kmission'><h2>🌅 Today’s mission</h2><ol>"+todo.map(function(t){return "<li>"+esc(t.e||"⭐")+" "+esc(t.t)+(t.due?" <span class='note'>by "+esc(niceTime(t.due))+"</span>":"")+"</li>";}).join("")+"</ol><p class='note'>"+(s.n?"Finish one today to keep your 🔥 "+s.n+"-day streak.":"Finish one today to start a 🔥 streak.")+"</p></section>";
+}
+/* evening: how did today go? */
+var MOODS=[["😀","Great"],["🙂","Good"],["😐","Okay"],["😕","Tough"]];
+function recapHtml(p){
+  var per=periodNow();if(per!=="evening"&&per!=="night")return "";var ds=today(),c=dayCounts(p.id,ds);if(!c.total)return "";
+  var pts=pointsOn(p.id,ds),s=streakOf(p.id),bonus=mysteryFoundText(p.id),mood=moodGet(p.id)[ds]||"";
+  var line=c.approved+c.waiting>=c.total?"🎉 You finished everything today!":(c.approved+c.waiting)+" of "+c.total+" done today.";
+  var h="<section class='card krecap'><h2>🌙 How did today go?</h2><p class='krecap-big'>"+line+"</p><ul class='krecap-list'><li>⭐ "+pts+" point"+(pts===1?"":"s")+" approved today"+(c.waiting?" · "+c.waiting+" waiting for a parent":"")+"</li><li>🔥 "+(s.today?s.n+"-day streak":"Do one more today to keep your streak")+"</li>"+(bonus?"<li>🎁 You found the mystery bonus: "+esc(bonus)+"</li>":"")+"</ul>";
+  h+="<p><b>How did you feel today?</b></p><div class='kmood'>"+MOODS.map(function(m){return "<button class='btn "+(mood===m[0]?"g":"n")+"' data-kp='mood' data-p='"+p.id+"' data-v='"+m[0]+"' aria-pressed='"+(mood===m[0]?"true":"false")+"' aria-label='"+m[1]+"'>"+m[0]+"<span>"+m[1]+"</span></button>";}).join("")+"</div>";
+  if(mood)h+="<p class='note'>"+({"😀":"Awesome! Keep it up tomorrow.","🙂":"Nice work today.","😐":"Thanks for sharing. Tomorrow is a new day.","😕":"Sorry it was a tough day. Maybe talk to a grown-up about it."}[mood]||"")+"</p>";
+  return h+"</section>";
+}
+/* my week (Monday to today) */
+function weekHtml(p,big){
+  var ws=weekStartOf(today()),days=[],d=localDate(ws);
+  for(var i=0;i<7;i++){var ds=fd(addD(d,i));if(ds>today())break;days.push(ds);}
+  var st0=stats(),done=0,best=null,bestN=0,bonus=0,moods=moodGet(p.id);
+  days.forEach(function(ds){var n=(st0.byDate[ds]||{})[p.id]||0;done+=n;if(n>bestN){bestN=n;best=ds;}var mt=mysteryTask(p.id,ds);if(mt&&(S.bonus||{})[ds+"|"+p.id+"|"+mt]&&S.done[ds+"|"+p.id+"|"+mt])bonus++;});
+  var pts=0;days.forEach(function(ds){pts+=pointsOn(p.id,ds);});
+  var names=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+  var h="<section class='card kweek'><h2>"+(big?"🎉 Your week in review":"📊 My week")+"</h2><div class='kweek-stats'><div><b>"+done+"</b><span>chores done</span></div><div><b>⭐ "+pts+"</b><span>points approved</span></div><div><b>🔥 "+streakOf(p.id).n+"</b><span>day streak</span></div><div><b>🎁 "+bonus+"</b><span>bonuses found</span></div></div>";
+  h+="<div class='kweek-days'>"+days.map(function(ds,i){var n=(st0.byDate[ds]||{})[p.id]||0;return "<div class='kwd"+(ds===today()?" now":"")+"'><span>"+names[i]+"</span><b>"+n+"</b><i aria-hidden='true'>"+(moods[ds]||"")+"</i></div>";}).join("")+"</div>";
+  if(best)h+="<p class='note'>Best day: "+esc(niceDate(best).split(",")[0])+" with "+bestN+" chore"+(bestN===1?"":"s")+".</p>";
+  return h+"</section>";
+}
+/* sibling team challenge: every kid's finished chores this week count together */
+function teamCfg(){var t=S.team;return t&&typeof t==="object"?t:{};}
+function teamProgress(){
+  var kids=kidsList();if(kids.length<2)return null;var cfg=teamCfg();if(cfg.off)return null;
+  var ws=weekStartOf(today()),d=localDate(ws),total=0,n=0,per={},st0=stats();
+  for(var i=0;i<7;i++){var ds=fd(addD(d,i));kids.forEach(function(k){total+=dueTasks(k.id,ds).length;if(ds<=today()){var c=(st0.byDate[ds]||{})[k.id]||0;n+=c;per[k.id]=(per[k.id]||0)+c;}});}
+  var target=Number(cfg.target)>0?Math.round(Number(cfg.target)):Math.max(1,Math.round(total*0.8));
+  var end=fd(addD(d,6)),left=Math.max(0,Math.round((localDate(end).getTime()-localDate(today()).getTime())/86400000)+1);
+  return {kids:kids,n:n,target:target,pct:Math.min(100,Math.round(n/target*100)),per:per,done:n>=target,left:left,reward:cfg.reward||""};
+}
+function teamHtml(){
+  var t=teamProgress();if(!t)return "";
+  var h="<section class='card kteam'><h2>🤝 Team challenge</h2><p><b>"+t.kids.map(function(k){return esc(k.n);}).join(" + ")+"</b>: "+t.n+" of "+t.target+" chores this week · "+t.left+" day"+(t.left===1?"":"s")+" left</p><div class='goal-track kteam-bar' role='progressbar' aria-label='Team challenge progress' aria-valuemin='0' aria-valuemax='100' aria-valuenow='"+t.pct+"'>"+t.kids.map(function(k){var w=Math.min(100,Math.round((t.per[k.id]||0)/t.target*100));return "<i style='width:"+w+"%;background:"+k.c+"'></i>";}).join("")+"</div>";
+  h+="<div class='chips'>"+t.kids.map(function(k){return "<span class='chip'>"+esc(k.e)+" "+esc(k.n)+": "+(t.per[k.id]||0)+"</span>";}).join("")+"</div>";
+  h+=t.done?"<p><b>🎉 You did it together!</b>"+(t.reward?" Ask a parent for your team reward: "+esc(t.reward)+".":"")+"</p>":(t.reward?"<p class='note'>Team reward: "+esc(t.reward)+"</p>":"<p class='note'>Help each other: every chore either of you finishes counts.</p>");
+  return h+"</section>";
+}
+function teamParentHtml(){
+  var kids=kidsList();if(kids.length<2)return "";var cfg=teamCfg(),t=teamProgress();
+  var h="<h2>🤝 Team challenge</h2><div class='card'><p class='note'>"+kids.map(function(k){return esc(k.n);}).join(" and ")+" share one goal each week (Monday to Sunday). Every chore either of them finishes counts. It shows on their pages.</p>";
+  if(t)h+="<p><b>This week:</b> "+t.n+" of "+t.target+" chores"+(t.done?" · 🎉 reached":"")+"</p>";
+  h+="<label for='teamtarget'>Weekly goal (chores)</label><input id='teamtarget' type='number' min='0' max='500' step='1' value='"+(Number(cfg.target)>0?Math.round(cfg.target):"")+"' placeholder='Automatic: 80% of their chores' style='width:260px'>";
+  h+="<label for='teamreward'>Team reward</label><input id='teamreward' maxlength='80' value='"+esc(cfg.reward||"")+"' placeholder='For example: Pizza and movie night' style='width:100%'>";
+  h+="<label class='timedchk'><input type='checkbox' id='teamon'"+(cfg.off?"":" checked")+"> Show the team challenge</label><button class='btn' data-kp='teamsave'>Save team challenge</button></div>";
+  return h;
+}
+document.addEventListener("click",function(e){
+  var b=e.target&&e.target.closest?e.target.closest("[data-kp]"):null;if(!b)return;e.preventDefault();
+  var a=b.getAttribute("data-kp");
+  if(a==="mood"){var pp=b.getAttribute("data-p");if(!person(pp))return;moodSet(pp,today(),b.getAttribute("data-v"));render();return;}
+  if(a==="teamsave"){if(!unlocked||devRole()!=="parent")return;var tv=((document.getElementById("teamtarget")||{}).value||"").trim(),rv=((document.getElementById("teamreward")||{}).value||"").trim().slice(0,80),on=!!(document.getElementById("teamon")||{}).checked;
+    var n=tv===""?0:Number(tv);if(!isFinite(n)||n<0||n>500||Math.floor(n)!==n){alert("Enter a whole number from 0 to 500, or leave it empty for automatic.");return;}
+    var snap=JSON.stringify(S);S.team={target:n,reward:rv,off:!on};if(!commitOr(snap))return;render();statusMessage("Team challenge saved.");return;}
+});
+(function(){var st=document.createElement("style");st.textContent=".kmission ol{font-size:22px;line-height:1.5;margin:6px 0 6px 26px;padding:0}.krecap-big{font-size:22px;font-weight:800;margin:4px 0}.krecap-list{list-style:none;padding:0;margin:6px 0;font-size:19px;line-height:1.6}.kmood{display:flex;flex-wrap:wrap;gap:8px}.kmood .btn{margin:0;min-width:84px;min-height:72px;font-size:30px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1}.kmood .btn span{font-size:14px;font-weight:600}.kweek-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:6px 0}.kweek-stats div{background:rgba(128,128,128,.12);border-radius:12px;padding:8px 10px}.kweek-stats b{display:block;font-size:24px}.kweek-stats span{font-size:15px;opacity:.85}.kweek-days{display:flex;gap:6px;margin:8px 0}.kwd{flex:1;text-align:center;background:rgba(128,128,128,.10);border-radius:10px;padding:6px 2px;min-width:0}.kwd.now{outline:2px solid currentColor}.kwd span{display:block;font-size:13px;opacity:.8}.kwd b{display:block;font-size:20px}.kwd i{display:block;font-style:normal;min-height:1.2em}.kteam-bar{display:flex}.kteam-bar i{flex:none}";document.head.appendChild(st);})();
+
+(function(){var p0=parentRaw;parentRaw=function(){return p0.apply(this,arguments)+teamParentHtml();};})();
 function kidGoalHtml(p){
   var r=rewardTarget(p.id);if(!r)return '';
   var points=S.stars[p.id]||0,pc=Math.max(0,Math.min(100,Math.round(points/r.c*100))),ready=points>=r.c;
@@ -4121,8 +4195,8 @@ var custOpen=false;
 function showSec(id,name){if(typeof kidLocked==="function"&&kidLocked(id).indexOf(name)>=0)return true;var pr=(S.prefs||{})[id];return !(pr&&pr.hide&&pr.hide.indexOf(name)>=0);}
 function personTheme(){if((view==='person'||view==='routine')&&pid){var pr=(S.prefs||{})[pid];if(pr&&(pr.theme==='light'||pr.theme==='dark'))return pr.theme;}return null;}
 /* ===== v38.20: kids' pages, phase 2 (age styles, safe customization) ===== */
-var KID_BLOCKS=[["fun","Level, bonus and fun fact"],["stats","Summary numbers"],["wallet","My wallet"],["helper","My helper button"],["themeshop","Avatar & theme shop"],["weather","Weather"]];
-var PREF_SECS=["weather","stats","schedule","reminders","shop","goal","food","fun","wallet","helper","themeshop"];
+var KID_BLOCKS=[["team","Team challenge"],["week","My week"],["fun","Level, bonus and fun fact"],["stats","Summary numbers"],["wallet","My wallet"],["helper","My helper button"],["themeshop","Avatar & theme shop"],["weather","Weather"]];
+var PREF_SECS=["weather","stats","schedule","reminders","shop","goal","food","fun","wallet","helper","themeshop","team","week"];
 function kidAge(id){var pr=(S.prefs||{})[id]||{};if(pr.age==="young"||pr.age==="older")return pr.age;return lookOf(id).layout==="teen"?"older":"young";}
 function kidLocked(id){var m=person(id);if(!m||!m.kid)return [];var pr=(S.prefs||{})[id]||{};if(Array.isArray(pr.lock))return pr.lock;return kidAge(id)==="young"?["schedule","goal"]:[];}
 function kidOrder(id){var pr=(S.prefs||{})[id]||{},o=Array.isArray(pr.order)?pr.order.filter(function(x,i,a){return a.indexOf(x)===i&&KID_BLOCKS.some(function(b){return b[0]===x;});}):[];KID_BLOCKS.forEach(function(b){if(o.indexOf(b[0])<0)o.push(b[0]);});return o;}
@@ -4141,7 +4215,7 @@ function nextTaskHtml(p){
   var todo=list.filter(function(t){return !st(p.id,t.id);}),wait=list.filter(function(t){return st(p.id,t.id)==="p";}).length,done=list.length-todo.length;
   if(!todo.length)return "<section class='card nextcard allgood' style='border-color:"+p.c+"'><div class='nx-emoji' aria-hidden='true'>🎉</div><h2 class='nx-t'>All done for today!</h2><p class='nx-sub'>"+(wait?wait+" waiting for a parent to check.":"Everything is approved. Great job!")+"</p>"+(speechOk()?"<button class='btn n nx-say' data-kz='say' data-text='"+esc("All done for today! Great job!")+"'>🔊 Read it to me</button>":"")+"</section>";
   var t=todo[0];
-  return "<section class='card nextcard' style='border-color:"+p.c+"' aria-label='Do this next'><p class='nx-k'>DO THIS NEXT · "+done+" of "+list.length+" done</p><div class='nx-emoji' aria-hidden='true'>"+esc(t.e||"⭐")+"</div><div class='nx-t'>"+esc(t.t)+"</div><div class='nx-btns'><button class='btn g nx-done' data-a='tick' data-p='"+p.id+"' data-t='"+t.id+"'>✓ I did it!</button>"+(speechOk()?"<button class='btn n nx-say' data-kz='say' data-text='"+esc("Next: "+t.t+". Tap I did it when you are done.")+"'>🔊 Read it to me</button>":"")+"</div></section>";
+  return "<section class='card nextcard' style='border-color:"+p.c+"' aria-label='Do this next'><p class='nx-k'>"+(periodNow()==="morning"?"🌅 GOOD MORNING · DO THIS FIRST":"DO THIS NEXT")+" · "+done+" of "+list.length+" done</p><div class='nx-emoji' aria-hidden='true'>"+esc(t.e||"⭐")+"</div><div class='nx-t'>"+esc(t.t)+"</div><div class='nx-btns'><button class='btn g nx-done' data-a='tick' data-p='"+p.id+"' data-t='"+t.id+"'>✓ I did it!</button>"+(speechOk()?"<button class='btn n nx-say' data-kz='say' data-text='"+esc("Next: "+t.t+". Tap I did it when you are done.")+"'>🔊 Read it to me</button>":"")+"</div></section>";
 }
 function myTodoList(id){try{var a=JSON.parse(localStorage.getItem("familyhub-mytodo-"+id)||"[]");return Array.isArray(a)?a:[];}catch(e){return [];}}
 function myTodoSave(id,a){try{localStorage.setItem("familyhub-mytodo-"+id,JSON.stringify(a.slice(-60)));return true;}catch(e){alert("Could not save on this device.");return false;}}
@@ -4561,7 +4635,7 @@ function pers(){
   var exH=personExtras(p),kidH='',wxH=showSec(pid,'weather')?wxHtml():'',stH='';
   if(showSec(pid,'stats'))stH='<div class="personal-stats"><div><b>'+left+'</b><span>Still to do</span></div><div><b>'+ (p.kid?g[2]:up.length)+'</b><span>'+(p.kid?'Awaiting approval':'Plans today & tomorrow')+'</span></div><div><b>'+ (p.kid?'⭐ '+(S.stars[pid]||0):next?niceTime(next.m):'—')+'</b><span>'+(p.kid?'My points':next?'Next: '+esc(next.t):'No upcoming plans')+'</span></div></div>';
   var layH='<div class="personal-layout"><div class="personal-main">'+pcBanner(p)+(p.kid&&kidAge(pid)==="young"?nextTaskHtml(p):"")+personalTasks(p)+(p.kid&&kidAge(pid)==="older"?myTodoHtml(p):"")+(p.kid&&showSec(pid,'shop')?'<details class="card personal-shop"><summary>🎁 My rewards shop</summary>'+rewardsHtml(p)+'</details>':'')+'</div><aside class="personal-aside">'+(p.kid?(showSec(pid,'goal')?kidGoalHtml(p):'')+petClaimsHtml(p):'')+(showSec(pid,'schedule')?personalSchedule(p):'')+(showSec(pid,'reminders')?personalReminders(p):'')+(!p.pet&&showSec(pid,'food')?foodHtml(p):'')+'</aside></div>';
-  if(p.kid){var KB={fun:showSec(pid,"fun")?exH:"",stats:stH,wallet:showSec(pid,"wallet")?walletHtml(p):"",helper:showSec(pid,"helper")?helperHtml(p):"",themeshop:showSec(pid,"themeshop")?cosmeticShop(p):"",weather:wxH};h+=layH+kidOrder(pid).map(function(k){return KB[k]||"";}).join("");}else h+=exH+kidH+wxH+stH+layH;
+  if(p.kid){var sunday=new Date().getDay()===0,KB={team:showSec(pid,"team")?teamHtml():"",week:(!sunday&&showSec(pid,"week"))?weekHtml(p,false):"",fun:showSec(pid,"fun")?exH:"",stats:stH,wallet:showSec(pid,"wallet")?walletHtml(p):"",helper:showSec(pid,"helper")?helperHtml(p):"",themeshop:showSec(pid,"themeshop")?cosmeticShop(p):"",weather:wxH};h+=(kidAge(pid)==="older"?missionHtml(p):"")+recapHtml(p)+((sunday&&showSec(pid,"week"))?weekHtml(p,true):"")+layH+kidOrder(pid).map(function(k){return KB[k]||"";}).join("");}else h+=exH+kidH+wxH+stH+layH;
   var LK=lookOf(pid);return '<div class="personal-page'+(p.kid?' kidpage '+kidAge(pid):'')+' layout-'+LK.layout+' bg-'+LK.bg+'">'+h+'</div>';
 }
 function personalEvents(id,days){return eventsAhead(today(),days).filter(function(e){return !attendees(e).length||attendees(e).indexOf(id)>=0||e.driver===id;});}
