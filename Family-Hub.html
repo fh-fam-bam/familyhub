@@ -708,15 +708,20 @@ function helperHtml(p){
 }
 function khHw(p){
   var left=khLeft(),t=kh.timer,h="";
-  var next=dueTasks(p.id,today()).filter(function(x){return !st(p.id,x.id);})[0];
-  h+="<p class='note'>"+(next?"Next up on your list: <b>"+esc(next.t)+"</b>":"Your list is all done or waiting for approval. Nice!")+"</p>";
-  h+="<div class='kh-timer' role='timer' aria-live='off'><div id='kh-time' class='kh-big'>"+(t.run?khFmt(left):(t.msg||'Focus timer'))+"</div>";
+  /* v38.1: show the kid's real homework from the Homework page */
+  if(typeof hwGroups==="function"){
+    hwCss();var hg=hwGroups(p.id),rows=hg.over.concat(hg.today,hg.tom),pr=hwProgress(p.id);
+    h+="<h3>📚 My homework"+(rows.length?" · "+pr.done+" of "+pr.total+" done":"")+"</h3>";
+    h+=rows.length?rows.map(function(r){return hwCard(r).replace(/<button type="button" class="hw-more"[\s\S]*?<\/button>/,"");}).join(""):"<p class='note'>No homework due today or tomorrow. 🎉</p>";
+    h+="<div class='kh-hwgo'><button class='btn g' data-a='go' data-v='hw'>📚 Open Homework page</button></div>";
+  }
+  h+="<h3>⏱️ Focus timer</h3><div class='kh-timer' role='timer' aria-live='off'><div id='kh-time' class='kh-big'>"+(t.run?khFmt(left):(t.msg||'Focus timer'))+"</div>";
   if(t.run)h+="<button class='btn r' data-a='khstop'>Stop</button>";
   else h+=[10,15,25].map(function(m){return "<button class='btn' data-a='khstart' data-m='"+m+"'>"+m+" min focus</button>";}).join('')+"<button class='btn n' data-a='khstart' data-m='5' data-b='1'>5 min break</button>";
-  h+="</div><h3>Homework checklist</h3>";
-  var L=khList(p.id);if(!L.length)h+="<p class='note'>Add what you need to do. It stays on this device.</p>";
+  h+="</div>";
+  var L=khList(p.id);if(L.length)h+="<h3>My own checklist</h3>";
   L.forEach(function(x,i){h+="<div class='row'><button class='btn"+(x.d?' g':' n')+"' data-a='khchk' data-i='"+i+"' data-p='"+esc(p.id)+"' aria-pressed='"+(!!x.d)+"' aria-label='Mark done: "+esc(x.t)+"'>"+(x.d?'✓':'○')+"</button><span class='t'"+(x.d?" style='text-decoration:line-through;opacity:.7'":'')+">"+esc(x.t)+"</span></div>";});
-  h+="<label for='kh-new' class='sr'>New homework item</label><input id='kh-new' maxlength='80' placeholder='Math worksheet, read 20 minutes…' style='width:100%'><button class='btn g' data-a='khadd' data-p='"+esc(p.id)+"'>Add</button>"+(L.some(function(x){return x.d;})?"<button class='btn n' data-a='khclear' data-p='"+esc(p.id)+"'>Clear finished</button>":'');
+  if(L.some(function(x){return x.d;}))h+="<button class='btn n' data-a='khclear' data-p='"+esc(p.id)+"'>Clear finished</button>";
   h+=khAskBox(p,"Stuck on something? Ask a parent:");
   return h;
 }
@@ -1439,7 +1444,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.0";
+var FH_BUILD="v38.1";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -3080,11 +3085,26 @@ var pc=Math.min(100,Math.round(g.p/g.t*100)),done=g.p>=g.t;
 return "<h1>"+esc(g.e)+" "+esc(g.n)+"</h1><div class='card' style='text-align:center'><div class='big' style='min-height:0;padding:10px'>"+g.p+" <span style='font-size:26px'>of "+g.t+" ⭐</span></div>"+gbar()+"<p>"+(done?"🎉 Goal reached! Time to celebrate together.":(g.t-g.p)+" points to go · "+pc+"%")+"</p></div><div class='card'><b>Who helped</b>"+P.filter(function(p){return p.kid}).map(function(p){return "<div class='row'><span class='dot' style='background:"+p.c+"'></span><span class='t'>"+esc(p.n)+"</span><b>"+((g.by||{})[p.id]||0)+" ⭐</b></div>"}).join("")+"</div><p class='note'>Every point earned counts toward the goal, even if it is later spent in the rewards shop.</p>"}
 function goalSet(){var g=S.goal;return "<h2>Family goal</h2><div class='card'>"+(g?"<div class='row'><span class='t'>"+esc(g.e)+" "+esc(g.n)+" · "+g.p+" of "+g.t+" ⭐</span><button class='btn r' data-a='goalclr'>Clear</button></div>":"")+"<input id='gn' placeholder='Goal, for example Family movie night'><input id='gt' type='number' placeholder='Points needed' style='width:130px'><input id='ge' placeholder='Emoji' style='width:80px'><button class='btn' data-a='goalset'>"+(g?"Replace goal":"Set goal")+"</button></div>"}
 function chores(){var h="<h1>Chores and routines</h1><p class='sub'>Pick a person.</p>"+(devRole()==='parent'?"<p><button class='btn g' data-a='go' data-v='mgr' style='min-height:52px'>✏️ Manage chores</button></p>":'')+pcChoresCard()+"<div class='cards'>";P.forEach(function(p){var g=prog(p.id);h+="<div class='cd' data-a='who' data-p='"+p.id+"'><div class='ch' style='background:"+p.c+"'>"+esc(p.e)+" "+esc(p.n)+"<span>"+g[0]+"/"+g[1]+" approved"+(g[2]?" · "+g[2]+" waiting":"")+"</span></div><div class='cb'><div class='bar' style='background:#8aa0b455;height:14px'><i style='width:"+(g[1]?g[0]/g[1]*100:0)+"%;background:"+p.c+"'></i></div><p class='note'>"+(p.kid?"⭐ "+(S.stars[p.id]||0)+" points":"Tap to open")+"</p></div></div>"});return h+"</div>"}
-function groc(){var h="<h1>Groceries</h1><div class='card'><input id='gi' placeholder='Add an item'><input id='gs' placeholder='Store (optional)'><button class='btn' data-a='addg'>Add item</button></div>";
-var stores=[];S.groc.forEach(function(g){var s=g.s||"Any store";if(stores.indexOf(s)<0)stores.push(s)});
-if(!stores.length)h+="<p class='note'>The list is empty.</p>";
-stores.forEach(function(s){h+="<h2>"+esc(s)+"</h2><div class='card'>";S.groc.forEach(function(g,i){if((g.s||"Any store")===s)h+="<div class='row'><button class='chk "+(g.c?"a":"")+"' aria-label='"+esc((g.c?'Bought, tap to put back: ':'Mark as bought: ')+g.t)+"' aria-pressed='"+(g.c?'true':'false')+"' data-a='gtick' data-i='"+i+"'>"+(g.c?"✓":"")+"</button><span class='t "+(g.c?"done":"")+"'>"+esc(g.t)+"</span></div>"});h+="</div>"});
-if(S.groc.some(function(g){return g.c}))h+="<button class='btn r' data-a='gclear'>Clear checked items</button>";return h}
+/* v38.1 groceries: trash button + swipe left to delete, Undo, bought items move to "In the cart" */
+var gUndo=null;
+function grocRow(g,i){
+  return "<div class='gsw' data-gi='"+i+"'><div class='gsw-bg' aria-hidden='true'>🗑 Delete</div><div class='row gsw-fg'><button class='chk "+(g.c?"a":"")+"' aria-label='"+esc((g.c?'Bought, tap to put back: ':'Mark as bought: ')+g.t)+"' aria-pressed='"+(g.c?'true':'false')+"' data-a='gtick' data-i='"+i+"'>"+(g.c?"✓":"")+"</button><span class='t "+(g.c?"done":"")+"'>"+esc(g.t)+"</span><button class='gx' data-a='gdel' data-i='"+i+"' aria-label='Delete "+esc(g.t)+"'>🗑</button></div></div>";
+}
+function groc(){
+  var stores=[],known=[];S.groc.forEach(function(g){var s=g.s||"Any store";if(!g.c&&stores.indexOf(s)<0)stores.push(s);if(g.s&&known.indexOf(g.s)<0)known.push(g.s);});
+  var left=S.groc.filter(function(g){return !g.c;}).length,got=S.groc.length-left;
+  var h="<h1>Groceries</h1><p class='sub'>"+(S.groc.length?left+" to buy"+(got?" · "+got+" in the cart":""):"Nothing on the list")+"</p><div class='card gadd'><input id='gi' placeholder='Add an item' enterkeyhint='done'><input id='gs' placeholder='Store (optional)' list='gstores'><datalist id='gstores'>"+known.map(function(s){return "<option value='"+esc(s)+"'>";}).join('')+"</datalist><button class='btn g' data-a='addg'>Add item</button></div>";
+  if(gUndo)h+="<div class='gundo' role='status'><span>Removed <b>"+esc(gUndo.items.length===1?gUndo.items[0].g.t:gUndo.items.length+" items")+"</b></span><button class='btn' data-a='gundo'>Undo</button></div>";
+  if(!S.groc.length)h+="<p class='note'>The list is empty.</p>";
+  else h+="<p class='note gtip'>Tap the circle when it is in the cart. To delete, swipe an item to the left or tap 🗑.</p>";
+  stores.forEach(function(s){h+="<h2>"+esc(s)+"</h2><div class='card glist'>";S.groc.forEach(function(g,i){if(!g.c&&(g.s||"Any store")===s)h+=grocRow(g,i);});h+="</div>";});
+  if(got){h+="<h2>🛒 In the cart</h2><div class='card glist'>";S.groc.forEach(function(g,i){if(g.c)h+=grocRow(g,i);});h+="</div><button class='btn r' data-a='gclear'>Remove "+got+" bought item"+(got===1?"":"s")+"</button>";}
+  return h;
+}
+function grocUndoArm(items){
+  if(gUndo&&gUndo.timer)clearTimeout(gUndo.timer);
+  gUndo={items:items,timer:setTimeout(function(){gUndo=null;if(view==="groc")render();},8000)};
+}
 function initializeChorePoints(){
   S.pendingPoints=S.pendingPoints||{};
   S.awards=S.awards||{};
@@ -3254,9 +3274,13 @@ function parentSections(html){
   var firstRun=!Object.keys(secOpen).length&&!secInit;secInit=true;
   items.forEach(function(it){if(it.count>0&&secOpen[it.key]===undefined)secOpen[it.key]=true;});
   var f=secFilter.toLowerCase(),out=head+"<div class='secbar'><label for='secq' class='sr'>Find a setting</label><input id='secq' type='search' placeholder='Find a setting…' value='"+esc(secFilter)+"' autocomplete='off'>"+
-    "<button class='btn g' data-a='secall'>Open all</button><button class='btn' data-a='secnone'>Close all</button></div><div class='secjump' role='navigation' aria-label='Jump to a section'>";
-  items.forEach(function(it){out+="<button class='chip' data-a='secjump' data-k='"+it.key+"'>"+it.title.replace(/<[^>]*>/g,"")+(it.count?" <b class='secbadge'>"+it.count+"</b>":"")+"</button>";});
-  out+="</div>";
+    "<button class='btn n' data-a='secnone'>Close all</button></div>";
+  /* v38.1: one grouped "Go to" menu instead of a chip per section; chips only for sections that need you */
+  var SEC_GROUPS=[["Approvals & requests",/approv|request|waiting|updates|note/i],["Chores, rewards & goals",/chore|task|reward|bount|goal|challenge|trial|people|pet/i],["Devices, sync & AI",/device|pin|sync|feed|ai helper|backup/i],["Screen & settings",/./]],grp=SEC_GROUPS.map(function(){return [];});
+  items.forEach(function(it){var pl=it.title.replace(/<[^>]*>/g,"");for(var gi=0;gi<SEC_GROUPS.length;gi++)if(SEC_GROUPS[gi][1].test(pl)){grp[gi].push(it);break;}});
+  out+="<div class='secpickrow'><label for='secpick' class='sr'>Go to a section</label><select id='secpick'><option value=''>☰ Go to a section…</option>"+SEC_GROUPS.map(function(g,gi){return grp[gi].length?"<optgroup label='"+esc(g[0])+"'>"+grp[gi].map(function(it){return "<option value='"+it.key+"'>"+it.title.replace(/<[^>]*>/g,"")+(it.count?" ("+it.count+" waiting)":"")+"</option>";}).join("")+"</optgroup>":"";}).join("")+"</select></div>";
+  var need=items.filter(function(it){return it.count>0;});
+  if(need.length)out+="<div class='secjump' role='navigation' aria-label='Sections that need you'><span class='note'>Needs you:</span>"+need.map(function(it){return "<button class='chip' data-a='secjump' data-k='"+it.key+"'>"+it.title.replace(/<[^>]*>/g,"")+" <b class='secbadge'>"+it.count+"</b></button>";}).join("")+"</div>";
   items.forEach(function(it){
     var plain=it.title.replace(/<[^>]*>/g,""),show=!f||plain.toLowerCase().indexOf(f)>=0||it.body.replace(/<[^>]*>/g," ").toLowerCase().indexOf(f)>=0;
     var open=!!secOpen[it.key]||(!!f&&show);
@@ -3276,6 +3300,10 @@ function secAction(a,b){
   if(a==="secall"||a==="secnone"){var o=a==="secall";Array.prototype.forEach.call(document.querySelectorAll(".sec"),function(s){secSet(s.id.slice(4),o);});return true;}
   return false;
 }
+document.addEventListener("change",function(e){
+  if(!e.target||e.target.id!=="secpick"||!e.target.value)return;
+  var k=e.target.value;e.target.value="";secAction("secjump",{getAttribute:function(){return k;}});
+});
 document.addEventListener("input",function(e){
   if(!e.target||e.target.id!=="secq")return;
   secFilter=e.target.value||"";var f=secFilter.toLowerCase();
@@ -3343,7 +3371,9 @@ else if(a==="addev"){if(v("et")){S.events.push({d:v("ed"),m:v("em"),t:v("et"),p:
 else if(a==="delev"){S.events.splice(+d("i"),1)}
 else if(a==="addg"){if(v("gi"))S.groc.push({t:v("gi"),s:v("gs"),c:0})}
 else if(a==="gtick"){S.groc[+d("i")].c=!S.groc[+d("i")].c}
-else if(a==="gclear"){S.groc=S.groc.filter(function(g){return !g.c})}
+else if(a==="gclear"){var gc=[];S.groc.forEach(function(g,i){if(g.c)gc.push({g:g,i:i});});S.groc=S.groc.filter(function(g){return !g.c});if(gc.length)grocUndoArm(gc);}
+else if(a==="gdel"){var gi=+d("i"),gg=S.groc[gi];if(!gg)return;S.groc.splice(gi,1);grocUndoArm([{g:gg,i:gi}]);}
+else if(a==="gundo"){if(!gUndo)return;var gu=gUndo.items;if(gUndo.timer)clearTimeout(gUndo.timer);gUndo=null;gu.forEach(function(x){S.groc.splice(Math.min(x.i,S.groc.length),0,x.g);});}
 else if(a==="unlock"){pinUnlock()}else if(a==="fgshow"){forgotOpen=true;render()}else if(a==="fghide"){forgotOpen=false;render()}
 else if(a==="lock"){unlocked=false;unlockedBy="";limitedUnlock=false}
 else if(a==="cv"){cv=d("v")}
@@ -3456,7 +3486,7 @@ function household(){
   var items=hhSorted().filter(function(x){return hhFilter==='all'||x.type===hhFilter;});
   if(!items.length)h+="<div class='card'><p class='note'>Nothing here yet. A parent can add an item below.</p></div>";
   items.forEach(function(x){
-    var t=hhType(x.type),p=x.person&&person(x.person),urgent=!x.completed&&x.type!=='contact'&&x.type!=='countdown'&&hhDayCount(x.date)<=0;
+    var t=hhType(x.type),hn=hhPeople(x).map(function(id){var q=person(id);return q?q.n:'';}).filter(Boolean).join(', '),p=hn?{n:hn}:null,urgent=!x.completed&&x.type!=='contact'&&x.type!=='countdown'&&hhDayCount(x.date)<=0;
     h+="<div class='card'"+(urgent?" style='border-left:6px solid #d9822b'":'')+"><div style='display:flex;align-items:center;flex-wrap:wrap'><div style='flex:1;min-width:180px'><h2 style='margin:0 0 6px'>"+t[1]+' '+esc(x.title)+"</h2><div"+(x.completed?" class='note'":'')+">"+esc(hhDateText(x))+"</div>";
     h+="<div class='note'>"+t[2]+(p?' · '+esc(p.n):'')+(x.repeat&&x.repeat!=='none'?' · Repeats '+x.repeat:'')+"</div>";
     if(x.amount)h+="<div>Amount: $"+esc(x.amount)+"</div>";
@@ -3476,6 +3506,7 @@ function household(){
   else h+="<div class='card'><p>Unlock the Parent area to add, edit, or remove household items.</p><button class='btn' data-a='go' data-v='par'>Parent area</button></div>";
   return h;
 }
+function hhPeople(x){if(!x)return [];if(Array.isArray(x.people)&&x.people.length)return x.people.slice();return x.person?[x.person]:[];}
 function hhForm(){
   var x=hhItems().filter(function(i){return i.id===hhEdit;})[0]||{},type=x.type||hhFormType;
   var h="<h2>"+(x.id?'Edit item':'Add household item')+"</h2><div class='card'><label for='hhtype'>Category</label><br><select id='hhtype'>";
@@ -3491,9 +3522,10 @@ function hhForm(){
     }
     if(type==='bill')h+="<br><label for='hhamount'>Amount in dollars (optional)</label><br><input id='hhamount' type='number' min='0' step='0.01' value='"+esc(x.amount||'')+"'>";
   }
-  h+="<br><label for='hhperson'>For</label><br><select id='hhperson'><option value=''>Whole family</option>";
-  S.members.filter(function(p){return !p.archived||x.person===p.id;}).forEach(function(p){h+="<option value='"+p.id+"'"+(x.person===p.id?' selected':'')+">"+esc(p.n)+"</option>";});
-  h+="</select><br><label for='hhnotes'>Notes (optional)</label><br><textarea id='hhnotes' rows='3' maxlength='2000' style='width:100%'>"+esc(x.notes||'')+"</textarea>";
+  var hhSel=hhPeople(x);
+  h+="<fieldset class='hhwho'><legend>For <span class='note'>(tap everyone it is for; none = whole family)</span></legend>";
+  S.members.filter(function(p){return !p.archived||hhSel.indexOf(p.id)>=0;}).forEach(function(p){h+="<label class='hhchip'><input type='checkbox' name='hhpp' value='"+esc(p.id)+"'"+(hhSel.indexOf(p.id)>=0?' checked':'')+"><span>"+esc(p.e||'')+" "+esc(p.n)+"</span></label>";});
+  h+="</fieldset><label for='hhnotes'>Notes (optional)</label><br><textarea id='hhnotes' rows='3' maxlength='2000' style='width:100%'>"+esc(x.notes||'')+"</textarea>";
   if(type==='medicine')h+="<p class='note'>Enter the instructions from the label or your clinician. The hub only records reminders and check-offs.</p>";
   if(type==='leftover')h+="<p class='note'>Dates are entered by you; the hub does not judge whether food is safe.</p>";
   h+="<br><button class='btn g' data-a='hhsave'>"+(x.id?'Save changes':'Add item')+"</button>";
@@ -3540,7 +3572,9 @@ function hhAction(a,b){
   if(time&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)){alert('Enter a valid time.');return;}
   if(amount&&(!isFinite(Number(amount))||Number(amount)<0)){alert('Enter a valid amount.');return;}
   var old=hhItems().filter(function(i){return i.id===hhEdit;})[0];
-  var item={id:old?old.id:'hh'+Date.now().toString(36)+Math.random().toString(36).slice(2,8),type:type,title:title,person:v('hhperson'),notes:v('hhnotes'),repeat:repeat};
+  var hhWho=Array.prototype.map.call(document.querySelectorAll("input[name='hhpp']:checked"),function(c){return c.value;}).filter(function(id){return !!person(id);});
+  var item={id:old?old.id:'hh'+Date.now().toString(36)+Math.random().toString(36).slice(2,8),type:type,title:title,person:hhWho[0]||'',notes:v('hhnotes'),repeat:repeat};
+  if(hhWho.length>1)item.people=hhWho;
   if(type==='contact')item.phone=phone;
   else{item.date=date;item.time=time;item.anchorDay=+date.slice(8,10);}
   if(amount)item.amount=Number(amount).toFixed(2);
@@ -4266,7 +4300,7 @@ function bringHtml(e,ds){
   return '<div class="bring"><b>🎒 Bring</b>'+e.list.map(function(t,i){var k=(e.origin||ds)+'|'+e.series+'|'+i,on=!!(S.packed||{})[k];return '<label><input type="checkbox" data-a="nxpack" data-k="'+esc(k)+'"'+(on?' checked':'')+'>'+esc(t)+'</label>';}).join('')+'</div>';
 }
 function personalReminders(p){
-  var items=hhSorted().filter(function(x){return x.person===p.id&&!x.completed&&x.type!=='contact'&&hhDayCount(x.date)<=7;});
+  var items=hhSorted().filter(function(x){return hhPeople(x).indexOf(p.id)>=0&&!x.completed&&x.type!=='contact'&&hhDayCount(x.date)<=7;});
   return '<section class="card"><h2>'+(p.pet?'Care reminders':'My reminders')+'</h2><p class="note">Assigned to '+esc(p.n)+' · Next 7 days and overdue</p>'+(items.length?items.map(function(x){var type=hhType(x.type);return '<div class="li"><b>'+(type?type[1]+' ':'')+esc(x.title)+'</b><div class="note">'+esc(hhDateText(x))+'</div></div>';}).join(''):'<p class="note">No reminders assigned.</p>')+'<button class="btn n" data-a="go" data-v="house">Household reminders</button></section>';
 }
 function personalTasks(p){
@@ -4477,7 +4511,7 @@ function validateHubBackup(s){
   if(s.rewards&&(!Array.isArray(s.rewards)||s.rewards.some(function(r){return !obj(r)||!safeId(r.id)||!text(r.n)||!text(r.e)||!validRewardCost(r.c);})))return false;
   if(s.req&&(!Array.isArray(s.req)||s.req.some(function(q){return !obj(q)||!person(q.p)||!safeId(q.r);})))return false;
   if(s.goal&&(!obj(s.goal)||!text(s.goal.n)||!text(s.goal.e)||!finiteNumber(s.goal.p)||!finiteNumber(s.goal.t)||s.goal.t<=0))return false;
-  if(s.household&&(!Array.isArray(s.household)||s.household.some(function(i){return !obj(i)||!safeId(i.id)||!hhType(i.type)||!text(i.title)||(i.type!=='contact'&&!hhDateValid(i.date))||(i.type==='contact'&&!text(i.phone))||(i.person&&!person(i.person));})))return false;
+  if(s.household&&(!Array.isArray(s.household)||s.household.some(function(i){return !obj(i)||!safeId(i.id)||!hhType(i.type)||!text(i.title)||(i.type!=='contact'&&!hhDateValid(i.date))||(i.type==='contact'&&!text(i.phone))||(i.person&&!person(i.person))||(i.people!==undefined&&(!Array.isArray(i.people)||i.people.length>20||i.people.some(function(q){return typeof q!=='string'||!person(q);})));})))return false;
   if(s.theme!==undefined&&['auto','light','dark'].indexOf(s.theme)<0)return false;
   if(s.spin&&(!Array.isArray(s.spin)||s.spin.some(function(i){return !text(i);})))return false;
   if(s.meals&&(!obj(s.meals)||Object.keys(s.meals).some(function(d){var m=s.meals[d];return !hhDateValid(d)||!obj(m)||Object.keys(m).some(function(k){return ['b','l','d','e','o'].indexOf(k)<0||!text(m[k]);});})))return false;
@@ -5281,5 +5315,63 @@ document.addEventListener("click",function(e){
 });
 </script>
 
+<script>
+/* ===== v38.1: grocery swipe-to-delete, Enter to add, styles for groceries, household people and parent menu ===== */
+(function(){
+  var st=document.createElement("style");st.id="v381-css";
+  st.textContent=
+  ".gsw{position:relative;overflow:hidden;border-radius:14px}"+
+  ".gsw-bg{position:absolute;inset:0;background:#c92a2a;color:#fff;display:flex;align-items:center;justify-content:flex-end;padding-right:22px;font-weight:800;font-size:18px;opacity:0;border-radius:14px}"+
+  ".gsw.sw .gsw-bg{opacity:1}.gsw.sw .gsw-fg{background:var(--card-solid,#1e293b)}"+
+  ".gsw-fg{position:relative;touch-action:pan-y;transition:transform .2s ease}.gsw.sw .gsw-fg{transition:none}.gsw.out .gsw-fg{transition:transform .2s ease;transform:translateX(-110%)!important}"+
+  ".gsw-fg .t{flex:1;min-width:0;overflow-wrap:anywhere}"+
+  ".gx{margin-left:auto;flex:0 0 auto;min-width:52px;min-height:52px;border:0;border-radius:14px;background:transparent;font-size:22px;opacity:.5;cursor:pointer;color:inherit}.gx:hover,.gx:focus-visible{opacity:1;background:rgba(201,42,42,.15)}"+
+  ".gundo{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:8px;z-index:6;background:var(--card-solid,#1e293b);border:1px solid var(--line,#445);border-radius:16px;padding:8px 8px 8px 16px;margin:8px 0;box-shadow:0 6px 18px rgba(0,0,0,.25)}"+
+  ".gtip{margin:4px 2px 0}.gadd input{min-width:0}"+
+  ".hhwho{border:0;padding:0;margin:12px 0 6px;display:flex;flex-wrap:wrap;gap:8px}.hhwho legend{padding:0;margin-bottom:6px;font-weight:600}"+
+  ".hhchip{display:inline-flex;align-items:center;gap:8px;min-height:48px;padding:6px 14px;border:2px solid var(--field-line,var(--line,#556));border-radius:999px;cursor:pointer;font-weight:600}"+
+  ".hhchip input{width:22px;height:22px;margin:0;accent-color:#3b5bdb}.hhchip:has(input:checked){background:#3b5bdb;border-color:#3b5bdb;color:#fff}"+
+  ".secpickrow{margin:8px 0 10px}.secpickrow select{width:100%;max-width:520px;min-height:52px;font-size:18px;border-radius:14px}"+
+  ".secjump{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 10px}"+
+  ".kh-hwgo{margin:10px 0 4px}.kh-card .hw-card{margin:8px 0}";
+  document.head.appendChild(st);
+
+  /* swipe left on a grocery row to delete it (with Undo) */
+  var row=null,fg=null,x0=0,y0=0,dx=0,mode=0,eat=0;
+  document.addEventListener("touchstart",function(e){
+    var r=e.target&&e.target.closest?e.target.closest(".gsw"):null;
+    if(!r||!e.touches||e.touches.length!==1){row=null;return;}
+    row=r;fg=r.querySelector(".gsw-fg");x0=e.touches[0].clientX;y0=e.touches[0].clientY;dx=0;mode=0;
+  },{passive:true});
+  document.addEventListener("touchmove",function(e){
+    if(!row||!e.touches)return;
+    var t=e.touches[0],mx=t.clientX-x0,my=t.clientY-y0;
+    if(!mode){if(Math.abs(mx)<10&&Math.abs(my)<10)return;mode=(Math.abs(mx)>Math.abs(my)*1.2&&mx<0)?1:2;if(mode===1)row.className+=" sw";}
+    if(mode!==1)return;
+    dx=Math.min(0,mx);fg.style.transform="translateX("+dx+"px)";
+  },{passive:true});
+  function end(){
+    if(!row)return;var r=row,f=fg;row=null;
+    if(mode!==1)return;
+    eat=Date.now();
+    var w=r.offsetWidth||300;
+    if(dx<-Math.min(110,w*0.3)){
+      r.className=r.className.replace(/\bsw\b/,"")+" sw out";
+      var i=+r.getAttribute("data-gi");
+      setTimeout(function(){var g=S.groc[i];if(!g){render();return;}S.groc.splice(i,1);grocUndoArm([{g:g,i:i}]);save();render();},180);
+    }else{f.style.transform="";r.className=r.className.replace(/\s*\bsw\b/,"");}
+  }
+  document.addEventListener("touchend",end,{passive:true});
+  document.addEventListener("touchcancel",end,{passive:true});
+  /* a swipe should not also count as a tap on the circle */
+  document.addEventListener("click",function(e){if(eat&&Date.now()-eat<450&&e.target&&e.target.closest&&e.target.closest(".gsw")){e.stopPropagation();e.preventDefault();}},true);
+  /* Enter in the grocery boxes adds the item */
+  document.addEventListener("keydown",function(e){
+    if(e.key!=="Enter"||!e.target||(e.target.id!=="gi"&&e.target.id!=="gs"))return;
+    e.preventDefault();var b=document.querySelector("[data-a='addg']");if(b)b.click();
+    setTimeout(function(){var gi=document.getElementById("gi");if(gi)gi.focus();},30);
+  });
+})();
+</script>
 </body>
 </html>
