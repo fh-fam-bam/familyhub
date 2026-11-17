@@ -218,18 +218,32 @@ public class MainActivity extends Activity {
     // ---------------------------------------------------------------------
     // Read-aloud with the tablet's own text-to-speech voice.
     // ---------------------------------------------------------------------
+    static final String PICO = "com.svox.pico";
+
     private void initTts() {
+        initTts(null);
+    }
+
+    // engine == null: the tablet's default voice engine. If it has no English voice
+    // installed (seen on the 2019 Fire tablet), try the built-in offline Pico engine.
+    private void initTts(final String engine) {
         try {
-            tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+            TextToSpeech.OnInitListener l = new TextToSpeech.OnInitListener() {
                 @Override
                 public void onInit(int status) {
-                    if (status != TextToSpeech.SUCCESS || tts == null) return;
+                    if (tts == null) return;
+                    if (status != TextToSpeech.SUCCESS) {
+                        if (engine == null && hasPackage(PICO)) switchEngine(PICO);
+                        return;
+                    }
                     try {
                         int r = tts.setLanguage(Locale.US);
                         if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) {
+                            if (engine == null && hasPackage(PICO)) { switchEngine(PICO); return; }
                             tts.setLanguage(Locale.getDefault());
                         }
                         tts.setSpeechRate(0.9f);
+                        if (engine == null && hasPackage(PICO)) watchForSilence();
                     } catch (Exception e) { /* keep the engine's defaults */ }
                     ttsReady = true;
                     if (pendingSay != null) {
@@ -243,9 +257,63 @@ public class MainActivity extends Activity {
                         });
                     }
                 }
-            });
+            };
+            tts = (engine == null) ? new TextToSpeech(this, l) : new TextToSpeech(this, l, engine);
         } catch (Exception e) {
             tts = null;
+        }
+    }
+
+    // If the default engine finishes a sentence without ever starting to play it
+    // (no voice data), switch to Pico and say the same sentence again.
+    private volatile boolean started = false;
+    private volatile String lastSaid = null;
+
+    private void watchForSilence() {
+        try {
+            tts.setOnUtteranceProgressListener(new android.speech.tts.UtteranceProgressListener() {
+                @Override public void onStart(String id) { started = true; }
+                @Override public void onDone(String id) { if (!started) fallBack(); }
+                @Override public void onError(String id) { fallBack(); }
+                @Override public void onError(String id, int code) { fallBack(); }
+            });
+        } catch (Exception e) { /* ignore */ }
+    }
+
+    private volatile boolean fellBack = false;
+
+    private void fallBack() {
+        if (fellBack) return;
+        fellBack = true;
+        final String again = lastSaid;
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                pendingSay = again;
+                switchEngine(PICO);
+            }
+        });
+    }
+
+    private void switchEngine(final String engine) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try { if (tts != null) tts.shutdown(); } catch (Exception e) { /* ignore */ }
+                tts = null;
+                ttsReady = false;
+                started = false;
+                initTts(engine);
+            }
+        });
+    }
+
+    private boolean hasPackage(String pkg) {
+        try {
+            getPackageManager().getPackageInfo(pkg, 0);
+            return true;
+        } catch (Exception e) {
+            return false;
         }
     }
 
@@ -257,6 +325,8 @@ public class MainActivity extends Activity {
             return;
         }
         try {
+            started = false;
+            lastSaid = t;
             tts.speak(t, TextToSpeech.QUEUE_FLUSH, null, "fh-say");
         } catch (Exception e) { /* ignore */ }
     }

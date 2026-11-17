@@ -10,8 +10,8 @@ android {
         applicationId "com.fhfambam.familyhub"
         minSdk 28          // Fire HD 10 (2019) runs Android 9 = API 28
         targetSdk 34
-        versionCode 2
-        versionName "1.1"
+        versionCode 3
+        versionName "1.2"
     }
 
     signingConfigs {
