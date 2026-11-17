@@ -882,7 +882,7 @@ var PC_DEFS=[
 ['amfeed','bowser','Morning feeding','🍖','am',1],
 ['water','bowser','Water bowl check or refill','💧','am',0],
 ['midfeed','bowser','Midday feeding (scheduled days only)','🥣','am',0],
-['poop','bowser','Poop cleanup','🧹','am',2],
+['poop','bowser','Pick up and throw away poop','💩','am',2],
 ['pmfeed','bowser','Evening feeding','🍖','pm',1],
 ['indoor','bowser','Indoor play','🧸','pm',0],
 ['walk','bowser','Outdoor play or walk','🦮','pm',2],
@@ -964,8 +964,9 @@ function pcRowHtml(d,it,ix,mode){
   }else if(res){
     line='Resolved by a parent';
   }else{
-    line=(kn?'Assigned to '+esc(kn)+' · ':'')+(it.pts>0&&pcRp(it.id)?pts(it.pts):'no points');
+    line=(kn?'Assigned to '+esc(kn)+' · ':'')+(it.kid&&person(it.kid)&&!person(it.kid).kid?'grown-up, no points':(it.pts>0&&pcRp(it.id)?pts(it.pts):'no points'));
     if(role!=='wall')btn="<button class='btn g' data-a='pcpick' data-d='"+d+"' data-i='"+it.id+"'>✓ Done</button>";
+    if(it.id==='poop'&&mode!=='missed'&&d===today()&&typeof ppSpinBtn==='function')btn+=ppSpinBtn(d);
     if(isPar){ex+="<button class='btn n' data-a='pcassign' data-d='"+d+"' data-i='"+it.id+"'>⇄ Change who</button>";if(mode==='missed')ex+="<button class='btn n' data-a='pcresolve' data-d='"+d+"' data-i='"+it.id+"'>Resolve</button>";}
   }
   return "<div class='pc-row'><div class='pc-top'><span aria-hidden='true'>"+(e.length||res?'✅':'○')+"</span> "+esc(it.e)+' '+esc(it.label)+(mode==='missed'?" <span class='note'>· "+esc(niceDate(d))+"</span>":'')+"</div><div class='note'>"+line+"</div>"+((btn||ex)?"<div class='pc-btns'>"+btn+ex+"</div>":'')+"</div>";
@@ -1068,6 +1069,7 @@ function pcComplete(d,iid,who){
   if(wm.kid)S.pendingPoints[k]=earn?it.pts:0;
   pcPickerClose();
   if(!commitOr(snap))return;render();
+  if(iid==='poop'&&typeof ppRain==='function')ppRain(wm.n);
   statusMessage(wm.kid?(earn?'Saved. A parent will approve '+pts(it.pts)+'.':'Saved. Thank you for caring for '+person(it.pet).n+'!'):'Recorded.');
 }
 function pcAct(a,b){
@@ -1312,16 +1314,17 @@ function p2Pts(b){var n=Number(b&&b.points);return Math.max(1,Math.min(100,Math.
 function p2Now(){return new Date().toISOString();}
 function p2Kids(){return P.filter(function(x){return x.kid&&!x.archived;});}
 function p2Submitted(pid,id){return Object.keys(S.done||{}).some(function(k){var a=k.split('|');return a[1]===pid&&a[2]===id&&(S.done[k]==='p'||S.done[k]==='a');});}
+function fnShow(n){if(!n||n.archived)return false;if(n.read){var t=Date.parse(n.readAt||n.at);if(isFinite(t)&&Date.now()-t>3*86400000)return false;}return true;}
 function phase2WallHtml(){
  var canPost=p2Parent();
- var notes=(Array.isArray(S.fridgeNotes)?S.fridgeNotes:[]).filter(function(n){return n&&!n.archived;}).slice(-8).reverse();
+ var notes=(Array.isArray(S.fridgeNotes)?S.fridgeNotes:[]).filter(fnShow).slice(-8).reverse();
  var open=(Array.isArray(S.bounties)?S.bounties:[]).filter(function(b){return b&&b.status==='open';});
  var h="<div class='home-grid duo'><section class='hcard'><div class='ch' style='background:#b17b18'>📝 Family Fridge Notes <span>"+notes.length+" visible</span></div><div class='cb'>";
  if(canPost){
   h+="<label for='fridge-author'>From</label><select id='fridge-author'>"+P.filter(function(p){return !p.pet&&!p.archived;}).map(function(p){return "<option value='"+esc(p.id)+"'"+(p.id===unlockedBy?' selected':'')+">"+esc(p.n)+"</option>";}).join('')+"</select><label for='fridge-text' class='sr'>New family note</label><textarea id='fridge-text' maxlength='300' placeholder='Leave a note for the family…' style='width:100%;display:block'></textarea><button class='btn g' data-a='p2noteadd'>Post note</button>";
  }else h+=bqNoteForm();
  if(!notes.length)h+="<p class='note'>No notes yet.</p>";
- notes.forEach(function(n){h+="<div class='p2-sticky'><b>"+esc((person(n.from)||{}).n||'Family')+"</b><p>"+esc(n.text)+"</p><small>"+esc(new Date(n.at).toLocaleDateString())+"</small> "+(canPost?"<button class='btn n' data-a='p2noteread' data-id='"+esc(n.id)+"'>"+(n.read?'✓ Read':'Mark read')+"</button>":(n.read?"<small>✓ Read</small>":""))+"</div>";});
+ notes.forEach(function(n){h+="<div class='p2-sticky'><b>"+esc((person(n.from)||{}).n||'Family')+"</b><p>"+esc(n.text)+"</p><small>"+esc(new Date(n.at).toLocaleDateString())+"</small> "+(canPost?"<button class='btn n' data-a='p2noteread' data-id='"+esc(n.id)+"'>"+(n.read?'✓ Read':'Mark read')+"</button><button class='btn r' data-a='p2notedel' data-id='"+esc(n.id)+"' aria-label='Remove this note'>🗑 Remove</button>"+(n.read?"<small class='note'> Hides itself 3 days after it was read.</small>":'')+"":(n.read?"<small>✓ Read</small>":""))+"</div>";});
  h+="</div></section><section class='hcard'><div class='ch' style='background:#7552a5'>🏆 Chore Bounties <span>"+open.length+" available</span></div><div class='cb'>";
  if(!open.length)h+="<p class='note'>No extra-credit chores available right now.</p>";
  open.forEach(function(b){h+="<div class='p2-bounty'><b>"+esc(b.title)+"</b><p>⭐ "+esc(String(p2Pts(b)))+" points · Parent approval required</p>"+(canPost?p2Kids().map(function(k){return "<button class='btn' data-a='p2claim' data-id='"+esc(b.id)+"' data-p='"+esc(k.id)+"'>Give to "+esc(k.n)+"</button>";}).join(''):bqClaimBtns(b))+"</div>";});
@@ -1336,8 +1339,8 @@ function phase2Act(a,b){var id=b.getAttribute('data-id'),snap=JSON.stringify(S),
  var parentOk=unlocked&&p2Parent();
  if(a==='p2noteadd'||a==='p2noteread'){if(!p2Parent())return alert('Notes are posted from a parent phone so they sync to every device.');}
  if(a==='p2noteadd'){var t=v('fridge-text'),from=v('fridge-author');if(!t||t.length>300||!person(from)||person(from).pet)return alert('Choose a family member and enter a note.');S.fridgeNotes=Array.isArray(S.fridgeNotes)?S.fridgeNotes:[];S.fridgeNotes.push({id:uid(),from:from,text:t,at:p2Now(),read:false});S.fridgeNotes=S.fridgeNotes.slice(-60);}
- else if(a==='p2noteread'){it=(S.fridgeNotes||[]).filter(function(x){return x.id===id;})[0];if(!it)return;it.read=true;}
- else if(a==='p2notedel'){if(!parentOk)return alert('Unlock the Parent area first.');it=(S.fridgeNotes||[]).filter(function(x){return x.id===id;})[0];if(!it)return;it.archived=true;}
+ else if(a==='p2noteread'){it=(S.fridgeNotes||[]).filter(function(x){return x.id===id;})[0];if(!it)return;it.read=true;if(!it.readAt)it.readAt=p2Now();}
+ else if(a==='p2notedel'){if(!p2Parent())return alert('Notes can be removed from a parent device.');it=(S.fridgeNotes||[]).filter(function(x){return x.id===id;})[0];if(!it)return;if(!confirm('Remove this note from the fridge? It disappears on every device.'))return;it.archived=true;}
  else if(a==='p2badd'){if(!parentOk)return alert('Unlock the Parent area first.');var title=v('p2btitle'),points=Number(v('p2bpoints'));if(!title||title.length>120||!isFinite(points)||points<1||points>100||Math.floor(points)!==points)return alert('Enter a title and a whole number of points from 1 to 100.');S.bounties=Array.isArray(S.bounties)?S.bounties:[];S.bounties.push({id:uid(),title:title,points:points,status:'open',u:p2Now()});S.bounties=S.bounties.slice(-100);}
  else if(a==='p2bcancel'){if(!parentOk)return alert('Unlock the Parent area first.');it=(S.bounties||[]).filter(function(x){return x.id===id&&x.status==='open';})[0];if(!it)return;it.status='removed';it.u=p2Now();}
  else if(a==='p2breopen'){if(!parentOk)return alert('Unlock the Parent area first.');it=(S.bounties||[]).filter(function(x){return x.id===id&&x.status==='claimed';})[0];if(!it)return;
@@ -1444,7 +1447,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.2";
+var FH_BUILD="v38.3";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -2736,7 +2739,7 @@ function wallHome(){
   h+="<button class='w-box' data-a='go' data-v='house'><h2>🏡 Reminders</h2><div class='w-small'>"+(rem.length?rem.map(function(x){return "<b>"+esc(x.title)+"</b> "+esc(hhDateText(x));}).join("<br>"):"None in the next 3 days")+"</div></button>";
   var rw="";kids.forEach(function(p){var r=rewardTarget(p.id);if(r)rw+="<div>"+esc(p.e)+" "+esc(p.n)+": <b>"+(S.stars[p.id]||0)+"</b>/"+r.c+" ⭐ "+esc(r.e||"")+"</div>";});
   if(S.goal){var gg=S.goal;rw+="<div>"+esc(gg.e||"🎯")+" "+esc(gg.n)+": <b>"+gg.p+"</b>/"+gg.t+"</div>";}
-  var wn=(Array.isArray(S.fridgeNotes)?S.fridgeNotes:[]).filter(function(n){return n&&!n.archived;}).slice(-2).reverse(),wb=(Array.isArray(S.bounties)?S.bounties:[]).filter(function(x){return x&&x.status==='open';});
+  var wn=(Array.isArray(S.fridgeNotes)?S.fridgeNotes:[]).filter(fnShow).slice(-2).reverse(),wb=(Array.isArray(S.bounties)?S.bounties:[]).filter(function(x){return x&&x.status==='open';});
   if(wn.length||wb.length)h+="<button class='w-box' data-a='nxwallfull'><h2>📝 Notes · 🏆 "+wb.length+" bounties</h2><div class='w-small'>"+wn.map(function(n){return "<b>"+esc((person(n.from)||{}).n||'Family')+":</b> "+esc(String(n.text).slice(0,60));}).join("<br>")+(wb.length?(wn.length?"<br>":"")+wb.slice(0,2).map(function(x){return "⭐ "+esc(String(p2Pts(x)))+" "+esc(x.title);}).join(" · "):"")+"</div></button>";
   h+="<button class='w-box' data-a='go' data-v='goal'><h2>🏆 Rewards</h2><div class='w-small'>"+(rw||"No reward goals set")+"</div></button>";
   h+="</section></div><footer class='w-foot'><button class='w-link' data-a='nxwallfull'>Full home page</button></footer></div>";
@@ -5538,6 +5541,91 @@ document.addEventListener("click",function(e){
   var on=!!(document.getElementById("coon")||{}).checked,g={};
   Array.prototype.forEach.call(document.querySelectorAll(".cograde"),function(i){var v=String(i.value||"").trim().slice(0,12);if(v&&/^[A-Za-z0-9 -]+$/.test(v))g[i.getAttribute("data-k")]=v;});
   S.coach={on:on,url:on?aiBase():"",grade:g};if(!save())return;render();statusMessage(on?"Homework coach is on for kids’ devices.":"Homework coach settings saved.");
+});
+</script>
+<script>
+/* ===== v38.3: Poop patrol spinner + poop rain ===== */
+function ppPeople(){return P.filter(function(m){return m&&!m.pet&&!m.archived;});}
+function ppSpun(d){var c=pcCfg();return c&&c.pspin&&c.pspin.d===d&&person(c.pspin.who)?c.pspin.who:"";}
+function ppSpinBtn(d){
+  if(devRole()!=="parent")return ppSpun(d)?"<span class='note pp-tag'>🎲 Picked by the poop spinner</span>":"";
+  if(ppSpun(d)&&!unlocked)return "<span class='note pp-tag'>🎲 Picked by the poop spinner</span>";
+  return "<button class='btn pp-spinbtn' data-pp='spin' data-d='"+esc(d)+"'>🎲 "+(ppSpun(d)?"Spin again":"Spin for poop duty")+"</button>";
+}
+function ppCss(){
+  if(document.getElementById("pp-css"))return;
+  var st=document.createElement("style");st.id="pp-css";
+  st.textContent=
+  ".pp-spinbtn{background:#8a4b08!important;color:#fff!important;border-color:#8a4b08!important}.pp-tag{margin-left:6px}"+
+  "#ppspin{position:fixed;inset:0;z-index:9500;background:rgba(15,10,5,.72);display:flex;align-items:center;justify-content:center;padding:16px}"+
+  "#ppspin .ppbox{background:var(--card-solid,#2a1d10);color:var(--ink,#fff);border-radius:28px;padding:22px;max-width:520px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);border:4px solid #8a4b08}"+
+  "#ppspin h2{margin:0 0 12px;font-size:28px}"+
+  "#ppspin .ppreel{height:170px;border-radius:22px;background:linear-gradient(#fff3e0,#ffe0b2);color:#3b2410;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;box-shadow:inset 0 6px 14px rgba(0,0,0,.25)}"+
+  "#ppspin .ppface{font-size:72px;line-height:1}#ppspin .ppname{font-size:30px;font-weight:800;margin-top:6px}"+
+  "#ppspin .ppreel.tick .ppface,#ppspin .ppreel.tick .ppname{animation:ppTick .09s ease-out}"+
+  "@keyframes ppTick{from{transform:translateY(-28px);opacity:.3}to{transform:none;opacity:1}}"+
+  "#ppspin .ppreel.win{animation:ppWin .6s ease-out 2;background:linear-gradient(#fff59d,#ffcc80)}"+
+  "@keyframes ppWin{0%{transform:scale(1)}40%{transform:scale(1.08) rotate(-2deg)}70%{transform:scale(.98) rotate(2deg)}100%{transform:scale(1)}}"+
+  "#ppspin .ppmsg{font-size:22px;font-weight:700;min-height:32px;margin:14px 0 6px}"+
+  "#ppspin .btn{min-height:54px;font-size:19px;margin:6px}"+
+  ".pp-rain{position:fixed;inset:0;pointer-events:none;z-index:9600;overflow:hidden}"+
+  ".pp-rain span{position:absolute;top:-80px;animation:ppFall linear forwards;will-change:transform}"+
+  "@keyframes ppFall{to{transform:translateY(115vh) rotate(var(--r,360deg))}}"+
+  ".pp-cheer{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);z-index:9601;background:#8a4b08;color:#fff;font-size:28px;font-weight:800;padding:18px 28px;border-radius:24px;box-shadow:0 14px 40px rgba(0,0,0,.4);text-align:center;animation:ppPop .5s cubic-bezier(.2,1.6,.4,1)}"+
+  "@keyframes ppPop{from{transform:translate(-50%,-50%) scale(.4);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}";
+  document.head.appendChild(st);
+}
+function ppReduce(){try{return window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;}catch(e){return false;}}
+function ppRain(name,count){
+  ppCss();
+  try{
+    var box=document.createElement("div");box.className="pp-rain";box.setAttribute("aria-hidden","true");
+    var n=ppReduce()?0:(count||46),emo=["💩","💩","💩","💩","✨","🧻","🐶"];
+    for(var i=0;i<n;i++){var e=document.createElement("span");e.textContent=emo[i%emo.length];e.style.left=(Math.random()*96)+"%";e.style.fontSize=(30+Math.random()*44)+"px";e.style.animationDuration=(1.8+Math.random()*1.8)+"s";e.style.animationDelay=(Math.random()*.7)+"s";e.style.setProperty("--r",(Math.random()<.5?-1:1)*(180+Math.random()*540)+"deg");box.appendChild(e);}
+    document.body.appendChild(box);
+    var ch=null;if(name!==null){ch=document.createElement("div");ch.className="pp-cheer";ch.setAttribute("role","status");ch.textContent="💩 Poop patrol complete!"+(name?" Thanks, "+name+"!":"");document.body.appendChild(ch);}
+    try{fxBeep("ok",pid);}catch(x){}
+    setTimeout(function(){if(box.parentNode)box.parentNode.removeChild(box);if(ch&&ch.parentNode)ch.parentNode.removeChild(ch);},6000);
+  }catch(e){}
+}
+var ppBusy=false;
+function ppSpin(d){
+  if(ppBusy)return;
+  if(devRole()!=="parent"){alert("The poop spinner runs on a parent device so everyone sees the result.");return;}
+  var c=pcCfg();if(!c){alert("Set up pet care first.");return;}
+  var ppl=ppPeople();if(ppl.length<2){alert("Add at least two family members first.");return;}
+  /* fair pick: anyone except whoever the spinner picked yesterday */
+  var y=pcAddDays(d,-1),last=(c.pspin&&c.pspin.d===y)?c.pspin.who:"";
+  var pool=ppl.filter(function(m){return m.id!==last;});if(!pool.length)pool=ppl;
+  var r=0;try{var a=new Uint32Array(1);crypto.getRandomValues(a);r=a[0]/4294967296;}catch(e){r=Math.random();}
+  var win=pool[Math.floor(r*pool.length)];
+  ppCss();ppBusy=true;
+  var o=document.createElement("div");o.id="ppspin";o.setAttribute("role","dialog");o.setAttribute("aria-modal","true");o.setAttribute("aria-label","Poop duty spinner");
+  o.innerHTML="<div class='ppbox'><h2>💩 Who's on poop duty?</h2><div class='ppreel' id='ppreel'><div class='ppface' id='ppface'>🎲</div><div class='ppname' id='ppname'>Spinning…</div></div><div class='ppmsg' id='ppmsg' role='status'></div><div id='ppbtns'></div></div>";
+  document.body.appendChild(o);
+  var reel=document.getElementById("ppreel"),face=document.getElementById("ppface"),nm=document.getElementById("ppname");
+  var steps=ppReduce()?1:26+Math.floor(Math.random()*6),i=0,start=Math.floor(Math.random()*ppl.length),winIx=ppl.indexOf(win);
+  /* land exactly on the winner on the last step */
+  var off=((winIx-(start+steps-1))%ppl.length+ppl.length)%ppl.length;start+=off;
+  function show(m){face.textContent=m.e||"🙂";nm.textContent=m.n;reel.className="ppreel";void reel.offsetWidth;reel.className="ppreel tick";}
+  function step(){
+    var m=ppl[(start+i)%ppl.length];show(m);i++;
+    if(i<steps){var t=i/steps;setTimeout(step,55+Math.pow(t,3)*420);return;}
+    reel.className="ppreel win";
+    document.getElementById("ppmsg").textContent=win.n+" is on poop duty today!";
+    var snap=JSON.stringify(S);c.over=c.over||{};c.over[d+"|poop"]=win.id;c.pspin={d:d,who:win.id};
+    var ok=commitOr(snap);
+    document.getElementById("ppbtns").innerHTML="<button class='btn g' data-pp='close'>👍 Got it</button>";
+    ppRain(null,26);ppBusy=false;
+    if(ok){/* refresh the page behind the overlay */var y0=window.pageYOffset||0;render();if(window.scrollTo)window.scrollTo(0,y0);}
+  }
+  setTimeout(step,250);
+}
+document.addEventListener("click",function(e){
+  var b=e.target&&e.target.closest?e.target.closest("[data-pp]"):null;if(!b)return;
+  e.preventDefault();var a=b.getAttribute("data-pp");
+  if(a==="spin"){ppSpin(b.getAttribute("data-d")||today());return;}
+  if(a==="close"){var o=document.getElementById("ppspin");if(o&&o.parentNode)o.parentNode.removeChild(o);return;}
 });
 </script>
 </body>
