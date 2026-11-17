@@ -1439,7 +1439,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v37.3";
+var FH_BUILD="v37.4";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -1770,10 +1770,11 @@ function syncPush(){
   SYNC_COLLS.forEach(function(c){if(c==="ledger")return;Object.keys(sync.known[c]).forEach(function(id){if(!sync.known[c][id].deleted)knownCount++;});});
   if(!sync.allow&&dels>=3&&dels*2>=knownCount){sync.guard=true;sync.guardInfo=dels+" of "+knownCount+" shared items would be deleted for everyone.";syncSetState("paused");return;}
   sync.guard=false;sync.busy=true;syncSetState("sending");syncFast();
-  var i=0,conflicts=0;
+  var i=0,conflicts=0,adopted=0;
   function done(){
     sync.busy=false;sync.allow=false;syncStore();
     if(conflicts){sync.notice="Another device changed "+conflicts+" item"+(conflicts===1?"":"s")+" at the same time. The newer version was kept.";syncAfterRemote();}
+    else if(adopted)syncAfterRemote();
     if(sync.permNew){statusMessage(sync.permNew+" change"+(sync.permNew===1?"":"s")+" on this device "+(sync.permNew===1?"was":"were")+" not allowed by the family sync rules and "+(sync.permNew===1?"was":"were")+" skipped ("+sync.permLast+"). Everything else synced.");sync.permNew=0;}
     syncSetState("ok");
     if(syncDiff().length)syncSchedule(300);
@@ -1795,7 +1796,19 @@ function syncPush(){
       /* v37.3: one refused change no longer blocks all syncing. Skip it (until it changes), remember it, keep going. */
       if(err&&err.code==="perm"){
         sync.permSkip=sync.permSkip||{};sync.permSkip[j.c+"/"+j.id]=j.del?"#del":j.json;
-        sync.permLast=(j.del?"delete of ":"")+j.c+" / "+j.id;sync.permNew=(sync.permNew||0)+1;sync.permTotal=(sync.permTotal||0)+1;
+        sync.permLast=(j.del?"delete of ":"")+j.c+" / "+j.id;sync.permTotal=(sync.permTotal||0)+1;
+        /* v37.4: on a kids'/wall device, replace this device's copy with the server (parent) copy so it stops retrying */
+        if(syncRole()!=="parent"&&sync.adapter&&typeof sync.adapter.get==="function"){
+          sync.adapter.get(j.c,j.id).then(function(rd){
+            if(rd&&sync.known[j.c]){delete sync.known[j.c][j.id];if(syncApplyDoc(j.c,j.id,rd)){adopted++;
+              /* if the adopted copy still differs locally (e.g. normalised fields), do not send it again */
+              var mine=syncList(j.c).filter(function(x){return x&&x.id===j.id;})[0];sync.permSkip[j.c+"/"+j.id]=mine?JSON.stringify(mine):"#del";
+              next();return;}}
+            sync.permNew=(sync.permNew||0)+1;next();
+          },function(){sync.permNew=(sync.permNew||0)+1;next();});
+          return;
+        }
+        sync.permNew=(sync.permNew||0)+1;
         next();return;
       }
       sync.busy=false;syncStore();syncSetState(err&&err.code==="perm"?"error":"offline",err);syncSchedule(15000);});
@@ -1939,6 +1952,15 @@ function syncRestAdapter(){
           throw httpErr(r2);
         });
       }
+    },
+    /* v37.4: read one item's current server copy (null if it does not exist) */
+    get:function(c,id){
+      var url="https://firestore.googleapis.com/v1/projects/"+P+"/databases/(default)/documents/households/family/items/"+encodeURIComponent(c+"__"+id);
+      return areq(url,"GET").then(function(r){
+        if(r.status===404)return null;
+        if(r.status!==200||!r.json)throw httpErr(r);
+        var d=parseDoc(r.json);return {rev:d.rev,json:d.json,deleted:d.deleted,st:d.st};
+      });
     },
     put:function(c,id,baseRev,json,del,stv){
       var path="households/family/items/"+encodeURIComponent(c+"__"+id),url="https://firestore.googleapis.com/v1/projects/"+P+"/databases/(default)/documents/"+path;
