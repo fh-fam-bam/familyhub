@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.11";
+var FH_BUILD="v38.12";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -2764,7 +2764,7 @@ function wallHome(){
   h+="</div></section>";
   /* column 3: dinner, groceries, reminders, rewards */
   var m=(S.meals||{})[ds]||{},gl=(S.groc||[]).filter(function(g){return !g.c;});
-  var rem=(typeof hhSorted==="function"?hhSorted():[]).filter(function(x){return !x.completed&&x.type!=="contact"&&hhDayCount(x.date)<=3;}),remMore=Math.max(0,rem.length-2);rem=rem.slice(0,2);
+  var rem=(typeof hhSorted==="function"?hhSorted():[]).filter(function(x){return !x.completed&&x.type!=="contact"&&!hhKidTaken(x)&&hhDayCount(x.date)<=3;}),remMore=Math.max(0,rem.length-2);rem=rem.slice(0,2);
   h+="<section class='w-col w-side' aria-label='Around the house'>";
   h+="<button class='w-box' data-a='go' data-v='meals'><h2>🍽️ Tonight</h2><div class='w-big'>"+esc(m.d||"Not planned yet")+"</div></button>";
   h+="<button class='w-box' data-a='go' data-v='groc'><h2>🛒 Shopping · "+gl.length+"</h2><div class='w-small'>"+(gl.length?gl.slice(0,4).map(function(g){return esc(g.t);}).join(" · ")+(gl.length>4?" …":""):"Nothing needed")+"</div></button>";
@@ -3501,7 +3501,7 @@ function hhDayCount(s){
 }
 function hhDateText(x){
   if(x.type==='contact')return x.phone;
-  if(x.completed)return 'Completed · '+x.completed;
+  if(x.completed)return (x.skipped?'Skipped · ':'Completed · ')+x.completed;
   var days=hhDayCount(x.date),text;
   if(x.type==='countdown')text=days===0?'Today!':days>0?days+' day'+(days===1?'':'s')+' to go':Math.abs(days)+' day'+(days===-1?'':'s')+' ago';
   else text=days===0?'Today':days===1?'Tomorrow':days<0?Math.abs(days)+' day'+(days===-1?'':'s')+' past date': 'In '+days+' days';
@@ -3522,7 +3522,7 @@ function household(){
   var h="<h1>Household</h1><p class='sub'>Reminders, useful numbers, and things coming up.</p><div class='seg'>";
   h+="<button class='btn "+(hhFilter==='all'?'on':'')+"' data-a='hhfilter' data-type='all'>All</button>";
   HH_TYPES.forEach(function(t){h+="<button class='btn "+(hhFilter===t[0]?'on':'')+"' data-a='hhfilter' data-type='"+t[0]+"'>"+t[1]+' '+t[2]+"</button>";});
-  h+="</div><p class='note'>These reminders appear in the hub while it is open. Phone alerts are not connected yet. Future reminders cannot be checked off early; medicine and bills require Parent unlock.</p>";
+  h+="</div><p class='note'>These reminders appear in the hub while it is open. Phone alerts are not connected yet. Future reminders cannot be checked off early. Anyone can mark medicine taken; bills need a parent.</p>";
   var items=hhSorted().filter(function(x){return hhFilter==='all'||x.type===hhFilter;});
   if(!items.length)h+="<div class='card'><p class='note'>Nothing here yet. A parent can add an item below.</p></div>";
   items.forEach(function(x){
@@ -3535,10 +3535,14 @@ function household(){
     if(x.type==='contact')h+="<a class='btn' style='display:inline-block;text-decoration:none;min-height:48px' href='tel:"+esc(x.phone.replace(/[^0-9+]/g,''))+"'>Call</a>";
     else if(x.type!=='countdown'&&!x.completed&&x.date<=today()){
       var label={leftover:'Used / cleared',bill:'Mark paid',medicine:'Mark taken',pet:'Done'}[x.type];
-      h+="<button class='btn g' style='min-height:48px' data-a='hhcomplete' data-id='"+x.id+"' data-date='"+x.date+"'>"+label+"</button>";
+      var hhLim=devRole()!=='parent';
+      if(hhKidTaken(x))h+="<p class='note' style='font-weight:700'>✓ "+({leftover:'Marked used',bill:'Marked paid',medicine:'Marked taken',pet:'Marked done'}[x.type])+". A parent’s phone will record it.</p>";
+      else if(x.type==='bill'&&hhLim)h+="<p class='note'>✋ A parent marks bills paid on their phone.</p>";
+      else h+="<button class='btn g' style='min-height:48px' data-a='hhcomplete' data-id='"+x.id+"' data-date='"+x.date+"'>"+label+"</button>";
+      if(!hhLim&&unlocked&&!hhKidTaken(x)&&(x.type==='medicine'||x.type==='bill'||x.type==='pet'))h+="<button class='btn n' style='min-height:48px' data-a='hhskip' data-id='"+x.id+"' data-date='"+x.date+"'>"+({medicine:'Skip (not taken)',bill:'Skip (not paid)',pet:'Skip'}[x.type])+"</button>";
     }
     if(unlocked&&S.reminderUndo&&S.reminderUndo.id===x.id)h+="<button class='btn n' data-a='nxundoreminder' data-id='"+x.id+"'>Undo last completion</button>";
-    if(x.lastDone)h+="<p class='note'>Last completed: "+esc(x.lastDone)+"</p>";
+    if(x.lastDone)h+="<p class='note'>Last completed: "+esc(x.lastDone)+"</p>";if(x.lastSkipped)h+="<p class='note'>Last skipped: "+esc(x.lastSkipped)+"</p>";
     if(unlocked)h+="<button class='btn n' style='min-height:48px' data-a='hhedit' data-id='"+x.id+"'>Edit</button><button class='btn r' style='min-height:48px' data-a='hhdelete' data-id='"+x.id+"'>Remove</button>";
     h+="</div></div></div>";
   });
@@ -3589,10 +3593,17 @@ function hhAction(a,b){
   var x=hhItems().filter(function(i){return i.id===attr('id');})[0];
   if(a==='hhcomplete'){
     if(!x||x.completed||x.type==='contact'||x.type==='countdown'||attr('date')!==x.date||x.date>today())return;
-    if((x.type==='medicine'||x.type==='bill')&&!unlocked){view='par';render();return;}
+    if(devRole()!=='parent'){
+      /* kids' and wall devices cannot change the family's household list, so they leave a "taken" mark that a parent's device records */
+      if(x.type==='bill')return;
+      var kk=x.date+'|hh|'+x.id;if(S.done[kk])return;
+      if(x.type==='medicine'&&!confirm('Mark '+x.title+' as taken?'))return;
+      var snapK=JSON.stringify(S);S.done[kk]='t';if(!commitOr(snapK))return;render();return;
+    }
+    if(x.type==='bill'&&!unlocked){view='par';render();return;}
     var occurrence=x.id+'|'+x.date;if(S.reminderLog[occurrence])return;
     if((x.type==='medicine'||x.type==='bill')&&!confirm(x.type==='medicine'?'Confirm this medicine was taken?':'Confirm this bill was paid?'))return;
-    var snapRc=JSON.stringify(S);S.reminderUndo={id:x.id,date:x.date,completed:x.completed||'',lastDone:x.lastDone||'',key:occurrence};S.reminderLog[occurrence]={at:new Date().toISOString()};
+    var snapRc=JSON.stringify(S);S.reminderUndo={id:x.id,date:x.date,completed:x.completed||'',lastDone:x.lastDone||'',lastSkipped:x.lastSkipped||'',skipped:!!x.skipped,key:occurrence};S.reminderLog[occurrence]={at:new Date().toISOString()};
     x.lastDone=today();
     if(x.repeat&&x.repeat!=='none'){
       x.anchorDay=x.anchorDay||+x.date.slice(8,10);x.date=hhNextDate(x);
@@ -3600,6 +3611,15 @@ function hhAction(a,b){
     if(!commitOr(snapRc))return;render();return;
   }
   if(!unlocked){view='par';render();return;}
+  if(a==='hhskip'){
+    if(!x||x.completed||!(x.type==='medicine'||x.type==='bill'||x.type==='pet')||attr('date')!==x.date||x.date>today())return;
+    var occS=x.id+'|'+x.date;if(S.reminderLog[occS])return;
+    if(!confirm(x.type==='medicine'?'Skip this dose? It will be saved as not taken.':x.type==='bill'?'Skip this bill? It will be saved as not paid.':'Skip this one?'))return;
+    var snapS=JSON.stringify(S);S.reminderUndo={id:x.id,date:x.date,completed:x.completed||'',lastDone:x.lastDone||'',lastSkipped:x.lastSkipped||'',skipped:!!x.skipped,key:occS};S.reminderLog[occS]={at:new Date().toISOString(),skipped:true};
+    x.lastSkipped=today();
+    if(x.repeat&&x.repeat!=='none'){x.anchorDay=x.anchorDay||+x.date.slice(8,10);x.date=hhNextDate(x);}else{x.completed=today();x.skipped=true;}
+    if(!commitOr(snapS))return;render();return;
+  }
   if(a==='hhedit'&&x){hhEdit=x.id;hhFormType=x.type;render();var form=document.getElementById('hhtitle');if(form)form.focus();return;}
   if(a==='hhcancel'){hhEdit='';render();return;}
   if(a==='hhdelete'&&x){if(confirm('Remove '+x.title+'?')){var snapRd=JSON.stringify(S);S.household=hhItems().filter(function(i){return i.id!==x.id;});if(hhEdit===x.id)hhEdit='';if(!commitOr(snapRd))return;render();}return;}
@@ -3621,7 +3641,7 @@ function hhAction(a,b){
   var snapHh=JSON.stringify(S);
   if(old){
     if(S.reminderUndo&&S.reminderUndo.id===old.id)delete S.reminderUndo;
-    if(old.lastDone)item.lastDone=old.lastDone;
+    if(old.lastDone)item.lastDone=old.lastDone;if(old.lastSkipped)item.lastSkipped=old.lastSkipped;if(old.skipped&&old.completed)item.skipped=true;
     if(old.completed)item.completed=old.completed;
     S.household=hhItems().map(function(i){return i.id===old.id?item:i;});
   }else{S.household=hhItems();S.household.push(item);}
@@ -4511,7 +4531,7 @@ function nxAction(a,b){
   }
   if(a==='nxundoreminder'){
     var item=hhItems().filter(function(i){return i.id===d('id');})[0],undo=S.reminderUndo;
-    if(item&&undo&&undo.id===item.id){item.date=undo.date;item.completed=undo.completed;item.lastDone=undo.lastDone;delete S.reminderLog[undo.key];delete S.reminderUndo;save();render();}return;
+    if(item&&undo&&undo.id===item.id){item.date=undo.date;item.completed=undo.completed;item.lastDone=undo.lastDone;item.lastSkipped=undo.lastSkipped||'';if(undo.skipped)item.skipped=true;else delete item.skipped;if(!item.lastSkipped)delete item.lastSkipped;delete S.reminderLog[undo.key];delete S.reminderUndo;save();render();}return;
   }
 }
 
@@ -4557,7 +4577,7 @@ function validateHubBackup(s){
   if(!obj(s)||!obj(s.tasks)||!obj(s.done)||!obj(s.stars)||!Array.isArray(s.events)||!Array.isArray(s.groc)||!text(s.pin))return false;
   if(Object.keys(s.tasks).some(function(p){return !person(p);}))return false;
   if(P.some(function(p){return !Array.isArray(s.tasks[p.id])||s.tasks[p.id].some(function(t){return !obj(t)||!safeId(t.id)||!text(t.t)||!text(t.g)||(t.e!==undefined&&!text(t.e))||(t.due!==undefined&&!validTime(t.due))||(t.start&&!hhDateValid(t.start))||(t.finish&&!hhDateValid(t.finish))||(t.days!==undefined&&(!Array.isArray(t.days)||t.days.some(function(d){return d!==Math.floor(d)||d<0||d>6;})))||(t.m!==undefined&&!(t.m===0||(t.m>=1&&t.m<=240&&t.m===Math.floor(t.m))))||(t.points!==undefined&&!validChorePoints(t.points));});}))return false;
-  if(Object.keys(s.done).some(function(k){var a=k.split('|');return a.length!==3||!hhDateValid(a[0])||!person(a[1])||!safeId(a[2])||['a','p'].indexOf(s.done[k])<0;}))return false;
+  if(Object.keys(s.done).some(function(k){var a=k.split('|');if(a.length===3&&a[1]==='hh'&&s.done[k]==='t')return !hhDateValid(a[0])||!safeId(a[2]);return a.length!==3||!hhDateValid(a[0])||!person(a[1])||!safeId(a[2])||['a','p'].indexOf(s.done[k])<0;}))return false;
   if(Object.keys(s.stars).some(function(p){return !person(p)||typeof s.stars[p]!=='number'||!isFinite(s.stars[p])||Math.abs(s.stars[p])>100000||Math.floor(s.stars[p]*2)!==s.stars[p]*2;}))return false;
   function eventValid(e){
     return obj(e)&&text(e.t)&&hhDateValid(e.d)&&validTime(e.m||'')&&validTime(e.end||'')&&(!e.through||(hhDateValid(e.through)&&e.through>=e.d&&!e.m&&(!e.repeat||e.repeat==='none')))&&(!e.id||safeId(e.id))&&(!e.p||!!person(e.p))&&(!e.people||(Array.isArray(e.people)&&!e.people.some(function(p){return !person(p);})))&&(!e.driver||(person(e.driver)&&!person(e.driver).kid))&&['none','daily','weekly','monthly','monthlynth','monthlylast'].indexOf(e.repeat||'none')>=0&&(e.repeat!=='weekly'||(Array.isArray(e.days)&&e.days.length>0))&&(e.skipShort===undefined||typeof e.skipShort==='boolean')&&(e.every===undefined||(e.every===Math.floor(e.every)&&e.every>=1&&e.every<=4))&&(e.kind===undefined||['','doctor','sports','lesson','school','work','family'].indexOf(e.kind)>=0)&&(e.travel===undefined||(e.travel===Math.floor(e.travel)&&e.travel>=0&&e.travel<=180))&&(e.list===undefined||(Array.isArray(e.list)&&e.list.length<=20&&!e.list.some(function(t){return !text(t)||t.length>60;})))&&(e.endNext===undefined||typeof e.endNext==='boolean')&&(e.endNext?(!!e.m&&!!e.end&&e.end<e.m&&!e.through):(!e.m||!e.end||e.end>e.m))&&(!e.days||(Array.isArray(e.days)&&!e.days.some(function(d){return d!==Math.floor(d)||d<0||d>6;})))&&(!e.until||hhDateValid(e.until));
@@ -6445,6 +6465,23 @@ document.addEventListener("click",function(e){
   if(bub&&p){if(!bub._orig)bub._orig=bub.innerHTML;bub.textContent="🥰 "+p.n+": "+palLines[Math.floor(Math.random()*palLines.length)];
     clearTimeout(palTimer);palTimer=setTimeout(function(){var bb=document.getElementById("pal-bubble");if(bb&&bb._orig){bb.innerHTML=bb._orig;bb._orig=null;}},3500);}
 });
+/* v38.12: household marks from kids' and wall devices */
+function hhKidTaken(x){return !!(x&&x.date&&S.done&&S.done[x.date+'|hh|'+x.id]==='t');}
+function hhReconcile(){
+  if(devRole()!=='parent'||!Array.isArray(S.household)||!S.done)return false;
+  var ch=false;
+  Object.keys(S.done).forEach(function(k){
+    var a=k.split('|');if(a.length!==3||a[1]!=='hh'||S.done[k]!=='t')return;
+    var x=S.household.filter(function(i){return i&&i.id===a[2];})[0];
+    if(!x||x.completed||x.date!==a[0]||x.type==='bill'||x.type==='contact'||x.type==='countdown')return;
+    S.reminderLog=S.reminderLog||{};S.reminderLog[x.id+'|'+x.date]={at:new Date().toISOString(),kidDevice:true};
+    x.lastDone=today();
+    if(x.repeat&&x.repeat!=='none'){x.anchorDay=x.anchorDay||+x.date.slice(8,10);x.date=hhNextDate(x);}else x.completed=today();
+    ch=true;
+  });
+  return ch;
+}
+(function(){var r0=render;render=function(){var c=false;try{c=hhReconcile();}catch(e){c=false;}if(c){try{save();}catch(e){}}return r0.apply(this,arguments);};})();
 </script>
 </body>
 </html>
