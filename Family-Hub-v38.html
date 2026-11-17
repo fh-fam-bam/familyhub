@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.17";
+var FH_BUILD="v38.18";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -3791,7 +3791,7 @@ function frame(){var el=document.getElementById("idle"),ph=photosFrame(),idx=-1;
   idlePhotoIndex=idx;el.style.backgroundImage=idx>=0?"url("+ph[idx]+")":fhScene();if(el.style.display==="flex")tick();}
 function tick(){checkDay();autoRefresh();updateNowLines();if(unlocked&&Date.now()-last>300000){unlocked=false;if(view==='par'||view==='house'||view==='mgr'||view==='pets')render();}var n=new Date(),t=n.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}),d=n.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"}),el=document.getElementById("idle");
 document.getElementById("clock").innerHTML="<b>"+t+"</b><span>"+d+"</span>";var bgc=document.querySelector(".bigclock");if(bgc)bgc.textContent=t;
-if(el.style.display==="flex")el.innerHTML=idleOverlay(n,t,d);
+if(el.style.display==="flex"){try{wxRefresh();}catch(x){}el.innerHTML=idleOverlay(n,t,d);}
 else if(!wheelBusy&&!document.getElementById("party")&&view!=="routine"&&Date.now()-last>S.idle*60000)showIdle()}
 setInterval(tick,5000);setInterval(function(){if(document.getElementById("idle").style.display==="flex")frame()},8000);
 ["click","touchstart","keydown"].forEach(function(t){document.addEventListener(t,function(){last=Date.now()},true)});
@@ -4129,7 +4129,7 @@ function wxInner(){
 function wxHtml(){return S.weather?"<section class='card weather-card' aria-label='Weather'>"+wxInner()+"</section>":'';}
 function wxPaint(){var els=document.querySelectorAll('.weather-card');for(var i=0;i<els.length;i++)els[i].innerHTML=wxInner();}
 function wxRefresh(force){
-  var w=S.weather,wallOn=typeof wallActive==='function'&&wallActive();if(!w||(!document.querySelector('.weather-card')&&!wallOn)||wxBusy)return;
+  var w=S.weather,wallOn=typeof wallActive==='function'&&wallActive(),idleEl=document.getElementById('idle'),idleOn=!!(idleEl&&idleEl.style.display==='flex');if(!w||(!document.querySelector('.weather-card')&&!wallOn&&!idleOn)||wxBusy)return;
   var c=wxCache(),key=w.lat+','+w.lon+','+w.units;
   if(!force&&c&&c.key===key&&wxValid(c.data)&&Date.now()-c.t<1800000)return;
   if(Date.now()-wxLastTry<60000&&!force)return;
