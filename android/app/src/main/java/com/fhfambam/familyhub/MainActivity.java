@@ -14,6 +14,7 @@ import android.os.Bundle;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
+import android.speech.tts.TextToSpeech;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -32,6 +33,7 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.util.Locale;
 
 /**
  * Family Hub wrapper.
@@ -56,6 +58,9 @@ public class MainActivity extends Activity {
     private ConnectivityManager.NetworkCallback netCallback;
     private SpeechRecognizer recognizer;
     private String pendingLang = "en-US";
+    private TextToSpeech tts;
+    private volatile boolean ttsReady = false;
+    private String pendingSay = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,6 +81,7 @@ public class MainActivity extends Activity {
         s.setCacheMode(isOnline() ? WebSettings.LOAD_DEFAULT : WebSettings.LOAD_CACHE_ELSE_NETWORK);
 
         web.addJavascriptInterface(new SpeechBridge(), "FHNative");
+        initTts();
 
         web.setWebViewClient(new WebViewClient() {
             @Override
@@ -167,6 +173,34 @@ public class MainActivity extends Activity {
             });
         }
 
+        // Read-aloud: the page's "Read it to me" button calls speak().
+        @JavascriptInterface
+        public boolean canSpeak() {
+            return ttsReady;
+        }
+
+        @JavascriptInterface
+        public void speak(final String text) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    sayNow(text);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void stopSpeaking() {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if (tts != null) {
+                        try { tts.stop(); } catch (Exception e) { /* ignore */ }
+                    }
+                }
+            });
+        }
+
         @JavascriptInterface
         public void cancel() {
             runOnUiThread(new Runnable() {
@@ -179,6 +213,52 @@ public class MainActivity extends Activity {
                 }
             });
         }
+    }
+
+    // ---------------------------------------------------------------------
+    // Read-aloud with the tablet's own text-to-speech voice.
+    // ---------------------------------------------------------------------
+    private void initTts() {
+        try {
+            tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+                @Override
+                public void onInit(int status) {
+                    if (status != TextToSpeech.SUCCESS || tts == null) return;
+                    try {
+                        int r = tts.setLanguage(Locale.US);
+                        if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) {
+                            tts.setLanguage(Locale.getDefault());
+                        }
+                        tts.setSpeechRate(0.9f);
+                    } catch (Exception e) { /* keep the engine's defaults */ }
+                    ttsReady = true;
+                    if (pendingSay != null) {
+                        final String t = pendingSay;
+                        pendingSay = null;
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                sayNow(t);
+                            }
+                        });
+                    }
+                }
+            });
+        } catch (Exception e) {
+            tts = null;
+        }
+    }
+
+    private void sayNow(String text) {
+        if (text == null) return;
+        String t = text.length() > 400 ? text.substring(0, 400) : text;
+        if (tts == null || !ttsReady) {
+            pendingSay = t;
+            return;
+        }
+        try {
+            tts.speak(t, TextToSpeech.QUEUE_FLUSH, null, "fh-say");
+        } catch (Exception e) { /* ignore */ }
     }
 
     private void emit(String kind, String text) {
@@ -369,6 +449,9 @@ public class MainActivity extends Activity {
         if (recognizer != null) {
             try { recognizer.cancel(); } catch (Exception e) { /* ignore */ }
         }
+        if (tts != null) {
+            try { tts.stop(); } catch (Exception e) { /* ignore */ }
+        }
         web.onPause();
         super.onPause();
     }
@@ -413,6 +496,10 @@ public class MainActivity extends Activity {
         if (recognizer != null) {
             try { recognizer.destroy(); } catch (Exception e) { /* ignore */ }
             recognizer = null;
+        }
+        if (tts != null) {
+            try { tts.shutdown(); } catch (Exception e) { /* ignore */ }
+            tts = null;
         }
         if (web != null) web.destroy();
         super.onDestroy();

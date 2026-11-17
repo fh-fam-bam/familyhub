@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.20";
+var FH_BUILD="v38.21";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -4133,8 +4133,9 @@ function prefsMergeLimited(local,remote){
     var m=JSON.parse(JSON.stringify(l));if(r&&typeof r==="object"){if(r.age!==undefined)m.age=r.age;else delete m.age;if(r.lock!==undefined)m.lock=r.lock;else delete m.lock;}out[id]=m;});
   return out;
 }
-function speechOk(){return !!(window.speechSynthesis&&window.SpeechSynthesisUtterance);}
-function sayAloud(t){try{if(!speechOk())return;window.speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(String(t));u.rate=0.9;window.speechSynthesis.speak(u);}catch(e){}}
+function fhNativeSay(){try{return !!(window.FHNative&&typeof window.FHNative.speak==="function");}catch(e){return false;}}
+function speechOk(){return fhNativeSay()||!!(window.speechSynthesis&&window.SpeechSynthesisUtterance);}
+function sayAloud(t){try{if(fhNativeSay()){window.FHNative.speak(String(t));return;}if(!speechOk())return;window.speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(String(t));u.rate=0.9;window.speechSynthesis.speak(u);}catch(e){}}
 function nextTaskHtml(p){
   var list=dueTasks(p.id,today());if(!list.length)return "";
   var todo=list.filter(function(t){return !st(p.id,t.id);}),wait=list.filter(function(t){return st(p.id,t.id)==="p";}).length,done=list.length-todo.length;
