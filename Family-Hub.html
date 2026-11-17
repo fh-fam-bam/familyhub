@@ -1439,7 +1439,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v37.1";
+var FH_BUILD="v37.2";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -1597,7 +1597,7 @@ function devAction(a){
       S.pins=S.pins||{};S.pins[unlockedBy]=pinMake(q1);save();render();alert("The PIN for this device is saved. It stays on this device only.");return;
     }
     if(a==="nxdevfs"){try{var el0=document.documentElement;(el0.requestFullscreen||el0.webkitRequestFullscreen||function(){}).call(el0);}catch(e){}return;}
-    if(a==="nxdevout"){try{if(sync.adapter&&sync.adapter.signOut)sync.adapter.signOut();}catch(e){}return;}
+    if(a==="nxdevout"){try{if(sync.adapter&&sync.adapter.signOut)sync.adapter.signOut();}catch(e){}render();statusMessage("Signed out of family sync on this device. Sign in again below.");return;}
     if(a==="nxdevsave"&&!kidsAcct()){var s0=document.getElementById("devrole");if(s0&&["parent","kids","wall"].indexOf(s0.value)>=0){dev.role=s0.value;devSave();limitedUnlock=false;unlocked=false;nav();render();}return;}
     return;
   }
@@ -2079,8 +2079,9 @@ function syncStart(){
   if(!ad){syncSetState("nosdk");return;}
   sync.adapter=ad;
   ad.onAuth(function(u){
-    if(!u){sync.user="";syncStop();syncSetState("signedout");if(view==="parent")syncRefreshAdmin();return;}
-    sync.user=u.email||u.uid;sync.email=u.email||sync.email;syncStore();if(typeof devRoleSync==="function")devRoleSync();syncSubscribe();if(view==="parent")syncRefreshAdmin();
+    /* v37.2: the Parent tab's view id is "par" (it was checked as "parent", so the panel never refreshed after sign-in/out) */
+    if(!u){sync.user="";syncStop();syncSetState("signedout");if(view==="par"||view==="parent")syncRefreshAdmin();return;}
+    sync.user=u.email||u.uid;sync.email=u.email||sync.email;syncStore();if(typeof devRoleSync==="function")devRoleSync();syncSubscribe();if(view==="par"||view==="parent")syncRefreshAdmin();
   });
 }
 if(window.addEventListener)window.addEventListener("online",function(){if(sync.on)syncSchedule(200);});
