@@ -1447,7 +1447,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.3";
+var FH_BUILD="v38.4";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -4116,8 +4116,19 @@ function palHtml(){
   var pets=P.filter(function(m){return m.pet;});
   if(!pets.length)return '';
   var bow=pets.filter(function(m){return m.n.toLowerCase()==='bowser';})[0]||pets[0],mood=petMood();
-  var h='<section class="card"><h2>🐾 Family pals</h2><div class="pal"><div class="pal-emoji" aria-hidden="true">'+esc(bow.e)+'</div><div><div class="bubble">'+mood.face+' '+esc(bow.n)+': '+esc(mood.say)+'</div><p class="note">'+esc(bow.n)+'’s happiness follows the whole family’s chores today: '+mood.pc+'%.</p></div></div><div class="chips">';
-  pets.forEach(function(m){var due=dueTasks(m.id,today()),dn=due.filter(function(t){return S.done[today()+'|'+m.id+'|'+t.id];}).length;h+='<button class="chip" style="min-height:44px;cursor:pointer" data-a="who" data-p="'+m.id+'">'+esc(m.e)+' '+esc(m.n)+': '+dn+'/'+due.length+' care today</button>';});
+  /* v38.4: pals follow the Pet care page (shifts, poop patrol) when it is set up */
+  var sm=typeof pcSummary==='function'?pcSummary():null,t0=today();
+  function openFor(pet){return sm?sm.list.filter(function(it){return it.pet===pet&&!(sm.ix[t0+'|'+it.id]||[]).length;}):[];}
+  var bOpen=openFor(bow.id),say=mood.face+' '+esc(bow.n)+': '+esc(mood.say);
+  if(sm&&bOpen.length){var nx=bOpen[0];say=esc(nx.e)+' '+esc(bow.n)+': '+esc(palAsk(nx))+(nx.kid&&person(nx.kid)?' <b>'+esc(person(nx.kid).n)+'</b>, that’s you!':'');}
+  else if(sm&&sm.list.some(function(it){return it.pet===bow.id;}))say='🥰 '+esc(bow.n)+': All my care is done today. Best family ever!';
+  var h='<section class="card pal-card"><h2>🐾 Family pals</h2><div class="pal"><button class="pal-emoji pal-tap" data-pal="pet" data-p="'+esc(bow.id)+'" aria-label="Pet '+esc(bow.n)+'" title="Tap to pet '+esc(bow.n)+'">'+esc(bow.e)+'</button><div><div class="bubble" id="pal-bubble">'+say+'</div><p class="note">'+esc(bow.n)+'’s mood follows everyone’s chores today: '+mood.pc+'%. Tap '+esc(bow.n)+' to give a pat.</p></div></div><div class="chips">';
+  pets.forEach(function(m){
+    if(sm){var all=sm.list.filter(function(it){return it.pet===m.id;}),left=openFor(m.id);
+      if(all.length){h+='<button class="chip" style="min-height:48px;cursor:pointer" data-a="go" data-v="pets">'+esc(m.e)+' '+esc(m.n)+': '+(all.length-left.length)+' of '+all.length+' done today'+(left.length?' · next: '+esc(left[0].e)+' '+esc(left[0].label)+(left[0].kid&&person(left[0].kid)?' ('+esc(person(left[0].kid).n)+')':''):' ✓')+'</button>';return;}}
+    var due=dueTasks(m.id,today()),dn=due.filter(function(t){return S.done[today()+'|'+m.id+'|'+t.id];}).length;
+    h+='<button class="chip" style="min-height:48px;cursor:pointer" data-a="'+(sm?'go':'who')+'" data-v="pets" data-p="'+m.id+'">'+esc(m.e)+' '+esc(m.n)+': '+(due.length?dn+'/'+due.length+' care today':'open care')+'</button>';});
+  if(!sm&&devRole()==='parent')h+='<p class="note">Tip: set up 🐾 Pet care (Chores page) for daily shifts and poop patrol.</p>';
   return h+'</div></section>';
 }
 function leftBy(filter){
@@ -5626,6 +5637,36 @@ document.addEventListener("click",function(e){
   e.preventDefault();var a=b.getAttribute("data-pp");
   if(a==="spin"){ppSpin(b.getAttribute("data-d")||today());return;}
   if(a==="close"){var o=document.getElementById("ppspin");if(o&&o.parentNode)o.parentNode.removeChild(o);return;}
+});
+</script>
+<script>
+/* ===== v38.4: Family pals: pet-care asks + tap to pet ===== */
+function palAsk(it){
+  var m={amfeed:"I'm hungry! Breakfast, please?",pmfeed:"Is it dinner time yet? My tummy says yes.",midfeed:"A little lunch snack, please?",water:"Can someone check my water bowl?",poop:"Um… I left a present. Poop patrol, please! 💩",indoor:"Play with me inside? I brought my toy!",walk:"Walkies? Pleeease? 🦮",pad:"My pee pad needs a fresh one, please.",cfeed:"Food time for me, please!",cspot:"My home could use a little tidy.",ctank:"Tank cleaning day! (with a grown-up)"};
+  return m[it.id]||("Can someone help with: "+it.label+"?");
+}
+(function(){
+  var st=document.createElement("style");st.id="pal-css";
+  st.textContent=
+  ".pal-tap{background:none;border:0;padding:0;cursor:pointer;line-height:1;font:inherit;font-size:inherit;color:inherit;position:relative;touch-action:manipulation}"+
+  ".pal-tap:focus-visible{outline:3px solid #3b5bdb;border-radius:16px}"+
+  ".pal-tap.wiggle{animation:palWig .6s ease-in-out}"+
+  "@keyframes palWig{0%,100%{transform:rotate(0)}20%{transform:rotate(-14deg) scale(1.1)}40%{transform:rotate(12deg) scale(1.15)}60%{transform:rotate(-8deg) scale(1.1)}80%{transform:rotate(5deg)}}"+
+  ".pal-heart{position:fixed;pointer-events:none;z-index:9400;font-size:30px;animation:palUp 1.4s ease-out forwards}"+
+  "@keyframes palUp{from{transform:translate(-50%,0) scale(.6);opacity:1}to{transform:translate(calc(-50% + var(--dx,0px)),-140px) scale(1.3);opacity:0}}";
+  document.head.appendChild(st);
+})();
+var palLines=["Woof! Thanks for the pats! 🐾","*happy tail wags*","Best. Scratch. Ever.","More pats, please! 🥰","I love this family! ❤️","*rolls over for belly rubs*","Is that a treat in your pocket? 👀"];
+var palTimer=null;
+document.addEventListener("click",function(e){
+  var b=e.target&&e.target.closest?e.target.closest("[data-pal='pet']"):null;if(!b)return;
+  e.preventDefault();
+  b.classList.remove("wiggle");void b.offsetWidth;b.classList.add("wiggle");
+  var r=b.getBoundingClientRect(),hs=["❤️","💕","🐾","❤️","✨"];
+  for(var i=0;i<5;i++){var h=document.createElement("span");h.className="pal-heart";h.textContent=hs[i];h.style.left=(r.left+r.width/2)+"px";h.style.top=(r.top+10)+"px";h.style.setProperty("--dx",((i-2)*28)+"px");h.style.animationDelay=(i*0.08)+"s";document.body.appendChild(h);(function(x){setTimeout(function(){if(x.parentNode)x.parentNode.removeChild(x);},1800);})(h);}
+  var bub=document.getElementById("pal-bubble"),p=person(b.getAttribute("data-p"));
+  if(bub&&p){if(!bub._orig)bub._orig=bub.innerHTML;bub.textContent="🥰 "+p.n+": "+palLines[Math.floor(Math.random()*palLines.length)];
+    clearTimeout(palTimer);palTimer=setTimeout(function(){var bb=document.getElementById("pal-bubble");if(bb&&bb._orig){bb.innerHTML=bb._orig;bb._orig=null;}},3500);}
 });
 </script>
 </body>
