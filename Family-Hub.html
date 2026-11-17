@@ -362,7 +362,7 @@ button.event-pill{padding-top:6px;padding-bottom:6px}
 .w-tasks{font-size:.95em;line-height:1.4}
 .w-pend{display:block;width:100%;background:rgba(255,200,60,.18);border:0;border-radius:10px;padding:.5em .7em;min-height:48px}
 .w-side{background:transparent;border:0;padding:0;gap:1.2vh;overflow:visible}
-.w-box{display:block;flex:1;min-height:0;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:.6em .9em}
+.w-box{display:block;flex:1 1 auto;min-height:0;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:.6em .9em}
 .w-big{font-size:1.5em;font-weight:800;line-height:1.15}.w-small{font-size:.98em;line-height:1.4}
 .w-foot{display:flex;justify-content:flex-end}.w-foot .w-link{padding:.25em .9em;min-height:44px;font-size:.9em}
 .wall button:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.9";
+var FH_BUILD="v38.10";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -2763,11 +2763,11 @@ function wallHome(){
   h+="</div></section>";
   /* column 3: dinner, groceries, reminders, rewards */
   var m=(S.meals||{})[ds]||{},gl=(S.groc||[]).filter(function(g){return !g.c;});
-  var rem=(typeof hhSorted==="function"?hhSorted():[]).filter(function(x){return !x.completed&&x.type!=="contact"&&hhDayCount(x.date)<=3;}).slice(0,3);
+  var rem=(typeof hhSorted==="function"?hhSorted():[]).filter(function(x){return !x.completed&&x.type!=="contact"&&hhDayCount(x.date)<=3;}),remMore=Math.max(0,rem.length-2);rem=rem.slice(0,2);
   h+="<section class='w-col w-side' aria-label='Around the house'>";
   h+="<button class='w-box' data-a='go' data-v='meals'><h2>🍽️ Tonight</h2><div class='w-big'>"+esc(m.d||"Not planned yet")+"</div></button>";
   h+="<button class='w-box' data-a='go' data-v='groc'><h2>🛒 Shopping · "+gl.length+"</h2><div class='w-small'>"+(gl.length?gl.slice(0,4).map(function(g){return esc(g.t);}).join(" · ")+(gl.length>4?" …":""):"Nothing needed")+"</div></button>";
-  h+="<button class='w-box' data-a='go' data-v='house'><h2>🏡 Reminders</h2><div class='w-small'>"+(rem.length?rem.map(function(x){return "<b>"+esc(x.title)+"</b> · "+esc(String(hhDateText(x)).split(" · ")[0]);}).join("<br>"):"None in the next 3 days")+"</div></button>";
+  h+="<button class='w-box' data-a='go' data-v='house'><h2>🏡 Reminders"+(remMore?" · +"+remMore+" more":"")+"</h2><div class='w-small'>"+(rem.length?rem.map(function(x){return "<b>"+esc(x.title)+"</b> · "+esc(String(hhDateText(x)).split(" · ")[0]);}).join("<br>"):"None in the next 3 days")+"</div></button>";
   var rw="";kids.forEach(function(p){var r=rewardTarget(p.id);if(r)rw+="<div>"+esc(p.e)+" "+esc(p.n)+": <b>"+(S.stars[p.id]||0)+"</b>/"+r.c+" ⭐ "+esc(r.e||"")+"</div>";});
   if(S.goal){var gg=S.goal;rw+="<div>"+esc(gg.e||"🎯")+" "+esc(gg.n)+": <b>"+gg.p+"</b>/"+gg.t+"</div>";}
   var wn=(Array.isArray(S.fridgeNotes)?S.fridgeNotes:[]).filter(fnShow).slice(-2).reverse(),wb=(Array.isArray(S.bounties)?S.bounties:[]).filter(function(x){return x&&x.status==='open';});
