@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.23";
+var FH_BUILD="v38.24";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -4891,7 +4891,7 @@ function validateHubBackup(s){
   if(!obj(s)||!obj(s.tasks)||!obj(s.done)||!obj(s.stars)||!Array.isArray(s.events)||!Array.isArray(s.groc)||!text(s.pin))return false;
   if(Object.keys(s.tasks).some(function(p){return !person(p);}))return false;
   if(P.some(function(p){return !Array.isArray(s.tasks[p.id])||s.tasks[p.id].some(function(t){return !obj(t)||!safeId(t.id)||!text(t.t)||!text(t.g)||(t.e!==undefined&&!text(t.e))||(t.due!==undefined&&!validTime(t.due))||(t.start&&!hhDateValid(t.start))||(t.finish&&!hhDateValid(t.finish))||(t.days!==undefined&&(!Array.isArray(t.days)||t.days.some(function(d){return d!==Math.floor(d)||d<0||d>6;})))||(t.m!==undefined&&!(t.m===0||(t.m>=1&&t.m<=240&&t.m===Math.floor(t.m))))||(t.points!==undefined&&!validChorePoints(t.points));});}))return false;
-  if(Object.keys(s.done).some(function(k){var a=k.split('|');if(a.length===3&&a[1]==='hh'&&s.done[k]==='t')return !hhDateValid(a[0])||!safeId(a[2]);return a.length!==3||!hhDateValid(a[0])||!person(a[1])||!safeId(a[2])||['a','p'].indexOf(s.done[k])<0;}))return false;
+  if(Object.keys(s.done).some(function(k){var a=k.split('|');if(a.length===3&&a[1]==='hh'&&s.done[k]==='t')return !hhDateValid(a[0])||!safeId(a[2]);if(a.length===3&&a[1]==='mood')return !hhDateValid(a[0])||!safeId(a[2])||['1','2','3','4'].indexOf(s.done[k])<0;return a.length!==3||!hhDateValid(a[0])||!person(a[1])||!safeId(a[2])||['a','p'].indexOf(s.done[k])<0;}))return false;
   if(Object.keys(s.stars).some(function(p){return !person(p)||typeof s.stars[p]!=='number'||!isFinite(s.stars[p])||Math.abs(s.stars[p])>100000||Math.floor(s.stars[p]*2)!==s.stars[p]*2;}))return false;
   function eventValid(e){
     return obj(e)&&text(e.t)&&hhDateValid(e.d)&&validTime(e.m||'')&&validTime(e.end||'')&&(!e.through||(hhDateValid(e.through)&&e.through>=e.d&&!e.m&&(!e.repeat||e.repeat==='none')))&&(!e.id||safeId(e.id))&&(!e.p||!!person(e.p))&&(!e.people||(Array.isArray(e.people)&&!e.people.some(function(p){return !person(p);})))&&(!e.driver||(person(e.driver)&&!person(e.driver).kid))&&['none','daily','weekly','monthly','monthlynth','monthlylast'].indexOf(e.repeat||'none')>=0&&(e.repeat!=='weekly'||(Array.isArray(e.days)&&e.days.length>0))&&(e.skipShort===undefined||typeof e.skipShort==='boolean')&&(e.every===undefined||(e.every===Math.floor(e.every)&&e.every>=1&&e.every<=4))&&(e.kind===undefined||['','doctor','sports','lesson','school','work','family'].indexOf(e.kind)>=0)&&(e.travel===undefined||(e.travel===Math.floor(e.travel)&&e.travel>=0&&e.travel<=180))&&(e.list===undefined||(Array.isArray(e.list)&&e.list.length<=20&&!e.list.some(function(t){return !text(t)||t.length>60;})))&&(e.endNext===undefined||typeof e.endNext==='boolean')&&(e.endNext?(!!e.m&&!!e.end&&e.end<e.m&&!e.through):(!e.m||!e.end||e.end>e.m))&&(!e.days||(Array.isArray(e.days)&&!e.days.some(function(d){return d!==Math.floor(d)||d<0||d>6;})))&&(!e.until||hhDateValid(e.until));
@@ -6928,6 +6928,146 @@ document.addEventListener("visibilitychange",function(){
   if(typeof devRole==="function"&&devRole()==="parent"&&typeof unlocked!=="undefined"&&unlocked)return;
   fhStartupUpdate("resume");
 });
+/* ===== v38.24: overnight updates, moods shared with parents, backup reminder, reward pace, family photo album ===== */
+/* --- overnight update check (every tablet, 1-5 AM, only when nobody has touched it for 15 minutes) --- */
+var fhLastInput=Date.now();
+["pointerdown","keydown","touchstart"].forEach(function(ev){document.addEventListener(ev,function(){fhLastInput=Date.now();},{passive:true,capture:true});});
+function fhNightCheck(){
+  var h=new Date().getHours();if(h<1||h>=5)return false;
+  if(Date.now()-fhLastInput<900000)return false;
+  if(typeof unlocked!=="undefined"&&unlocked)return false;
+  fhStartupUpdate("night");return true;
+}
+setInterval(function(){try{fhNightCheck();}catch(e){}},1200000);
+
+/* --- moods: saved in the family's check-off records (ds|mood|kid = "1".."4") so parents can see them --- */
+function moodGet(id){
+  var o={};try{var l=JSON.parse(localStorage.getItem("familyhub-mood-"+id)||"{}");if(l&&typeof l==="object")Object.keys(l).forEach(function(k){o[k]=l[k];});}catch(e){}
+  Object.keys(S.done||{}).forEach(function(k){var a=k.split("|");if(a.length===3&&a[1]==="mood"&&a[2]===id){var m=MOODS[Number(S.done[k])-1];if(m)o[a[0]]=m[0];}});
+  return o;
+}
+function moodSet(id,ds,v){
+  var i=-1;MOODS.forEach(function(m,n){if(m[0]===v)i=n;});if(i<0)return;
+  try{var l=JSON.parse(localStorage.getItem("familyhub-mood-"+id)||"{}");if(!l||typeof l!=="object")l={};l[ds]=v;var ks=Object.keys(l).sort();while(ks.length>60)delete l[ks.shift()];localStorage.setItem("familyhub-mood-"+id,JSON.stringify(l));}catch(e){}
+  var snap=JSON.stringify(S);S.done[ds+"|mood|"+id]=String(i+1);commitOr(snap);
+}
+function moodParentHtml(){
+  var kids=P.filter(function(p){return p.kid&&!p.archived;});if(!kids.length)return "";
+  var days=[];for(var i=6;i>=0;i--)days.push(fd(addD(localDate(today()),-i)));
+  var h="<h2>😊 How the kids felt</h2><div class='card'><p class='note'>Kids can pick how their day went on their page in the evening. Only the last 7 days are shown here.</p>";
+  kids.forEach(function(k){var m=moodGet(k.id),any=days.some(function(d){return m[d];});
+    h+="<div class='row' style='flex-wrap:wrap'><span class='t'><b>"+esc(k.e)+" "+esc(k.n)+"</b></span><span style='display:flex;gap:6px;flex-wrap:wrap'>"+(any?days.map(function(d){return "<span class='chip' title='"+esc(niceDate(d))+"'>"+esc(niceDate(d).split(",")[0].slice(0,3))+" "+(m[d]||"·")+"</span>";}).join(""):"<span class='note'>Nothing picked this week</span>")+"</span></div>";
+    var tough=days.filter(function(d){return m[d]==="😕";}).length;if(tough>=2)h+="<p class='note'>"+esc(k.n)+" picked 😕 Tough on "+tough+" days this week. Maybe check in.</p>";});
+  return h+"</div>";
+}
+
+/* --- backup reminder --- */
+(function(){var hb=hhBackup;hhBackup=function(){var r=hb.apply(this,arguments);try{localStorage.setItem("familyhub-lastbackup",String(Date.now()));}catch(e){}return r;};})();
+function backupAgeDays(){var t=0;try{t=Number(localStorage.getItem("familyhub-lastbackup"))||0;}catch(e){}return t?Math.floor((Date.now()-t)/86400000):-1;}
+(function(){var pt=pqTilesHtml;pqTilesHtml=function(cnt){var h=pt.apply(this,arguments),d=backupAgeDays();
+  if(d<0||d>=30)h+="<div class='card pqbk'><p><b>💾 "+(d<0?"No backup downloaded on this device yet.":"Last backup was "+d+" days ago.")+"</b> A backup protects the chores, points, calendar and settings if something goes wrong. Photos are not included.</p><button class='btn g' style='min-height:48px' data-a='hhbackup'>Download backup</button></div>";
+  return h;};})();
+
+/* --- reward pace --- */
+function rewardPace(id){
+  var t=today(),from=fd(addD(localDate(t),-27)),first="",sum=0;
+  Object.keys(S.awards||{}).forEach(function(k){var a=S.awards[k];if(!a||a.reversedAt||a.person!==id)return;if(!first||a.date<first)first=a.date;if(a.date>=from&&a.date<=t)sum+=Number(a.points)||0;});
+  if(!first)return {perWeek:0,days:0};
+  var start=first>from?first:from,days=Math.round((localDate(t).getTime()-localDate(start).getTime())/86400000)+1;
+  return {perWeek:Math.round(sum/Math.max(7,days)*7),days:days};
+}
+function rewardPaceHtml(){
+  var kids=P.filter(function(p){return p.kid&&!p.archived;});if(!kids.length||!(S.rewards||[]).length)return "";
+  var h="<h2>⭐ Reward pace</h2><div class='card'><p class='note'>How long each reward takes at the rate each child has earned points over the last 4 weeks (or since they started).</p>";
+  kids.forEach(function(k){var r=rewardPace(k.id),list=S.rewards.filter(function(x){return !x.for||x.for.indexOf(k.id)>=0;}).slice().sort(function(a,b){return a.c-b.c;});
+    h+="<h3>"+esc(k.e)+" "+esc(k.n)+" · "+(r.perWeek?"about "+r.perWeek+" points a week":"no approved points yet")+"</h3>";
+    if(!r.perWeek||!list.length){h+="<p class='note'>"+(list.length?"Check back after a week of approved chores.":"No rewards set for "+esc(k.n)+".")+"</p>";return;}
+    h+=list.map(function(x){var w=x.c/r.perWeek,txt=w<1?"under a week":w<1.5?"about 1 week":"about "+Math.round(w)+" weeks";return "<div class='row'><span class='t'>"+esc(x.e||"")+" "+esc(x.n)+" <span class='note'>"+x.c+" ⭐</span></span><b>"+txt+"</b></div>";}).join("");
+    var fast=list.filter(function(x){return x.c/r.perWeek<1;}).length,slow=list.filter(function(x){return x.c/r.perWeek>8;}).length;
+    if(r.days<14)h+="<p class='note'>Only "+r.days+" day"+(r.days===1?"":"s")+" of points so far, so this is a rough guess.</p>";
+    else if(fast===list.length)h+="<p class='note'>Every reward comes in under a week. If they feel too easy, raise the prices or add a bigger reward.</p>";
+    else if(slow===list.length)h+="<p class='note'>Every reward takes over 2 months. Consider a smaller reward so there is something to reach soon.</p>";
+  });
+  return h+"</div>";
+}
+(function(){var p1=parentRaw;parentRaw=function(){return p1.apply(this,arguments)+rewardPaceHtml()+moodParentHtml();};})();
+
+/* --- shared family photo album (parents add; every tablet can show it) --- */
+var FA_MAX=60,FA_DOC=86000,fa={list:[],ver:0,db:null,busy:""};
+function faOpen(){return new Promise(function(res,rej){if(fa.db)return res(fa.db);if(!window.indexedDB)return rej(new Error("no db"));var r=indexedDB.open("familyhub-album",1);r.onupgradeneeded=function(){r.result.createObjectStore("p",{keyPath:"id"});};r.onsuccess=function(){fa.db=r.result;res(fa.db);};r.onerror=function(){rej(r.error);};});}
+function faTx(mode,fn){return faOpen().then(function(db){return new Promise(function(res,rej){var tx=db.transaction("p",mode),st=tx.objectStore("p"),out=fn(st);tx.oncomplete=function(){res(out&&out.result);};tx.onerror=function(){rej(tx.error);};});});}
+function faSort(){fa.list.sort(function(a,b){return a.at<b.at?-1:a.at>b.at?1:0;});fa.ver++;}
+function faLoad(){return faTx("readonly",function(st){return st.getAll();}).then(function(all){fa.list=(all||[]).filter(function(x){return x&&typeof x.d==="string";});faSort();try{if(view==="par"||view==="photos")render();}catch(e){}}).catch(function(){});}
+function faStore(o){fa.list=fa.list.filter(function(x){return x.id!==o.id;});fa.list.push(o);faSort();return faTx("readwrite",function(st){st.put(o);}).catch(function(){});}
+function faDrop(id){fa.list=fa.list.filter(function(x){return x.id!==id;});fa.ver++;return faTx("readwrite",function(st){st.delete(id);}).catch(function(){});}
+function faValid(o,id){var v=o&&o.v;return o&&o.id===id&&v&&typeof v==="object"&&typeof v.d==="string"&&v.d.length<=FA_DOC+2000&&v.d.indexOf("data:image/jpeg;base64,")===0&&typeof v.at==="string"&&v.at.length<=40;}
+(function(){var ap=syncApplyDoc;syncApplyDoc=function(c,id,rd){
+  if(c!=="cfg"||!/^photo_[A-Za-z0-9-]{1,60}$/.test(String(id)))return ap.apply(this,arguments);
+  if(!rd||typeof rd.rev!=="number"||!isFinite(rd.rev)||!sync.known[c])return false;
+  var kn=sync.known[c][id];if(kn&&kn.rev>=rd.rev)return false;
+  if(rd.deleted){faDrop(id);sync.known[c][id]={rev:rd.rev,json:null,deleted:true};return true;}
+  if(typeof rd.json!=="string"||rd.json.length>99000)return false;
+  var o=null;try{o=JSON.parse(rd.json);}catch(e){}if(!faValid(o,id))return false;
+  faStore({id:id,d:o.v.d,at:o.v.at});sync.known[c][id]={rev:rd.rev,json:null,deleted:false};return true;};})();
+function faCanAdd(){return devRole()==="parent"&&syncRole()==="parent"&&sync.on&&!!sync.adapter;}
+function faSrc(){var s="both";try{s=localStorage.getItem("familyhub-frame-src")||"both";}catch(e){}return ["both","family","mine"].indexOf(s)>=0?s:"both";}
+(function(){var pf0=photosFrame,cache=null,key="";photosFrame=function(){var mine=pf0(),s=faSrc(),k=fa.ver+"|"+s+"|"+mine.length+"|"+(mine[0]||"").length;
+  if(cache&&k===key&&cache.mine===mine)return cache.out;
+  var fam=fa.list.map(function(x){return x.d;}),out=s==="family"?fam:s==="mine"?mine:fam.concat(mine);
+  if(!out.length&&s!=="both")out=fam.concat(mine);
+  cache={mine:mine,out:out};key=k;return out;};})();
+function faCompress(file){
+  return new Promise(function(res,rej){var r=new FileReader();r.onerror=rej;r.onload=function(){var im=new Image();im.onerror=rej;im.onload=function(){
+    var max=1280,q=[0.72,0.62,0.52,0.44],d="";
+    for(var round=0;round<6;round++){var k=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=Math.max(1,Math.round(im.width*k));c.height=Math.max(1,Math.round(im.height*k));c.getContext("2d").drawImage(im,0,0,c.width,c.height);
+      for(var i=0;i<q.length;i++){d=c.toDataURL("image/jpeg",q[i]);if(d.length<=FA_DOC)return res(d);}max=Math.round(max*0.82);}
+    rej(new Error("too big"));};im.src=r.result;};r.readAsDataURL(file);});
+}
+function faPut(id,json,del,base){
+  return sync.adapter.put("cfg",id,base||0,json,del).then(function(r){
+    if(r&&r.ok)return r;
+    if(r&&r.remote)return sync.adapter.put("cfg",id,r.remote.rev,json,del);
+    if(r&&!r.remote&&del)return {ok:true,rev:base||0};
+    return r;
+  });
+}
+function faAdd(files){
+  if(!faCanAdd()){alert("Turn on family sync on this parent device to share photos.");return;}
+  var fs=[].slice.call(files||[]);if(!fs.length)return;
+  if(fa.list.length+fs.length>FA_MAX){alert("The family album holds up to "+FA_MAX+" photos. Remove some first.");return;}
+  var ok=0,bad=0,me="A parent";fa.busy="Sharing "+fs.length+" photo"+(fs.length===1?"":"s")+"…";render();
+  var chain=Promise.resolve();
+  fs.forEach(function(f){chain=chain.then(function(){return faCompress(f).then(function(d){
+    var id="photo_"+Date.now().toString(36)+Math.random().toString(36).slice(2,7),o={id:id,v:{d:d,at:new Date().toISOString(),by:String(me).slice(0,60)}};
+    return faPut(id,JSON.stringify(o),false,0).then(function(r){if(!r||!r.ok)throw new Error("save");sync.known.cfg=sync.known.cfg||{};sync.known.cfg[id]={rev:r.rev,json:null,deleted:false};ok++;return faStore({id:id,d:d,at:o.v.at});});
+  }).catch(function(){bad++;});});});
+  chain.then(function(){fa.busy=ok?"✓ Shared "+ok+" photo"+(ok===1?"":"s")+" with every family tablet."+(bad?" "+bad+" could not be shared.":""):"Could not share the photos. Check the connection and try again.";render();});
+}
+function faDel(id){
+  if(!faCanAdd()){alert("Only a parent device with family sync on can remove album photos.");return;}
+  if(!confirm("Remove this photo from the family album on every tablet?"))return;
+  var kn=(sync.known.cfg||{})[id];
+  faPut(id,"",true,kn?kn.rev:0).then(function(r){if(!r||!r.ok)throw new Error("del");sync.known.cfg[id]={rev:r.rev,json:null,deleted:true};return faDrop(id);}).then(function(){fa.busy="Removed from the family album.";render();},function(){alert("Could not remove it. Check the connection and try again.");});
+}
+function faHtml(){
+  var s=faSrc(),can=faCanAdd(),h="<div class='fa-box'><p><b>👪 Family album</b> · "+fa.list.length+" of "+FA_MAX+" · shared with every family tablet</p>";
+  if(fa.busy)h+="<p class='pfmsg' role='status'>"+esc(fa.busy)+"</p>";
+  if(fa.list.length){h+="<div class='pfgrid'>";fa.list.forEach(function(x,i){h+="<div class='pfth'><img src='"+x.d+"' alt='Family album photo "+(i+1)+"'>"+(can?"<button class='btn r' data-fa='del' data-id='"+esc(x.id)+"' aria-label='Remove family photo "+(i+1)+"'>✕</button>":"")+"</div>";});h+="</div>";}
+  else h+="<p class='note'>"+(can?"No family photos yet. Photos you add here show on every family tablet.":"No family photos yet. A parent can add them from their device.")+"</p>";
+  if(can)h+="<label class='btn g' for='fa-in'>＋ Add to family album</label><input type='file' id='fa-in' class='pfin' aria-label='Choose photos for the family album' accept='image/*' multiple>";
+  else if(devRole()==="parent")h+="<p class='note'>Turn on family sync on this device to add family photos.</p>";
+  h+="<p><b>This screen shows</b></p><div class='fa-src' role='radiogroup' aria-label='Photos this screen shows'>"+[["both","Family album + this tablet’s photos"],["family","Family album only"],["mine","This tablet’s photos only"]].map(function(o){return "<label class='day-choice'><input type='radio' name='fa-src' data-fa='src' value='"+o[0]+"'"+(s===o[0]?" checked":"")+"> "+o[1]+"</label>";}).join("")+"</div>";
+  return h+"<hr></div>";
+}
+(function(){var a=photoFrameBody,b=pfLimitedBody;photoFrameBody=function(){return faHtml()+"<p><b>📱 This tablet’s own photos</b></p>"+a.apply(this,arguments);};pfLimitedBody=function(){return faHtml()+"<p><b>📱 This tablet’s own photos</b> (anyone can add their own here)</p>"+b.apply(this,arguments);};})();
+document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e.target.closest("[data-fa='del']"):null;if(!b)return;e.preventDefault();faDel(b.getAttribute("data-id"));});
+document.addEventListener("change",function(e){var t=e.target;if(!t)return;
+  if(t.id==="fa-in"){faAdd(t.files);t.value="";return;}
+  if(t.getAttribute&&t.getAttribute("data-fa")==="src"){try{localStorage.setItem("familyhub-frame-src",t.value);}catch(x){}fa.ver++;fa.busy="This screen will show: "+(t.value==="both"?"family album and this tablet’s photos":t.value==="family"?"family album only":"this tablet’s photos only")+".";render();}
+});
+(function(){var st=document.createElement("style");st.textContent=".fa-box .pfgrid{margin:6px 0}.fa-src{display:flex;flex-wrap:wrap;gap:6px}.pqbk{margin:8px 0}";document.head.appendChild(st);})();
+faLoad();
+
 window.FH_READY=true;
 </script>
 
