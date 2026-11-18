@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.24";
+var FH_BUILD="v38.25";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -2456,8 +2456,8 @@ function aiBoxInner(){
   if(view==="cal"&&!aiPanelOpen)return aiQuickInner();
   var hasUrl=!!(S.ai&&S.ai.url),slim=aiPanelOpen&&hasUrl,h=slim?"<p class='note'>Nothing changes until you approve it. What you send goes to Google's Gemini, so leave out private details.</p>":"<p class='note'>Describe or photograph something and the helper proposes calendar events or dinners. Nothing changes until a parent approves it below. Free allowance is limited each day, and what you send goes to Google's Gemini service, so leave out private details.</p>";
   if(slim)h+="<input type='hidden' id='aiurl' value='"+esc(S.ai.url)+"'>";else h+="<label for='aiurl'>Helper address</label><input id='aiurl' maxlength='200' placeholder='https://familyhub-helper.yourname.workers.dev' value='"+esc((S.ai&&S.ai.url)||"")+"' style='width:100%'><button class='btn' data-a='nxaiurl'>Save address</button>";
-  h+="<label for='aitask' style='display:block'>What should it do?</label><select id='aitask'>"+[["event","Find calendar events (flyer, message, schedule)"],["meal","Suggest dinners"],["fridge","Dinners from a fridge/pantry photo"]].map(function(x){return "<option value='"+x[0]+"'"+(aiMode===x[0]?" selected":"")+">"+x[1]+"</option>";}).join("")+"</select>";
-  h+="<label for='aitext'>Text (paste a message, or add notes)</label><textarea id='aitext' rows='4' maxlength='6000' style='width:100%' placeholder='Paste a text or email here…'></textarea>";
+  h+="<label for='aitask' style='display:block'>What should it do?</label><select id='aitask'>"+[["auto","Anything (calendar + dinners)"],["event","Find calendar events (flyer, message, schedule)"],["meal","Suggest dinners"],["fridge","Dinners from a fridge/pantry photo"]].map(function(x){return "<option value='"+x[0]+"'"+(aiMode===x[0]?" selected":"")+">"+x[1]+"</option>";}).join("")+"</select>";
+  h+="<label for='aitext'>Type or tap 🎤 and talk. You can ask for several things at once.</label><div class='ai-trow'><textarea id='aitext' rows='4' maxlength='6000' style='width:100%' placeholder='Add soccer Tuesday at 4 to the calendar and suggest a dinner for Friday'></textarea>"+aiMicHtml()+"</div><p id='aimicmsg' class='note' role='status'></p>";
   h+="<label for='aiphoto'>Photo or screenshot (optional)</label><input id='aiphoto' type='file' accept='image/*'>";
   h+="<label for='aicount'>How many dinners? (dinner tasks only)</label><select id='aicount'><option>3</option><option>5</option><option>7</option></select>";
   h+="<div><button class='btn g' data-a='nxaigo'"+(aiBusy?" disabled":"")+">"+(aiBusy?"Working…":"Ask the helper")+"</button></div>";
@@ -2466,15 +2466,15 @@ function aiBoxInner(){
 }
 function aiBtnSync(){var b=document.getElementById('aibtn');if(b)b.hidden=(devRole()!=='parent');}
 function aiPanelHtml(){
-  if(!aiPanelOpen||devRole()!=='parent'||!unlocked)return '';
+  if(!aiPanelOpen||!aiOk())return '';
   return "<div class='aip-back' data-a='aipanelclose'></div><div class='aip' role='dialog' aria-modal='true' aria-label='AI helper'><div class='aip-top'><b>✨ AI helper</b><button class='btn n' data-a='aipanelclose' aria-label='Close AI helper'>✕</button></div><div class='card' id='aibox'>"+aiBoxInner()+"</div><div id='aiprops'>"+aiPropsHtml()+"</div></div>";
 }
 function aiPanelAct(a){
   if(a==='aipanelclose'){aiPanelOpen=false;render();return;}
   if(devRole()!=='parent')return;
-  if(!unlocked){alert('Tap 🔒 Parent and sign in first, then use ✨ AI.');return;}
+  if(!aiOk()){alert('Tap 🔒 Parent and sign in first, then use ✨ AI. To skip the PIN on this device, turn it off under Parent area > AI helper without the PIN.');return;}
   aiPanelOpen=!aiPanelOpen;
-  if(aiPanelOpen){aiQuickOpen=false;aiMode=(view==='meals')?'meal':'event';}
+  if(aiPanelOpen){aiQuickOpen=false;aiMode='auto';}
   render();
   if(aiPanelOpen){var t=document.getElementById('aitext');if(t&&t.focus)try{t.focus();}catch(x){}}
 }
@@ -2666,7 +2666,7 @@ document.addEventListener("change",function(e){
   if(t.id==="icsfile"&&unlocked&&devRole()==="parent"){icsImportFile(t.files&&t.files[0]);}
 });
 function aiAction(a,d){
-  if(!unlocked||devRole()!=="parent")return;
+  if(devRole()!=="parent")return;if(!unlocked&&!(aiOk()&&["nxaigo","nxaiyes","nxaino","nxairecipe","nxaiquick"].indexOf(a)>=0))return;
   if(a==="nxairecipe"){recipeOpen=(recipeOpen===d("d"))?"":d("d");render();return;}
   if(a==="nxaiurl"){var u=((document.getElementById("aiurl")||{}).value||"").trim().replace(/\/+$/,"");if(u&&!/^https:\/\/[A-Za-z0-9.\-]+(:\d+)?$/.test(u)){alert("The helper address should look like https://something.workers.dev");return;}S.ai={url:u};save();aiMsg=u?"Address saved.":"Address cleared.";feedBoxRefresh();aiRefreshMsg();return;}
   if(a==="nxaigo"){aiGo();return;}
@@ -2949,14 +2949,14 @@ var aiQuickOpen=false,evFormOpen=false,aiPanelOpen=false;
 function aiQuickInner(){
   var h="<b>✨ Add events with AI</b><p class='note'>Paste a message, or add a photo of a flyer, schedule or screenshot. You check everything before it goes on the calendar.</p>";
   if(!(S.ai&&S.ai.url))return h+"<p>The helper is not set up yet. Parent area &gt; AI helper.</p>";
-  h+="<input type='hidden' id='aitask' value='event'><label for='aitext'>Message or notes</label><textarea id='aitext' rows='3' maxlength='6000' style='width:100%' placeholder='For example: Soccer practice every Tuesday at 4pm, Lakeside Park, starting Nov 18'></textarea>";
+  h+="<input type='hidden' id='aitask' value='event'><label for='aitext'>Message or notes</label><div class='ai-trow'><textarea id='aitext' rows='3' maxlength='6000' style='width:100%' placeholder='For example: Soccer practice every Tuesday at 4pm, Lakeside Park, starting Nov 18'></textarea>"+aiMicHtml()+"</div><p id='aimicmsg' class='note' role='status'></p>";
   h+="<div class='aiq-row'><label class='btn' for='aiphoto'>📷 Add a photo</label><input id='aiphoto' type='file' accept='image/*' class='pfin'><span id='aiphotoname' class='note'></span></div>";
   h+="<div><button class='btn g' data-a='nxaigo'"+(aiBusy?" disabled":"")+">"+(aiBusy?"Working…":"Find events")+"</button><button class='btn n' data-a='nxquickai'>Close</button></div>";
   if(aiMsg)h+="<p class='note' role='status'>"+esc(aiMsg)+"</p>";
   return h;
 }
 function aiQuickBlock(){
-  if(!unlocked||aiPanelOpen)return "";
+  if(!aiOk()||aiPanelOpen)return "";
   return (aiQuickOpen?"<div class='card' id='aibox'>"+aiBoxInner()+"</div>":"")+"<div id='aiprops'>"+aiPropsHtml()+"</div>";
 }
 document.addEventListener("change",function(e){
@@ -3982,7 +3982,7 @@ function cal(){
   var ds=fd(cd),h="<h1>Calendar</h1><div class='cal-bar'><div class='grp'><button class='btn' data-a='nxcalnav' data-n='-1' aria-label='Previous dates'>◀</button><button class='btn g' data-a='nxcalnav' data-n='0'>Today</button><button class='btn' data-a='nxcalnav' data-n='1' aria-label='Next dates'>▶</button></div>";
   h+="<div class='fld'><label for='calview'>View</label><select id='calview'>"+[['two','Today / Tomorrow'],['timeline','Time grid'],['day','Day'],['three','3 days'],['week','Week'],['month','Month'],['list','Agenda']].map(function(x){return "<option value='"+x[0]+"'"+(cv===x[0]?' selected':'')+">"+x[1]+"</option>";}).join('')+"</select>";
   h+="</div><div class='fld'><label for='calwho'>Show</label><select id='calwho'><option value=''>Everyone</option>"+P.map(function(p){return "<option value='"+p.id+"'"+(calP===p.id?' selected':'')+">"+esc(p.n)+"</option>";}).join('')+"</select></div>";
-  h+="<button class='btn push' data-a='nxnewcalendar'>+ Add event</button>"+(sfSpeechCtor()?"<button class='btn sf-quickmic' data-sf='micquick' type='button' aria-pressed='false'>🎤 Talk to add</button>":"")+(unlocked?"<button class='btn g' data-a='nxaiquick'>✨ Add with AI</button>":"")+"</div><p class='calendar-help"+(calP?" on":"")+"'>"+(calP?'Showing '+esc(person(calP)?person(calP).n:'selected person')+' and whole-family plans.':'Showing everyone.')+" Other calendars can be added in the Parent area.</p>";h+=aiQuickBlock();
+  h+="<button class='btn push' data-a='nxnewcalendar'>+ Add event</button>"+((sfSpeechCtor()||fhVoiceAny())?"<button class='btn sf-quickmic' data-sf='micquick' type='button' aria-pressed='false'>🎤 Talk to add</button>":"")+(aiOk()?"<button class='btn g' data-a='nxaiquick'>✨ Add with AI</button>":"")+"</div><p class='calendar-help"+(calP?" on":"")+"'>"+(calP?'Showing '+esc(person(calP)?person(calP).n:'selected person')+' and whole-family plans.':'Showing everyone.')+" Other calendars can be added in the Parent area.</p>";h+=aiQuickBlock();
   if(cv==='month')h=moBar();
   if(cv==='two'||cv==='timeline'){h+="<div class='calendar-days'>";for(var z=0;z<2;z++)h+="<section class='calendar-day'>"+(cv==='timeline'?timeDay(fd(addD(cd,z))):dayAgenda(fd(addD(cd,z))))+"</section>";h+='</div>';}else if(cv==='day'||cv==='three'||cv==='list'){
     var count=cv==='day'?1:cv==='three'?3:7;
@@ -5195,7 +5195,7 @@ function sfEnhance(){
   if(lt){lt.textContent='What is happening?';ess.appendChild(lt);}
   var row=document.createElement('div');row.className='sf-trow';
   if(it){it.setAttribute('placeholder','Soccer practice');row.appendChild(it);}
-  if(sfSpeechCtor()){var mic=document.createElement('button');mic.type='button';mic.className='sf-mic';mic.setAttribute('data-sf','mic');mic.setAttribute('aria-label','Talk to add: speak the event');mic.setAttribute('aria-pressed','false');mic.textContent='🎤';row.appendChild(mic);}
+  if(sfSpeechCtor()||fhVoiceAny()){var mic=document.createElement('button');mic.type='button';mic.className='sf-mic';mic.setAttribute('data-sf','mic');mic.setAttribute('aria-label','Talk to add: speak the event');mic.setAttribute('aria-pressed','false');mic.textContent='🎤';row.appendChild(mic);}
   ess.appendChild(row);
   var hd=document.createElement('div');hd.id='sfheard';hd.className='sf-heard';hd.setAttribute('role','status');hd.setAttribute('aria-live','polite');ess.appendChild(hd);
   if(ld)ess.appendChild(ld);if(idt)ess.appendChild(idt);
@@ -5587,7 +5587,7 @@ function hwDraft(o){o=o||{};var kids=hwKids();
 function hwFormHtml(){
   var f=hwUI.form,kids=hwKids(),h="<div class='card hw-form' id='hwform'><h2>"+(f.id?"Edit homework":"Add homework")+"</h2>";
   h+="<label>Who is it for?</label><div class='hw-chips'>"+kids.map(function(k){return "<button type='button' class='hw-chip"+(f.kids.indexOf(k.id)>=0?" on":"")+"' data-hw='fkid' data-k='"+esc(k.id)+"'>"+esc(k.e)+" "+esc(k.n)+"</button>";}).join("")+"</div>";
-  h+="<label for='hwt'>What is the homework?</label><div class='hw-trow'><input type='text' id='hwt' maxlength='160' placeholder='Math worksheet page 42' value='"+esc(f.t)+"'>"+(typeof sfSpeechCtor==="function"&&sfSpeechCtor()?"<button type='button' class='hw-mic' data-hw='fmic' aria-label='Say the homework'>🎤</button>":"")+"</div>";
+  h+="<label for='hwt'>What is the homework?</label><div class='hw-trow'><input type='text' id='hwt' maxlength='160' placeholder='Math worksheet page 42' value='"+esc(f.t)+"'>"+(typeof fhVoiceAny==="function"&&fhVoiceAny()?"<button type='button' class='hw-mic' data-hw='fmic' aria-label='Say the homework'>🎤</button>":"")+"</div>";
   h+="<label>Subject</label><div class='hw-chips'>"+HW_SUBJ.map(function(s){var on=(f.subj||hwGuessSubj(f.t))===s[0];return "<button type='button' class='hw-chip"+(on?" on":"")+"' data-hw='fsubj' data-s='"+s[0]+"'>"+s[1]+" "+s[2]+"</button>";}).join("")+"</div>";
   h+="<label>When</label><div class='hw-chips'><button type='button' class='hw-chip"+(!f.rep?" on":"")+"' data-hw='frep' data-r='0'>📅 One time</button><button type='button' class='hw-chip"+(f.rep?" on":"")+"' data-hw='frep' data-r='1'>🔁 Every week</button></div>";
   if(!f.rep){
@@ -7068,6 +7068,138 @@ document.addEventListener("change",function(e){var t=e.target;if(!t)return;
 (function(){var st=document.createElement("style");st.textContent=".fa-box .pfgrid{margin:6px 0}.fa-src{display:flex;flex-wrap:wrap;gap:6px}.pqbk{margin:8px 0}";document.head.appendChild(st);})();
 faLoad();
 
+/* ===== v38.25: optional no-PIN AI on a parent device, 📷 Photos button for this device's own photos, "Anything" AI mode with voice ===== */
+var FH_NOPIN_KEY="familyhub-nopin-aiph",phPanelOpen=false,aiRec=null;
+function fhEasy(){try{return devRole()==="parent"&&localStorage.getItem(FH_NOPIN_KEY)==="1";}catch(e){return false;}}
+function aiOk(){return devRole()==="parent"&&(unlocked||fhEasy());}
+/* the family album always needs the Parent area unlocked */
+(function(){var c0=faCanAdd;faCanAdd=function(){return !!unlocked&&c0.apply(this,arguments);};})();
+/* the switch, in Parent area > This device and PINs */
+(function(){var d0=deviceAdminHtml;deviceAdminHtml=function(){
+  return d0.apply(this,arguments)+"<h2>AI helper without the PIN</h2><div class='card'><label class='day-choice' style='min-height:48px'><input type='checkbox' id='nopinai'"+(fhEasy()?" checked":"")+"> On this device, use ✨ AI without the PIN</label><p class='note'>Saved on this device only. Approvals, points, rewards, settings and the family album still need the PIN. Leave this off on a tablet the kids use.</p></div>";};})();
+document.addEventListener("change",function(e){var t=e.target;if(!t||t.id!=="nopinai")return;
+  if(!unlocked||devRole()!=="parent"){t.checked=fhEasy();return;}
+  try{if(t.checked)localStorage.setItem(FH_NOPIN_KEY,"1");else localStorage.removeItem(FH_NOPIN_KEY);}catch(x){}
+  statusMessage(t.checked?"✨ AI now works on this device without the PIN.":"✨ AI needs the PIN again on this device.");render();});
+/* 📷 Photos button on every device: add this device's own photos without a PIN */
+(function(){var ai=document.getElementById("aibtn");if(!ai||document.getElementById("phbtn"))return;
+  var b=document.createElement("button");b.id="phbtn";b.type="button";b.setAttribute("data-a","phpanel");b.setAttribute("aria-label","Open this device's photos");b.innerHTML="📷<span class='phl'> Photos</span>";
+  ai.parentNode.insertBefore(b,ai.nextSibling);
+  var st=document.createElement("style");st.textContent="#phbtn{font-weight:700;margin-left:8px;white-space:nowrap}@media (max-width:480px){#phbtn .phl{display:none}}.ai-trow{position:relative}.ai-trow textarea{padding-right:60px}.ai-mic{position:absolute;right:4px;top:4px;width:48px;height:48px;border-radius:50%;border:0;background:#3b5bdb;color:#fff;font-size:22px;cursor:pointer;padding:0}.ai-mic.live{background:#c0392b;box-shadow:0 0 0 4px rgba(192,57,43,.3)}.ai-mic:focus{outline:3px solid #f08c00;outline-offset:2px}";document.head.appendChild(st);})();
+function phLocalBody(){
+  var ph=photos(),canDel=unlocked||limitedUnlock,h="<p class='note'>Photos you add here stay on this device and show when the screen is idle. <b>"+ph.length+" of 30 saved.</b></p>";
+  if(pfMsg)h+="<p class='pfmsg' role='status'>"+esc(pfMsg)+"</p>";
+  if(ph.length){h+="<div class='pfgrid'>";ph.forEach(function(u,i){h+="<div class='pfth'><img src='"+u+"' alt='Saved photo "+(i+1)+"'>"+(canDel?"<button class='btn r' data-a='pfdel' data-i='"+i+"' aria-label='Remove photo "+(i+1)+"'>✕</button>":"")+"</div>";});h+="</div>";}
+  else h+="<p class='note'>No photos on this device yet.</p>";
+  h+="<label class='btn g' for='pf'>＋ Add photos</label><input type='file' id='pf' class='pfin' aria-label='Choose photos for this device' accept='image/*' multiple>";
+  h+="<p class='note'>"+(canDel?"":"Removing photos needs the PIN. ")+"The 👪 family album (shared with every tablet) is in the Parent area and needs the PIN.</p>";
+  return h;
+}
+function phPanelHtml(){
+  if(!phPanelOpen)return "";
+  return "<div class='aip-back' data-a='phpanelclose'></div><div class='aip' role='dialog' aria-modal='true' aria-label='Photos'><div class='aip-top'><b>📷 This device’s photos</b><button class='btn n' data-a='phpanelclose' aria-label='Close photos'>✕</button></div><div class='card'>"+phLocalBody()+"</div></div>";
+}
+(function(){var p0=aiPanelHtml;aiPanelHtml=function(){return p0.apply(this,arguments)+phPanelHtml();};})();
+document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e.target.closest("[data-a='phpanel'],[data-a='phpanelclose']"):null;if(!b)return;
+  e.stopPropagation();e.preventDefault();
+  if(b.getAttribute("data-a")==="phpanelclose"){phPanelOpen=false;render();return;}
+  phPanelOpen=!phPanelOpen;if(phPanelOpen){aiPanelOpen=false;pfMsg="";}render();},true);
+document.addEventListener("keydown",function(e){if((e.key==="Escape"||e.keyCode===27)&&phPanelOpen){phPanelOpen=false;render();}});
+
+/* 🎤 for the AI helper: speak, and it asks the helper when you stop */
+function aiMicHtml(){return fhVoiceAny()?"<button type='button' class='ai-mic"+(aiRec?" live":"")+"' data-aimic='1' aria-label='Talk to the AI helper' aria-pressed='"+(aiRec?"true":"false")+"'>🎤</button>":"";}
+function aiSay(m){var el=document.getElementById("aimicmsg");if(el)el.textContent=m;}
+function aiListen(){
+  var C=sfSpeechCtor();if(!C)return;
+  if(aiRec){try{aiRec.stop();}catch(e){}return;}
+  var r=new C(),txt="";aiRec=r;
+  try{r.lang=navigator.language||"en-US";r.interimResults=true;r.continuous=false;r.maxAlternatives=1;}catch(e){}
+  function mic(on){var b=document.querySelector("[data-aimic]");if(b){b.className="ai-mic"+(on?" live":"");b.setAttribute("aria-pressed",on?"true":"false");}}
+  r.onresult=function(ev){var t="";for(var i=0;i<ev.results.length;i++)t+=ev.results[i][0].transcript+" ";txt=t.replace(/\s+/g," ").trim();var ta=document.getElementById("aitext");if(ta)ta.value=txt;aiSay("Heard: “"+txt+"”"+(window.FHNative?" · Keep talking, or tap the 🎤 when you are done.":""));};
+  r.onerror=function(ev){var er=ev&&ev.error;aiSay(er==="no-speech"?"I did not hear anything. Tap the 🎤 and try again.":(er==="not-allowed"||er==="service-not-allowed")?"The microphone is blocked. Allow microphone access, then try again.":"Voice input did not work here. You can type instead.");};
+  r.onend=function(){aiRec=null;mic(false);if(txt){var ta=document.getElementById("aitext");if(ta)ta.value=txt;aiSay("Asking the helper…");aiGo();}};
+  mic(true);aiSay("Listening… for example “Add soccer Tuesday at 4 to the calendar and suggest a dinner for Friday”.");
+  try{r.start();}catch(e){aiRec=null;mic(false);aiSay("Voice input did not work here. You can type instead.");}
+}
+document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e.target.closest("[data-aimic]"):null;if(!b)return;e.preventDefault();if(!aiOk())return;aiListen();});
+
+/* "Anything" mode: one message can hold calendar requests and dinner requests */
+var AI_MEAL_RX=/\b(dinner|dinners|supper|suppers|meal|meals|recipe|recipes|cook|eat)\b/i,
+    AI_ASK_RX=/\b(suggest|suggestion|suggestions|idea|ideas|recommend|what should|what can|what to|what's for|whats for|what is for|give me|plan|cook|make|recipe|recipes)\b/i,
+    AI_CAL_RX=/\b(calendar|appointment|reservation|schedule|remind)\b/i;
+function aiSplit(text){
+  var parts=String(text||"").split(/[.;!?\n]+|,?\s+(?:and then|and also|then also|also|plus)\s+|,?\s+and\s+(?=(?:can you |could you |please )?(?:suggest|give|what|recommend|plan|ask|find|tell|add|put|schedule|remind|make|pick)\b)/i),ev=[],ml=[];
+  parts.forEach(function(p){p=String(p||"").trim();if(!p)return;if(AI_MEAL_RX.test(p)&&AI_ASK_RX.test(p)&&!AI_CAL_RX.test(p))ml.push(p);else ev.push(p);});
+  /* "and" joins nothing useful on its own */
+  ev=ev.filter(function(p){return /[a-z0-9]{2,}/i.test(p)&&!/^(and|then|also|please|thanks|thank you)$/i.test(p);});
+  return {event:ev.join(". "),meal:ml.join(". ")};
+}
+function aiMealDay(t){try{var r=sfParseVoice(t,new Date(),[]);return (r&&r.dateFound&&aiDateOk(r.date))?r.date:"";}catch(e){return "";}}
+function aiPost(body,img){if(img)body.image=img;return aiHttp("/ai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(function(r){return r.text().then(function(t){if(!r.ok)throw new Error(aiErrText(r,t));return JSON.parse(t).result;});});}
+function aiGoAuto(){
+  var text=((document.getElementById("aitext")||{}).value||"").trim(),el=document.getElementById("aiphoto"),file=el&&el.files&&el.files[0];
+  if(!text&&!file){aiMsg="Type or say something first, or add a photo.";aiRefreshMsg();return;}
+  if(!aiBase()){aiMsg="Save the helper address first.";aiRefreshMsg();return;}
+  var sp=aiSplit(text),fridge=!!file&&/\b(fridge|pantry|freezer|cupboard)\b/i.test(text);
+  if(!sp.event&&!sp.meal)sp.event=text;
+  var cnt=parseInt((document.getElementById("aicount")||{}).value||"3",10)||3,notes=[];
+  Object.keys(S.foodPrefs||{}).forEach(function(id){var f=S.foodPrefs[id],pp=person(id);if(pp&&f)notes.push(pp.n+(f.likes?" likes "+f.likes:"")+(f.dislikes?"; dislikes "+f.dislikes:""));});
+  var jobs=[],ppl=P.map(function(p){return p.n;}),td=fd(new Date());
+  if(sp.event||(file&&!fridge))jobs.push({task:"event",body:{task:"event",text:sp.event,today:td,people:ppl,notes:"",count:cnt},img:file&&!fridge});
+  if(sp.meal||fridge)jobs.push({task:fridge?"fridge":"meal",body:{task:fridge?"fridge":"meal",text:"",today:td,people:ppl,notes:[notes.join(". "),sp.meal].filter(Boolean).join(". "),count:cnt},img:fridge,day:aiMealDay(sp.meal)});
+  aiBusy=true;aiMsg=jobs.length>1?"Working on your calendar and dinner requests…":"Working…";aiRefreshMsg();
+  var got={event:0,meal:0},errs=[];
+  (file?aiShrink(file):Promise.resolve(null)).then(function(img){
+    var chain=Promise.resolve();
+    jobs.forEach(function(j){chain=chain.then(function(){return aiPost(j.body,j.img?img:null).then(function(res){
+      var before=aiProps.length?aiProps[0]:null,n=aiHandle(j.task,res);
+      if(j.task!=="event"&&j.day&&n){for(var i=0;i<n&&i<aiProps.length;i++)if(aiProps[i].kind==="meal")aiProps[i].d=j.day;aiPropsSave();}
+      got[j.task==="event"?"event":"meal"]+=n;
+    },function(e){errs.push((j.task==="event"?"Calendar: ":"Dinners: ")+((e&&e.message)||"failed"));});});});
+    return chain;
+  }).then(function(){
+    aiBusy=false;var bits=[];
+    if(got.event)bits.push(got.event+" calendar event"+(got.event===1?"":"s"));
+    if(got.meal)bits.push(got.meal+" dinner idea"+(got.meal===1?"":"s"));
+    aiMsg=(bits.length?"The helper found "+bits.join(" and ")+". Review below.":"The helper didn't find anything to propose.")+(errs.length?" "+errs.join(" "):"");
+    aiRefreshMsg();aiRefreshProps();
+  },function(e){aiBusy=false;aiMsg=(e&&e.message)||"Something went wrong.";aiRefreshMsg();});
+}
+(function(){var g0=aiGo;aiGo=function(){if(aiBusy)return;var s=document.getElementById("aitask");if(s&&s.value==="auto"){aiMode="auto";return aiGoAuto();}return g0.apply(this,arguments);};})();
+/* v38.25: calmer photo frame on phones (iPhone portrait and landscape): small see-through info, no forecast, dims after 8 s */
+(function(){var st=document.createElement("style");st.textContent=
+"@media (max-width:600px),(max-height:500px){"+
+"#idle::before{background:linear-gradient(0deg,rgba(0,0,0,.42),transparent 32%)}"+
+"#idle{padding:14px 16px max(14px,env(safe-area-inset-bottom))}"+
+"#idle .idle-glance{top:max(12px,env(safe-area-inset-top));right:12px;left:auto;max-width:62vw}"+
+"#idle .idle-glance>*+*{margin-top:6px}"+
+"#idle .idle-pill{background:rgba(15,27,45,.28);border:0;box-shadow:none;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);font-size:13px;line-height:1.3;padding:5px 10px;border-radius:12px;text-shadow:0 1px 3px #000;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}"+
+"#idle .idle-pill .wx-days,#idle .idle-pill .wx-foot{display:none}"+
+"#idle .idle-pill .wx-now{display:flex;align-items:center;gap:6px}#idle .idle-pill .wx-ico{font-size:18px}#idle .idle-pill .wx-temp{font-size:15px;font-weight:700;display:inline}#idle .idle-pill .wx-now>div>div{display:inline;margin-right:4px}"+
+"#idle .idle-fav{display:none}"+
+"#idle .idle-time{font-size:44px!important;text-shadow:0 1px 6px #000!important}#idle .idle-date{font-size:16px!important;margin-top:2px}"+
+"#idle .idle-glance,#idle .idle-time,#idle .idle-date{transition:opacity 1.5s ease}"+
+"#idle.fh-dim .idle-glance{opacity:.3}#idle.fh-dim .idle-time,#idle.fh-dim .idle-date{opacity:.55}"+
+"}"+
+"@media (max-height:500px){#idle .idle-time{font-size:34px!important}#idle .idle-date{font-size:14px!important}}";
+document.head.appendChild(st);})();
+(function(){var s0=showIdle,dimT=null;showIdle=function(){var el=document.getElementById("idle");if(el)el.classList.remove("fh-dim");clearTimeout(dimT);dimT=setTimeout(function(){var e2=document.getElementById("idle");if(e2)e2.classList.add("fh-dim");},8000);return s0.apply(this,arguments);};})();
+
+/* v38.25: talk on iPhones too. iPhone browsers have no web speech recognition, so the 🎤 opens a box
+   and the keyboard's own dictation mic does the listening. */
+function fhDictate(title,example,onText){
+  var old=document.getElementById("fhdict");if(old)old.remove();
+  var o=document.createElement("div");o.id="fhdict";o.className="fhd-ov";
+  o.innerHTML="<div class='fhd' role='dialog' aria-modal='true' aria-label='"+esc(title)+"'><h2>🎤 "+esc(title)+"</h2><p class='note'>Tap the 🎤 on your keyboard and talk, then tap Use this. (No keyboard 🎤? Turn on Dictation in Settings › General › Keyboard.)</p><textarea id='fhdtext' rows='3' maxlength='600' placeholder='"+esc(example)+"'></textarea><div class='fhd-b'><button type='button' class='btn g' data-fhd='ok'>Use this</button><button type='button' class='btn n' data-fhd='no'>Cancel</button></div></div>";
+  document.body.appendChild(o);
+  var ta=document.getElementById("fhdtext");try{ta.focus();}catch(e){}
+  o.addEventListener("click",function(e){var b=e.target.closest?e.target.closest("[data-fhd]"):null;if(!b)return;var v=(ta.value||"").replace(/\s+/g," ").trim();o.remove();if(b.getAttribute("data-fhd")==="ok"&&v)onText(v);});
+}
+(function(){var st=document.createElement("style");st.textContent=".fhd-ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:flex-start;justify-content:center;padding:max(16px,env(safe-area-inset-top)) 16px 16px}.fhd{background:var(--bg);color:var(--ink);border-radius:18px;padding:16px;width:min(100%,520px);box-shadow:0 18px 50px #0006}.fhd h2{margin:0 0 6px}.fhd textarea{width:100%;font-size:18px;box-sizing:border-box}.fhd-b{display:flex;gap:8px;margin-top:10px}.fhd-b .btn{flex:1;min-height:48px}";document.head.appendChild(st);})();
+function fhVoiceAny(){return true;}
+(function(){var v0=sfStartVoice;sfStartVoice=function(){if(sfSpeechCtor())return v0.apply(this,arguments);fhDictate("Say the event","Soccer practice tomorrow at 4 pm for Julian",function(t){sfSay("Heard: “"+t+"”");sfApplyVoice(t);});};})();
+(function(){var h0=hwListen;hwListen=function(onText){if(sfSpeechCtor())return h0.apply(this,arguments);fhDictate("Say the homework","Julian math worksheet page 42 due Thursday",onText);};})();
+(function(){var a0=aiListen;aiListen=function(){if(sfSpeechCtor())return a0.apply(this,arguments);var ta=document.getElementById("aitext");if(ta){try{ta.focus();}catch(e){}}aiSay("Tap the 🎤 on your keyboard and talk, then tap Ask the helper. (No keyboard 🎤? Turn on Dictation in Settings › General › Keyboard.)");};})();
 window.FH_READY=true;
 </script>
 
