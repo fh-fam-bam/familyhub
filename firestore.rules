@@ -1,0 +1,115 @@
+rules_version = '2';
+// Family Hub Firestore rules – v39.1 (Stage 1: accounts and roles)
+// Paste into Firebase console › Firestore Database › Rules, then Publish.
+//
+// Who is who:
+//  - The two old shared logins below keep working exactly as before until you say they can go.
+//  - New accounts get their role from /users/{uid}: "parent", "display" (wall tablet) or "kid" (later).
+//    Only a parent can create or change /users records.
+// Stage 2 will narrow what "display" and "kid" can read (parent care items). For now they have the
+// same access as the old kids' login.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- the old shared logins (remove later, only after you confirm) ----
+    function isLegacyParent() {
+      return request.auth != null && request.auth.uid in ['wL2GTwTYn7Ngjtnyy0NkQ5IKlsZ2'];
+    }
+    function isLegacyKids() {
+      return request.auth != null && request.auth.uid in ['RhyyWQhemQefhVkPQt2EfAhgxDw1'];
+    }
+
+    // ---- roles from /users/{uid} ----
+    function userPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+    function hasRole(r) {
+      return request.auth != null && exists(userPath()) && get(userPath()).data.role == r;
+    }
+    function isParent() { return isLegacyParent() || hasRole('parent'); }
+    function isKids()   { return isLegacyKids() || hasRole('display') || hasRole('kid'); }
+
+    // ---- account records ----
+    function validUser() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['role', 'personId'])
+        && d.keys().hasOnly(['role', 'personId', 'name', 'email', 'updatedBy', 'updatedAt'])
+        && d.role in ['parent', 'display', 'kid']
+        && d.personId is string
+        && (d.role == 'display'
+              ? d.personId == 'none'
+              : d.personId.matches('^[A-Za-z0-9_-]{1,100}$'))
+        && (!('name' in d.keys()) || (d.name is string && d.name.size() <= 80))
+        && (!('email' in d.keys()) || (d.email is string && d.email.size() <= 200))
+        && (!('updatedBy' in d.keys()) || d.updatedBy == request.auth.uid)
+        && (!('updatedAt' in d.keys()) || d.updatedAt is timestamp);
+    }
+    match /users/{uid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || isParent());
+      // A parent cannot change or remove their own role, so nobody locks themselves out by accident.
+      allow create, update: if isParent() && validUser()
+        && !(uid == request.auth.uid && request.resource.data.role != 'parent');
+      allow delete: if isParent() && uid != request.auth.uid;
+    }
+
+    // A newly signed-in account asks to be approved (it can only write its own request).
+    match /accessRequests/{uid} {
+      allow read, delete: if isParent() || (request.auth != null && request.auth.uid == uid);
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['email', 'name', 'at'])
+        && request.resource.data.email is string && request.resource.data.email.size() <= 200
+        && request.resource.data.name is string && request.resource.data.name.size() <= 80
+        && request.resource.data.at is timestamp;
+    }
+
+    // ---- shared family data (unchanged from v38.25 apart from the role functions) ----
+    match /households/family/items/{id} {
+
+      function goodShape() {
+        let d = request.resource.data;
+        return d.keys().hasAll(['json', 'rev', 'deleted'])
+          && d.keys().hasOnly(['json', 'rev', 'deleted', 'ts', 'st'])
+          && d.json is string
+          && d.json.size() < 100000
+          && d.rev is int
+          && d.deleted is bool
+          && d.rev == (resource == null ? 1 : resource.data.rev + 1)
+          && (!('st' in d.keys()) || (d.st is string && d.st.size() <= 1));
+      }
+      // Kids may only create/update chore records marked pending ('p') or empty,
+      // and may never touch one a parent has approved ('a') or one with no marker.
+      function kidDoneOk() {
+        let d = request.resource.data;
+        return 'st' in d.keys() && d.st in ['', 'p']
+          && (resource == null
+              || ('st' in resource.data.keys() && resource.data.st != 'a'));
+      }
+
+      allow read: if isParent() || isKids();
+
+      allow create, update: if goodShape() && (
+        (isParent() && id.matches('^(events|eventRequests|groc|req|boardreq|done|meals|cfg|ledger|hw)__[A-Za-z0-9_-]{1,120}$'))
+        ||
+        (isKids() && id.matches('^done__[A-Za-z0-9_-]{1,120}$') && kidDoneOk())
+        ||
+        (isKids() && id.matches('^(eventRequests|req|groc|boardreq|hw)__[A-Za-z0-9_-]{1,120}$')
+                  && !('st' in request.resource.data.keys()))
+      );
+
+      allow delete: if false;
+    }
+
+    // Parent-only: PIN hashes, calendar links, AI helper address
+    match /households/family/private/{pid} {
+      allow read: if isParent();
+      allow create, update: if isParent() && pid == 'main'
+        && request.resource.data.keys().hasOnly(['json', 'rev'])
+        && request.resource.data.keys().hasAll(['json', 'rev'])
+        && request.resource.data.json is string
+        && request.resource.data.json.size() < 100000
+        && request.resource.data.rev is int
+        && request.resource.data.rev == (resource == null ? 1 : resource.data.rev + 1);
+      allow delete: if false;
+    }
+  }
+}
