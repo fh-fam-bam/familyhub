@@ -526,7 +526,7 @@ function load(){try{var raw=localStorage.getItem(KEY),s=raw?JSON.parse(raw):null
 if(s&&s.tasks&&s.done&&s.stars&&Array.isArray(s.events)&&Array.isArray(s.groc)&&(s.members?validMembers(s.members):true)&&(s.members||defaultMembers).every(function(p){return Array.isArray(s.tasks[p.id]);}))return s;
 if(raw)initialDataProblem=true;
 }catch(x){initialDataProblem=true;}
-return {pin:"1234",stars:{},done:{},groc:[],events:[],tasks:{
+return {stars:{},done:{},groc:[],events:[],tasks:{
 dad:[T("To-do","Check this week’s appointments","📅"),T("To-do","Plan dinners","🍽️")],
 monica:[T("To-do","Check this week’s appointments","📅"),T("To-do","Update grocery list","🛒")],
 julian:[T("Morning","Get dressed and brush teeth","🪥"),T("After school","Homework","📚"),T("After school","Unload dishwasher","🍽️"),T("Evening","Pack backpack","🎒")],
@@ -1449,13 +1449,13 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v39.0";
+var FH_BUILD="v39.1";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
 var limitedUnlock=false;
 function kidsAcct(){var k=S.kidsAccount&&typeof S.kidsAccount.email==="string"?S.kidsAccount.email.trim().toLowerCase():"";return !!(k&&sync.user&&String(sync.user).toLowerCase()===k);}
-function syncRole(){return dev.role!=="parent"?dev.role:(kidsAcct()?"kids":"parent");}
+function syncRole(){var ar=typeof acctRole==="function"?acctRole():"";if(ar==="display")return "wall";if(ar==="kid")return "kids";return dev.role!=="parent"?dev.role:(kidsAcct()?"kids":"parent");}
 function devRole(){return syncRole();}
 function devRoleSync(){
   if(kidsAcct()&&dev.role==="parent"){dev.role="kids";try{localStorage.setItem(DEV_KEY,JSON.stringify(dev));}catch(e){}}
@@ -1519,7 +1519,7 @@ function pinAdults(){return (S.members||P).filter(function(p){return !p.kid&&!p.
 function pinCheck(who,pin){
   var st=S.pins&&typeof S.pins[who]==="string"?S.pins[who]:"";
   if(st){var ix=st.indexOf("$");return ix>0&&pinHash(st.slice(0,ix),pin)===st.slice(ix+1);}
-  return pin===String(S.pin||"1234");
+  return !!S.pin&&pin===String(S.pin);
 }
 function pinLockInfo(){try{var r=JSON.parse(localStorage.getItem("familyhub-pinlock")||"null");if(r&&typeof r==="object")return {n:+r.n||0,until:+r.until||0};}catch(e){}return {n:0,until:0};}
 function pinUnlock(){
@@ -1570,7 +1570,7 @@ function pinForgot(){
 function pinLockScreen(){
   var ad=pinAdults(),h="<h1>Parent area</h1><div class='card'><p>Choose who you are and enter your PIN.</p>";
   if(ad.length>1){h+="<label for='pinwho'>I am</label><select id='pinwho'>"+ad.map(function(p){return "<option value='"+esc(p.id)+"'>"+esc(p.n)+"</option>";}).join("")+"</select>";}
-  h+="<input id='pin' type='password' inputmode='numeric' placeholder='PIN' autocomplete='off'><button class='btn' data-a='unlock'>Unlock</button><p class='note'>"+((S.pins&&Object.keys(S.pins).length)?"Each parent has their own PIN. After 5 wrong tries the lock waits a minute.":"The starting PIN is 1234. After unlocking, set your own PIN under “This device and PINs”.")+"</p>"+pinForgotHtml()+"</div>";
+  h+="<input id='pin' type='password' inputmode='numeric' placeholder='PIN' autocomplete='off'><button class='btn' data-a='unlock'>Unlock</button><p class='note'>"+((S.pins&&Object.keys(S.pins).length)?"Each parent has their own PIN. After 5 wrong tries the lock waits a minute.":(S.pin?"After unlocking, you can set your own PIN under “This device and PINs”.":"No PIN is set on this device yet. Sign in below with a parent account to open the Parent area."))+"</p>"+pinForgotHtml()+"</div>";
   return h;
 }
 function limitedParentHtml(){
@@ -1941,6 +1941,9 @@ function syncRestAdapter(){
   return {
     name:"rest",
     token:function(){return ensure();},
+    uid:function(){return tok.refresh?tok.uid:"";},
+    /* v39.1: take over a sign-in made elsewhere (Google sign-in on a parent phone) */
+    adopt:function(o){tok.refresh=o.refresh;tok.uid=o.uid||"";tok.email=o.email||"";tok.id="";tok.exp=0;storeTok();return ensure().then(function(){if(authCb)authCb({uid:tok.uid,email:tok.email});return true;});},
     onAuth:function(cb){
       authCb=cb;loadTok();
       if(!tok.refresh){cb(null);return;}
@@ -2225,7 +2228,8 @@ function syncStart(){
   sync.adapter=ad;
   ad.onAuth(function(u){
     /* v37.2: the Parent tab's view id is "par" (it was checked as "parent", so the panel never refreshed after sign-in/out) */
-    if(!u){sync.user="";syncStop();syncSetState("signedout");if(view==="par"||view==="parent")syncRefreshAdmin();return;}
+    if(!u){sync.user="";syncStop();syncSetState("signedout");if(typeof acctOnAuth==="function")acctOnAuth(null);if(view==="par"||view==="parent")syncRefreshAdmin();return;}
+    if(typeof acctOnAuth==="function")acctOnAuth(u);
     sync.user=u.email||u.uid;sync.email=u.email||sync.email;syncStore();if(typeof devRoleSync==="function")devRoleSync();syncSubscribe();if(view==="par"||view==="parent")syncRefreshAdmin();
   });
 }
@@ -4938,7 +4942,7 @@ function validateHubBackup(s){
   function safeId(x){return typeof x==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(x);}
   function text(x){return typeof x==='string';}
   function finiteNumber(x){return typeof x==='number'&&isFinite(x)&&x>=0;}
-  if(!obj(s)||!obj(s.tasks)||!obj(s.done)||!obj(s.stars)||!Array.isArray(s.events)||!Array.isArray(s.groc)||!text(s.pin))return false;
+  if(!obj(s)||!obj(s.tasks)||!obj(s.done)||!obj(s.stars)||!Array.isArray(s.events)||!Array.isArray(s.groc)||(s.pin!==undefined&&!text(s.pin)))return false;
   if(Object.keys(s.tasks).some(function(p){return !person(p);}))return false;
   if(P.some(function(p){return !Array.isArray(s.tasks[p.id])||s.tasks[p.id].some(function(t){return !obj(t)||!safeId(t.id)||!text(t.t)||!text(t.g)||(t.e!==undefined&&!text(t.e))||(t.due!==undefined&&!validTime(t.due))||(t.start&&!hhDateValid(t.start))||(t.finish&&!hhDateValid(t.finish))||(t.days!==undefined&&(!Array.isArray(t.days)||t.days.some(function(d){return d!==Math.floor(d)||d<0||d>6;})))||(t.m!==undefined&&!(t.m===0||(t.m>=1&&t.m<=240&&t.m===Math.floor(t.m))))||(t.points!==undefined&&!validChorePoints(t.points));});}))return false;
   if(Object.keys(s.done).some(function(k){var a=k.split('|');if(a.length===3&&a[1]==='hh'&&s.done[k]==='t')return !hhDateValid(a[0])||!safeId(a[2]);if(a.length===3&&a[1]==='mood')return !hhDateValid(a[0])||!safeId(a[2])||['1','2','3','4'].indexOf(s.done[k])<0;return a.length!==3||!hhDateValid(a[0])||!person(a[1])||!safeId(a[2])||['a','p'].indexOf(s.done[k])<0;}))return false;
@@ -7250,6 +7254,226 @@ function fhVoiceAny(){return true;}
 (function(){var v0=sfStartVoice;sfStartVoice=function(){if(sfSpeechCtor())return v0.apply(this,arguments);fhDictate("Say the event","Soccer practice tomorrow at 4 pm for Julian",function(t){sfSay("Heard: “"+t+"”");sfApplyVoice(t);});};})();
 (function(){var h0=hwListen;hwListen=function(onText){if(sfSpeechCtor())return h0.apply(this,arguments);fhDictate("Say the homework","Julian math worksheet page 42 due Thursday",onText);};})();
 (function(){var a0=aiListen;aiListen=function(){if(sfSpeechCtor())return a0.apply(this,arguments);var ta=document.getElementById("aitext");if(ta){try{ta.focus();}catch(e){}}aiSay("Tap the 🎤 on your keyboard and talk, then tap Ask the helper. (No keyboard 🎤? Turn on Dictation in Settings › General › Keyboard.)");};})();
+/* ---- v39.1 ---- */
+/* ===== v39.1 (Stage 1): accounts and roles =====
+   Each sign-in account has a record at /users/{uid}: role ("parent" | "display" | "kid") and personId.
+   - parent: signs in with Google on their own phone; that phone needs no PIN.
+   - display: the wall tablet's own email + password account (created by a parent); always a wall display.
+   - kid: reserved for kids' own devices later; behaves like a kids' device.
+   Accounts with no record (the old shared family login) work exactly as before. */
+var ACCT_KEY="familyhub-acct",acct={uid:"",role:"",personId:"",name:"",state:"none",msg:""};
+(function(){try{var o=JSON.parse(localStorage.getItem(ACCT_KEY)||"null");if(o&&typeof o==="object"&&typeof o.uid==="string"){acct.uid=o.uid;acct.role=["parent","display","kid"].indexOf(o.role)>=0?o.role:"";acct.personId=typeof o.personId==="string"?o.personId:"";acct.name=typeof o.name==="string"?o.name:"";acct.state=acct.role?"ok":"none";}}catch(e){}})();
+function acctStore(){try{localStorage.setItem(ACCT_KEY,JSON.stringify({uid:acct.uid,role:acct.role,personId:acct.personId,name:acct.name}));}catch(e){}}
+function acctUid(){try{return sync.adapter&&sync.adapter.uid?sync.adapter.uid():"";}catch(e){return "";}}
+function acctRole(){var u=acctUid();return u&&acct.uid===u?acct.role:"";}
+function acctIsParent(){return acctRole()==="parent";}
+var FS_ROOT="https://firestore.googleapis.com/v1/projects/"+FH_CLOUD_CONFIG.projectId+"/databases/(default)/documents";
+function fsCall(path,method,body){
+  if(!sync.adapter||!sync.adapter.token)return Promise.reject(new Error("Not signed in."));
+  return Promise.resolve(sync.adapter.token()).then(function(t){
+    return fetch(FS_ROOT+"/"+path,{method:method||"GET",headers:{Authorization:"Bearer "+t,"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined,cache:"no-store"});
+  }).then(function(r){return r.text().then(function(x){var j=null;try{j=JSON.parse(x);}catch(e){}return {status:r.status,json:j};});});
+}
+function fsStr(d,k){return d&&d.fields&&d.fields[k]&&typeof d.fields[k].stringValue==="string"?d.fields[k].stringValue:"";}
+function fsFields(o){var f={};Object.keys(o).forEach(function(k){f[k]=k==="updatedAt"||k==="at"?{timestampValue:o[k]}:{stringValue:String(o[k])};});return {fields:f};}
+function fsIdOf(d){var n=String((d&&d.name)||"");return decodeURIComponent(n.slice(n.lastIndexOf("/")+1));}
+function acctApply(){
+  var r=acctRole(),ch=false;
+  if(r==="display"&&dev.role!=="wall"){dev.role="wall";ch=true;}
+  if(r==="kid"&&dev.role==="parent"){dev.role="kids";ch=true;}
+  if(ch)devSave();
+  if(typeof devRoleSync==="function")devRoleSync();
+}
+/* called by syncStart when the sign-in changes */
+function acctOnAuth(u){
+  if(!u){acct.state="none";acct.msg="";if(view==="par")render();return;}
+  var uid=u.uid||acctUid();if(!uid)return;
+  if(acct.uid!==uid){acct.uid=uid;acct.role="";acct.personId="";acct.name="";}
+  acct.state="loading";
+  fsCall("users/"+encodeURIComponent(uid)).then(function(r){
+    if(r.status===200&&r.json){var ro=fsStr(r.json,"role");acct.role=["parent","display","kid"].indexOf(ro)>=0?ro:"";acct.personId=fsStr(r.json,"personId");acct.name=fsStr(r.json,"name");acct.state=acct.role?"ok":"norole";}
+    else if(r.status===404){acct.role="";acct.personId="";acct.state="norole";if(sync.viaGoogle)acctRequest(u);}
+    else{acct.state=acct.role?"ok":"error";acct.msg="Could not read this account’s role (status "+r.status+").";}
+    acctStore();acctApply();render();
+  },function(){acct.state=acct.role?"ok":"offline";acctApply();});
+}
+/* a new account with no role asks the parents for one (they approve it in Parent > Accounts) */
+function acctRequest(u){
+  var uid=(u&&u.uid)||acctUid();if(!uid)return;
+  fsCall("accessRequests/"+encodeURIComponent(uid),"PATCH",fsFields({email:(u&&u.email)||sync.user||"",name:sync.gname||"",at:new Date().toISOString()})).then(function(r){
+    acct.msg=r.status===200?"A parent can now approve this account in Parent › Accounts.":"Could not send the request (status "+r.status+"). A parent can still add this account by its ID.";render();
+  },function(){});
+}
+/* parent phones signed in with a parent account open the Parent area with no PIN */
+function acctAutoUnlock(){
+  if(acctIsParent()&&devRole()==="parent"&&!unlocked){unlocked=true;unlockedBy=(person(acct.personId)?acct.personId:"");}
+}
+(function(){var r0=render;render=function(){try{acctAutoUnlock();}catch(e){}return r0.apply(this,arguments);};})();
+function acctTabletLike(){return !!(window.FHNative||/Silk|;\s*KF[A-Z0-9]{2,}[;)\s]/.test(navigator.userAgent||"")||dev.role==="wall");}
+function acctSyncOn(){
+  if(sync.on&&sync.adapter)return true;
+  var lr=null;try{lr=localStorage.getItem('familyhub-local-restore');}catch(e){}
+  if(lr&&!confirm("This device has a backup that was restored on this device only. When family sync turns on, it is merged with the family's shared copy. Continue?"))return false;
+  try{localStorage.removeItem('familyhub-local-restore');}catch(e){}
+  sync.on=true;syncStore();syncStart();return !!sync.adapter;
+}
+/* --- Google sign-in (parent phones). Firebase's sign-in library is loaded only when this button is used. --- */
+var FB_SDK="https://www.gstatic.com/firebasejs/10.12.2/";
+function acctLoad(src){return new Promise(function(res,rej){var s=document.createElement("script");s.src=src;s.onload=res;s.onerror=function(){rej(new Error("Could not load Google sign-in. Check the internet connection."));};document.head.appendChild(s);});}
+function acctFb(){
+  if(window.firebase&&firebase.auth)return Promise.resolve();
+  return acctLoad(FB_SDK+"firebase-app-compat.js").then(function(){return acctLoad(FB_SDK+"firebase-auth-compat.js");});
+}
+function acctFbAuth(){var a;try{a=firebase.app("fhauth");}catch(e){a=firebase.initializeApp(FH_CLOUD_CONFIG,"fhauth");}return a.auth();}
+function acctAdopt(user){
+  if(!user||!user.refreshToken)throw new Error("Google did not return a sign-in.");
+  sync.viaGoogle=true;sync.gname=user.displayName||"";
+  return sync.adapter.adopt({refresh:user.refreshToken,uid:user.uid,email:user.email||""});
+}
+function acctGoogle(){
+  if(acctTabletLike()){alert("Google sign-in is for parent phones. The wall tablet signs in with its own email and password.");return;}
+  if(!acctSyncOn()){return;}
+  acct.msg="Opening Google sign-in…";render();
+  acctFb().then(function(){
+    var auth=acctFbAuth(),prov=new firebase.auth.GoogleAuthProvider();prov.setCustomParameters({prompt:"select_account"});
+    return auth.setPersistence(firebase.auth.Auth.Persistence.NONE).then(function(){return auth.signInWithPopup(prov);}).then(function(res){return acctAdopt(res.user);},function(e){
+      var c=(e&&e.code)||"";
+      if(c==="auth/popup-blocked"||c==="auth/operation-not-supported-in-this-environment"){
+        try{localStorage.setItem("familyhub-gredirect","1");}catch(x){}
+        return auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).then(function(){return auth.signInWithRedirect(prov);});
+      }
+      throw e;
+    });
+  }).then(function(){acct.msg="";render();},function(e){
+    var c=(e&&e.code)||"";
+    acct.msg=c==="auth/popup-closed-by-user"||c==="auth/cancelled-popup-request"?"Sign-in was cancelled.":
+      c==="auth/unauthorized-domain"?"Google sign-in is not allowed on this web address yet. A parent needs to add it in Firebase › Authentication › Settings › Authorized domains.":
+      c==="auth/operation-not-allowed"?"Google sign-in is turned off. A parent needs to turn it on in Firebase › Authentication › Sign-in method.":
+      "Google sign-in did not work: "+((e&&e.message)||c||"unknown problem");
+    render();
+  });
+}
+/* finish a Google sign-in that had to use a full-page redirect */
+window.addEventListener("load",function(){
+  var f=null;try{f=localStorage.getItem("familyhub-gredirect");}catch(e){}if(!f)return;
+  try{localStorage.removeItem("familyhub-gredirect");}catch(e){}
+  if(!acctSyncOn())return;
+  acctFb().then(function(){return acctFbAuth().getRedirectResult();}).then(function(res){if(res&&res.user)return acctAdopt(res.user);}).then(function(){render();},function(e){acct.msg="Google sign-in did not finish: "+((e&&e.message)||"unknown problem");render();});
+});
+/* --- the wall tablet's own email + password sign-in (works signed out, no PIN needed) --- */
+function acctEmailSignIn(){
+  var em=((document.getElementById("acctem")||{}).value||"").trim(),pw=(document.getElementById("acctpw")||{}).value||"";
+  if(!em||!pw){alert("Enter the tablet account’s email and password.");return;}
+  if(!acctSyncOn())return;
+  sync.viaGoogle=false;acct.msg="Signing in…";render();
+  sync.adapter.signIn(em,pw).then(function(){acct.msg="";render();},function(e){acct.msg=(e&&e.message)||"That email or password was not accepted.";render();});
+}
+function acctSignInHtml(){
+  if(sync.user)return "";
+  var h="<div class='card'><h2 style='margin-top:0'>Sign in</h2>";
+  if(!acctTabletLike())h+="<p><button class='btn' data-a='nxacctgoogle' style='min-height:52px'>Sign in with Google</button></p><p class='note'>For parents’ own phones. You stay signed in, and the Parent area opens without a PIN.</p>";
+  h+="<details"+(acctTabletLike()?" open":"")+"><summary>Wall tablet sign-in (email and password)</summary><label for='acctem'>Tablet account email</label><input id='acctem' type='email' autocomplete='username'><label for='acctpw'>Password</label><input id='acctpw' type='password' autocomplete='current-password'><button class='btn' data-a='nxacctemail'>Sign in</button><p class='note'>Use the display account a parent created for this tablet. It stays signed in.</p></details>";
+  if(acct.msg)h+="<p class='note' role='status'><b>"+esc(acct.msg)+"</b></p>";
+  return h+"</div>";
+}
+function acctStatusHtml(){
+  if(!sync.user)return "";
+  var r=acctRole(),who=person(acct.personId);
+  var t=r==="parent"?"Parent account"+(who?" ("+esc(who.n)+")":""):r==="display"?"Wall display account":r==="kid"?"Kid account"+(who?" ("+esc(who.n)+")":""):
+    acct.state==="loading"?"Checking this account…":acct.state==="norole"?(sync.viaGoogle?"This account is waiting for a parent to approve it.":"Shared family login (no role record)"):"Account role not checked yet";
+  var h="<p><b>Account:</b> "+t+"</p>";
+  if(acct.state==="norole"&&sync.viaGoogle)h+="<p class='note'>Account ID: <code style='user-select:all'>"+esc(acctUid())+"</code></p>";
+  if(acct.msg)h+="<p class='note' role='status'>"+esc(acct.msg)+"</p>";
+  return h;
+}
+/* --- Parent › Accounts: approve new accounts, change roles, create the wall tablet's account --- */
+var acctAdmin={users:null,reqs:null,msg:"",busy:false};
+function acctPeopleOpts(role,sel){
+  var list=(S.members||P).filter(function(p){return !p.pet&&!p.archived&&(role==="parent"?!p.kid:role==="kid"?!!p.kid:false);});
+  if(role==="display")return "<option value='none'>(none)</option>";
+  return list.map(function(p){return "<option value='"+esc(p.id)+"'"+(p.id===sel?" selected":"")+">"+esc(p.n)+"</option>";}).join("");
+}
+function acctRoleOpts(sel){return [["parent","Parent"],["display","Wall display"],["kid","Kid (own device, later)"]].map(function(o){return "<option value='"+o[0]+"'"+(o[0]===sel?" selected":"")+">"+o[1]+"</option>";}).join("");}
+function acctAdminInner(){
+  var a=acctAdmin,h="";
+  if(!sync.user)return "<p class='note'>Sign in to family sync to manage accounts.</p>";
+  h+="<p class='note'>Your account ID: <code style='user-select:all'>"+esc(acctUid())+"</code></p>";
+  if(a.users===null)h+="<button class='btn' data-a='nxacctload'>Show accounts</button>";
+  else{
+    var reqs=a.reqs||[];
+    if(reqs.length){h+="<h3>Waiting for approval</h3>";reqs.forEach(function(q,i){
+      h+="<div class='row' style='flex-wrap:wrap'><span class='t'><b>"+esc(q.name||q.email||q.uid)+"</b><br><span class='note'>"+esc(q.email)+" · "+esc(q.uid)+"</span></span>"+
+        "<select id='aqr"+i+"' data-acctrole='aqp"+i+"' aria-label='Role'>"+acctRoleOpts("parent")+"</select><select id='aqp"+i+"' aria-label='Person'>"+acctPeopleOpts("parent","")+"</select>"+
+        "<button class='btn g' data-a='nxacctok' data-i='"+i+"'>Approve</button><button class='btn n' data-a='nxacctno' data-i='"+i+"'>Decline</button></div>";});}
+    h+="<h3>Accounts</h3>";
+    if(!a.users.length)h+="<p class='note'>No accounts have a role yet.</p>";
+    a.users.forEach(function(u,i){var me=u.uid===acctUid(),pn=person(u.personId);
+      h+="<div class='row' style='flex-wrap:wrap'><span class='t'><b>"+esc(u.name||u.email||u.uid)+"</b>"+(me?" (you)":"")+"<br><span class='note'>"+esc(u.email)+" · "+esc(u.role)+(pn?" · "+esc(pn.n):"")+"</span></span>"+
+        (me?"":"<select id='aur"+i+"' data-acctrole='aup"+i+"' aria-label='Role'>"+acctRoleOpts(u.role)+"</select><select id='aup"+i+"' aria-label='Person'>"+acctPeopleOpts(u.role,u.personId)+"</select><button class='btn' data-a='nxacctset' data-i='"+i+"'>Save</button><button class='btn r' data-a='nxacctdel' data-i='"+i+"'>Remove role</button>")+"</div>";});
+    h+="<button class='btn n' data-a='nxacctload'>Refresh</button>";
+  }
+  h+="<hr><h3>Create the wall tablet’s account</h3><p class='note'>Choose an email and a password for the tablet. Nothing is saved in the app; you type the same email and password on the tablet once, and it stays signed in.</p>"+
+    "<label for='acdem'>Tablet email</label><input id='acdem' type='email' autocomplete='off' placeholder='for example family+wall@…'><label for='acdpw'>Password (at least 8 characters)</label><input id='acdpw' type='password' autocomplete='new-password'><label for='acdpw2'>Password again</label><input id='acdpw2' type='password' autocomplete='new-password'><label for='acdnm'>Name</label><input id='acdnm' value='Wall tablet' maxlength='40'><button class='btn' data-a='nxacctmkdisp'>Create tablet account</button>";
+  if(a.msg)h+="<p class='note' role='status'><b>"+esc(a.msg)+"</b></p>";
+  return h;
+}
+function acctAdminHtml(){return "<h2>Accounts</h2><div class='card' id='acctbox'>"+acctAdminInner()+"</div>";}
+function acctAdminRefresh(){var el=document.getElementById("acctbox");if(el)el.innerHTML=acctAdminInner();}
+function acctLoadAll(){
+  acctAdmin.msg="Loading…";acctAdminRefresh();
+  Promise.all([fsCall("users?pageSize=100"),fsCall("accessRequests?pageSize=100")]).then(function(rs){
+    if(rs[0].status!==200){acctAdmin.msg=rs[0].status===403?"This sign-in is not allowed to manage accounts (the new database rules may not be published yet).":"Could not load accounts (status "+rs[0].status+").";acctAdminRefresh();return;}
+    acctAdmin.users=((rs[0].json&&rs[0].json.documents)||[]).map(function(d){return {uid:fsIdOf(d),role:fsStr(d,"role"),personId:fsStr(d,"personId"),name:fsStr(d,"name"),email:fsStr(d,"email")};});
+    var have={};acctAdmin.users.forEach(function(u){have[u.uid]=1;});
+    acctAdmin.reqs=rs[1].status===200?((rs[1].json&&rs[1].json.documents)||[]).map(function(d){return {uid:fsIdOf(d),name:fsStr(d,"name"),email:fsStr(d,"email")};}).filter(function(q){return !have[q.uid];}):[];
+    if(acctAdmin.msg==="Loading…")acctAdmin.msg="";acctAdminRefresh();
+  },function(e){acctAdmin.msg="Could not load accounts: "+((e&&e.message)||e);acctAdminRefresh();});
+}
+function acctWrite(uid,role,pid,name,email){
+  var o={role:role,personId:role==="display"?"none":pid,name:name||"",email:email||"",updatedBy:acctUid(),updatedAt:new Date().toISOString()};
+  if(role!=="display"&&!person(pid))return Promise.reject(new Error("Choose who this account belongs to."));
+  return fsCall("users/"+encodeURIComponent(uid),"PATCH",fsFields(o)).then(function(r){if(r.status!==200)throw new Error(r.status===403?"Not allowed (only a parent can change roles).":"status "+r.status);});
+}
+function acctAction(a,el){
+  var d=function(k){return el.getAttribute("data-"+k);},val=function(id){return ((document.getElementById(id)||{}).value||"").trim();};
+  if(a==="nxacctgoogle"){acctGoogle();return true;}
+  if(a==="nxacctemail"){acctEmailSignIn();return true;}
+  if(!unlocked||devRole()!=="parent")return false;
+  if(a==="nxacctload"){acctLoadAll();return true;}
+  if(a==="nxacctok"){var i=+d("i"),q=(acctAdmin.reqs||[])[i];if(!q)return true;
+    acctWrite(q.uid,val("aqr"+i),val("aqp"+i),q.name,q.email).then(function(){return fsCall("accessRequests/"+encodeURIComponent(q.uid),"DELETE");}).then(function(){acctAdmin.msg="Approved.";acctLoadAll();},function(e){acctAdmin.msg="Could not approve: "+e.message;acctAdminRefresh();});return true;}
+  if(a==="nxacctno"){var j=+d("i"),q2=(acctAdmin.reqs||[])[j];if(!q2||!confirm("Decline "+(q2.email||q2.uid)+"?"))return true;
+    fsCall("accessRequests/"+encodeURIComponent(q2.uid),"DELETE").then(function(){acctLoadAll();});return true;}
+  if(a==="nxacctset"){var k=+d("i"),u=(acctAdmin.users||[])[k];if(!u)return true;
+    acctWrite(u.uid,val("aur"+k),val("aup"+k),u.name,u.email).then(function(){acctAdmin.msg="Saved.";acctLoadAll();},function(e){acctAdmin.msg="Could not save: "+e.message;acctAdminRefresh();});return true;}
+  if(a==="nxacctdel"){var m=+d("i"),u2=(acctAdmin.users||[])[m];if(!u2||!confirm("Remove the role from "+(u2.email||u2.uid)+"? That account will no longer see family data."))return true;
+    fsCall("users/"+encodeURIComponent(u2.uid),"DELETE").then(function(r){acctAdmin.msg=r.status===200?"Removed.":"Could not remove (status "+r.status+").";acctLoadAll();});return true;}
+  if(a==="nxacctmkdisp"){
+    var em=val("acdem"),pw=(document.getElementById("acdpw")||{}).value||"",pw2=(document.getElementById("acdpw2")||{}).value||"",nm=val("acdnm")||"Wall tablet";
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){alert("Enter an email address for the tablet.");return true;}
+    if(pw.length<8){alert("Use a password of at least 8 characters.");return true;}
+    if(pw!==pw2){alert("The two passwords do not match.");return true;}
+    acctAdmin.msg="Creating…";acctAdminRefresh();
+    fetch("https://identitytoolkit.googleapis.com/v1/accounts:signUp?key="+FH_CLOUD_CONFIG.apiKey,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:em,password:pw,returnSecureToken:false})})
+      .then(function(r){return r.json().then(function(j){if(r.status!==200||!j.localId)throw new Error(/EMAIL_EXISTS/.test((j.error&&j.error.message)||"")?"That email already has an account. Choose another, or approve it below if it already asked.":"Google said: "+((j.error&&j.error.message)||r.status));return j.localId;});})
+      .then(function(uid){return acctWrite(uid,"display","none",nm,em);})
+      .then(function(){["acdpw","acdpw2"].forEach(function(i){var x=document.getElementById(i);if(x)x.value="";});acctAdmin.msg="Tablet account created. On the tablet: Parent screen › Wall tablet sign-in, type that email and password.";acctLoadAll();},
+            function(e){acctAdmin.msg="Could not create the tablet account: "+e.message;acctAdminRefresh();});
+    return true;}
+  return false;
+}
+/* the person list follows the chosen role */
+document.addEventListener("change",function(e){var t=e.target,pid=t&&t.getAttribute&&t.getAttribute("data-acctrole");if(!pid)return;var p=document.getElementById(pid);if(p)p.innerHTML=acctPeopleOpts(t.value,"");});
+document.addEventListener("click",function(e){var n=e.target;while(n&&n!==document&&!(n.getAttribute&&n.getAttribute("data-a")))n=n.parentNode;if(!n||n===document)return;var a=n.getAttribute("data-a");if(a&&a.indexOf("nxacct")===0){if(acctAction(a,n)){e.preventDefault();e.stopPropagation();}}},true);
+if(sync.user&&typeof acctOnAuth==="function"&&acctUid())acctOnAuth({uid:acctUid(),email:sync.user});
+
+(function(){
+  var pl=pinLockScreen;pinLockScreen=function(){return pl.apply(this,arguments)+acctSignInHtml();};
+  var lp=limitedParentHtml;limitedParentHtml=function(){var h=lp.apply(this,arguments);return (sync.user?"":acctSignInHtml())+h;};
+  var sb=syncBoxInner;syncBoxInner=function(){return acctStatusHtml()+sb.apply(this,arguments);};
+  var sl=syncLimitedInner;syncLimitedInner=function(){return acctStatusHtml()+sl.apply(this,arguments);};
+  var sa=syncAdminHtml;syncAdminHtml=function(){return sa.apply(this,arguments)+acctAdminHtml();};
+})();
 window.FH_READY=true;
 </script>
 
