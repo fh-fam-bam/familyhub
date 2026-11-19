@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v38.25";
+var FH_BUILD="v39.0";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -2088,6 +2088,7 @@ function syncBoxInner(){
     h+="<label for='syncemail'>Family sync email</label><input id='syncemail' type='email' autocomplete='username' value='"+esc(sync.email||"")+"'><label for='syncpw'>Password</label><input id='syncpw' type='password' autocomplete='current-password'><button class='btn' data-a='nxsyncin'>Sign in</button>";
   }else{
     h+="<button class='btn' data-a='nxsyncnow'>Sync now</button><button class='btn n' data-a='nxsyncout'>Sign out</button>";
+    if(syncRole()==="parent")h+="<p><button class='btn' data-a='nxsyncbackup'>Download full cloud backup</button></p><p class='note'>v39.0: saves an exact copy of everything in the family database to a file on this phone. Keep it somewhere private.</p>";
   }
   h+="<button class='btn n' data-a='nxsynctest'>Run connection check</button>";
   if(sync.testLog)h+="<pre style='white-space:pre-wrap;word-break:break-word;font-size:14px'>"+esc(sync.testLog)+"</pre>";
@@ -2144,6 +2145,54 @@ function syncQuickCheck(){
     });
   }).catch(function(e){out("Failed: "+((e&&e.message)||e)+". Check the Wi-Fi, or sign out and sign in again.");});
 }
+/* v39.0 (Stage 0): exact copy of the family database (every document, raw fields, timestamps) for a parent.
+   Read-only: it never writes to the database. */
+function fhSaveFile(name,text){
+  var a=document.createElement("a"),url;
+  if(typeof Blob!=="undefined"&&window.URL&&window.URL.createObjectURL&&"download" in a){
+    url=window.URL.createObjectURL(new Blob([text],{type:"application/json"}));a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){window.URL.revokeObjectURL(url);},60000);return true;}
+  return false;
+}
+function syncCloudBackup(){
+  var log=[];function out(t){log.push(t);sync.testLog=log.join("\n");syncRefreshAdmin();}
+  if(!sync.adapter||!sync.adapter.token||!sync.user){out("Sign in to family sync first.");return;}
+  if(syncRole()!=="parent"){out("Only a parent phone can download the cloud backup.");return;}
+  var ROOT="https://firestore.googleapis.com/v1/projects/"+FH_CLOUD_CONFIG.projectId+"/databases/(default)/documents",FAMP="households/family";
+  var docs=[],problems=[],counts={},tok="";
+  function call(url,method,body){
+    return fetch(url,{method:method||"GET",headers:{Authorization:"Bearer "+tok,"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined,cache:"no-store"})
+      .then(function(r){return r.text().then(function(t){var j=null;try{j=JSON.parse(t);}catch(e){}return {status:r.status,json:j};});});
+  }
+  function colls(path){
+    return call(ROOT+(path?"/"+path:"")+":listCollectionIds","POST",{pageSize:100}).then(function(r){
+      if(r.status!==200){out(path?"  (Folder list not available, using the known folders.)":"  (Top-level folder list is not available to app accounts. That is normal.)");return null;}
+      return (r.json&&r.json.collectionIds)||[];
+    });
+  }
+  function list(cp,pt){
+    return call(ROOT+"/"+cp+"?pageSize=300"+(pt?"&pageToken="+encodeURIComponent(pt):"")).then(function(r){
+      if(r.status!==200){problems.push("Could not read "+cp+" (status "+r.status+").");return;}
+      var j=r.json||{};(j.documents||[]).forEach(function(d){docs.push(d);counts[cp]=(counts[cp]||0)+1;});
+      out("  "+cp+": "+(counts[cp]||0)+" so far…");
+      if(j.nextPageToken)return list(cp,j.nextPageToken);
+    });
+  }
+  out("Getting a fresh sign-in…");
+  Promise.resolve(sync.adapter.token()).then(function(t){tok=t;out("Signed in as "+sync.user+". Reading the family database (nothing is changed)…");
+    return call(ROOT+"/"+FAMP).then(function(r){if(r.status===200&&r.json)docs.push(r.json);else if(r.status!==404)problems.push("Could not read "+FAMP+" (status "+r.status+").");});
+  }).then(function(){return colls("").then(function(top){if(top&&top.length)out("Top-level folders: "+top.join(", "));if(top&&top.some(function(c){return c!=="households";}))problems.push("There are other top-level folders ("+top.filter(function(c){return c!=="households";}).join(", ")+"). They are not in this file; use the Firebase console export for them.");});
+  }).then(function(){return colls(FAMP);}).then(function(sub){
+    sub=sub||["items","private"];out("Family folders: "+sub.join(", "));
+    var chain=Promise.resolve();sub.forEach(function(c){chain=chain.then(function(){return list(FAMP+"/"+c);});});return chain;
+  }).then(function(){
+    var file={app:"Family Hub",kind:"cloud-backup",formatVersion:1,build:FH_BUILD,exportedAt:new Date().toISOString(),project:FH_CLOUD_CONFIG.projectId,account:sync.user,counts:counts,problems:problems,documents:docs};
+    var text=JSON.stringify(file,null,1),name="Family-Hub-cloud-backup-"+today()+".json";
+    var ok=fhSaveFile(name,text);
+    out("Done: "+docs.length+" documents. "+Object.keys(counts).map(function(k){return k+" "+counts[k];}).join(", ")+".");
+    if(problems.length)out("Problems:\n- "+problems.join("\n- "));
+    out(ok?"Saved as "+name+". Check your Downloads.":"This browser cannot save files. Try the backup on another phone or computer.");
+  }).catch(function(e){out("Backup failed: "+((e&&e.message)||e)+". Nothing was changed. Check the Wi-Fi and try again.");});
+}
 function syncAction(a){
   if(a==="nxsynccheck"&&(unlocked||(typeof limitedUnlock!=="undefined"&&limitedUnlock))){syncQuickCheck();return;}
   if(!unlocked&&!(typeof limitedUnlock!=="undefined"&&limitedUnlock&&(a==="nxsyncin"||a==="nxsyncon")))return;
@@ -2161,6 +2210,7 @@ function syncAction(a){
     return;
   }
   if(a==="nxsynctest"){syncConnTest();return;}
+  if(a==="nxsyncbackup"){syncCloudBackup();return;}
   if(a==="nxsyncout"){if(sync.adapter&&sync.adapter.signOut)sync.adapter.signOut();return;}
   if(a==="nxsyncnow"){syncSchedule(10);return;}
   if(a==="nxsyncallow"){sync.allow=true;sync.guard=false;syncSchedule(10);syncRefreshAdmin();return;}
