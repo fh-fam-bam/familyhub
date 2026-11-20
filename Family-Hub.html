@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v39.1";
+var FH_BUILD="v39.2";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -1628,7 +1628,7 @@ devApply();setTimeout(function(){try{devDimApply();}catch(e){}},500);
 
 /* ===== Family sync v2: shared family data (calendar, chores, points, groceries, meals, settings) ===== */
 var FH_CLOUD_CONFIG={apiKey:"AIzaSyBpt2dEDYjLLBdvVet3BXvAt9xDRAtXYs0",authDomain:"family-hub-e8690.firebaseapp.com",projectId:"family-hub-e8690",storageBucket:"family-hub-e8690.firebasestorage.app",messagingSenderId:"387756198863",appId:"1:387756198863:web:83784641848a0862a2a0ba"};
-var SYNC_KEY="familyhub-sync",SYNC_V=2,SYNC_COLLS=["events","eventRequests","groc","req","boardreq","done","meals","cfg","ledger","hw"];
+var SYNC_KEY="familyhub-sync",SYNC_V=2,SYNC_COLLS=["events","eventRequests","groc","req","boardreq","done","meals","cfg","ledger","hw","careK","careP","stat","slog","cant"];
 var sync={awardPending:{},on:false,adapter:null,known:{},ready:false,unsub:null,user:"",state:"off",detail:"",last:"",busy:false,timer:null,applying:false,pending:false,guard:false,guardInfo:"",notice:"",allow:false,cursor:"",ledger:[],starsSynced:{},starsInit:false,stage:"",testLog:"",email:""};
 function syncResetKnown(){sync.known={};SYNC_COLLS.forEach(function(c){sync.known[c]={};});sync.cursor="";sync.ledger=[];sync.starsSynced={};sync.starsInit=false;sync.ready=false;sync.awardPending={};}
 syncResetKnown();
@@ -1647,7 +1647,7 @@ function syncCut(days){var d=new Date();d.setDate(d.getDate()+days);return d.get
 function syncDoneId(k){return String(k).split("|").join("__");}
 function syncDoneKey(id){var a=String(id).split("__");return a.length===3&&a[0]&&a[1]&&a[2]?a.join("|"):null;}
 function syncInWindow(c,id){if(c==="done")return String(id).slice(0,10)>=syncCut(-14);if(c==="meals")return id>=syncCut(-14)&&id<=syncCut(120);return true;}
-var SYNC_MAX=90000,SYNC_KID_COLLS=["done","eventRequests","req","groc","boardreq","hw"];
+var SYNC_MAX=90000,SYNC_KID_COLLS=["done","eventRequests","req","groc","boardreq","hw","careK","slog","cant"];
 var SYNC_AUX=[["pp","pendingPoints"],["sb","submissions"],["pc","petClaims"],["db","doneBy"],["bo","bonus"],["at","approvalTag"]];
 var SYNC_BLOBS=["prefs","team","challenge","spin","awards","parentNotes","fridgeNotes","bounties","packed","mealIngredients","foodPrefs","rewardTargets","returnNotes","household","pointNews","petLog","approvalReversals","kidsAccount","recipes","cosmetics","trial","walletLog","petCare","coach"];
 var SYNC_ID_RE=/^[A-Za-z0-9_-]{1,120}$/;
@@ -1750,7 +1750,7 @@ function syncDiff(){
       if(!kn||kn.deleted||kn.json!==js)jobs.push({c:c,id:it.id,json:js,del:false,base:kn?kn.rev:0});
       else if(c==="done"&&syncRole()==="parent"&&kn.st===undefined)jobs.push({c:c,id:it.id,json:js,del:false,base:kn.rev});
     });
-    if(c==="ledger"||c==="cfg")return;
+    if(c==="ledger"||c==="cfg"||c==="slog")return;
     Object.keys(k).forEach(function(id){var kn=k[id];if(!seen[id]&&!kn.deleted&&syncInWindow(c,id))jobs.push({c:c,id:id,json:kn.json||"",del:true,base:kn.rev});});
   });
   /* v37.3: leave out changes the rules already refused (they are retried once they change or the page reloads) */
@@ -1917,9 +1917,9 @@ function syncRestAdapter(){
   }
   var FAM="projects/"+P+"/databases/(default)/documents/households/family";
   function tsNorm(s){var m=/^(.*?)(?:\.(\d+))?Z$/.exec(String(s));if(!m)return String(s);var f=(m[2]||"");while(f.length<9)f+="0";return m[1]+"."+f;}
-  function parseDoc(d){
-    var f=d.fields||{},nm=String(d.name||""),last=decodeURIComponent(nm.substring(nm.lastIndexOf("/")+1)),ix=last.indexOf("__");
-    return {c:ix>0?last.slice(0,ix):"",id:ix>0?last.slice(ix+2):last,rev:f.rev&&f.rev.integerValue!==undefined?parseInt(f.rev.integerValue,10):NaN,json:f.json&&f.json.stringValue!==undefined?f.json.stringValue:null,deleted:!!(f.deleted&&f.deleted.booleanValue),st:f.st&&f.st.stringValue!==undefined?f.st.stringValue:undefined,ts:f.ts&&f.ts.timestampValue?f.ts.timestampValue:""};
+  function parseDoc(d,cc){
+    var f=d.fields||{},nm=String(d.name||""),last=decodeURIComponent(nm.substring(nm.lastIndexOf("/")+1)),ix=cc?-1:last.indexOf("__");
+    return {c:cc||(ix>0?last.slice(0,ix):""),id:ix>0?last.slice(ix+2):last,rev:f.rev&&f.rev.integerValue!==undefined?parseInt(f.rev.integerValue,10):NaN,json:f.json&&f.json.stringValue!==undefined?f.json.stringValue:null,deleted:!!(f.deleted&&f.deleted.booleanValue),st:f.st&&f.st.stringValue!==undefined?f.st.stringValue:undefined,ts:f.ts&&f.ts.timestampValue?f.ts.timestampValue:""};
   }
   function queryChanged(cursor){
     var out=[],best=cursor||"";
@@ -1935,6 +1935,35 @@ function syncRestAdapter(){
       });
     }
     return page(cursor||"");
+  }
+  /* v39.2: care items live in their own folders so the database can keep parent care items from the wall tablet */
+  var CARE_COLL={careK:"careKid",careP:"careParent"};
+  function docPath(c,id){return CARE_COLL[c]?"households/family/"+CARE_COLL[c]+"/"+encodeURIComponent(id):"households/family/items/"+encodeURIComponent(c+"__"+id);}
+  function queryColl(collId,cc,cursor,eq){
+    var out=[],best=cursor||"";
+    function page(cur){
+      var sq={from:[{collectionId:collId}],orderBy:[{field:{fieldPath:"ts"},direction:"ASCENDING"}],limit:300},fl=[];
+      if(eq)fl.push({fieldFilter:{field:{fieldPath:eq[0]},op:"EQUAL",value:{stringValue:eq[1]}}});
+      if(cur)fl.push({fieldFilter:{field:{fieldPath:"ts"},op:"GREATER_THAN_OR_EQUAL",value:{timestampValue:cur}}});
+      if(fl.length===1)sq.where=fl[0];else if(fl.length>1)sq.where={compositeFilter:{op:"AND",filters:fl}};
+      return areq("https://firestore.googleapis.com/v1/"+FAM+":runQuery","POST",{structuredQuery:sq}).then(function(r){
+        if(r.status!==200||!Array.isArray(r.json))throw httpErr(r);
+        var got=[];r.json.forEach(function(x){if(x&&x.document)got.push(parseDoc(x.document,cc));});
+        got.forEach(function(d){out.push(d);if(d.ts&&(!best||tsNorm(d.ts)>tsNorm(best)))best=d.ts;});
+        if(got.length>=300&&best&&best!==cur)return page(best);
+        return {docs:out,cursor:best};
+      });
+    }
+    return page(cursor||"");
+  }
+  function careFetch(){
+    var cc=sync.careCur||(sync.careCur={K:"",P:""}),out=[],role=syncRole(),kp=(typeof acctRole==="function"&&acctRole()==="kid")?acct.personId:"";
+    return queryColl("careKid","careK",cc.K,kp?["own",kp]:null).then(function(r){
+      out=out.concat(r.docs);cc.K=r.cursor||cc.K;sync.careKPolled=true;
+      if(role!=="parent")return;
+      return queryColl("careParent","careP",cc.P,null).then(function(r2){out=out.concat(r2.docs);cc.P=r2.cursor||cc.P;sync.careOk=true;},
+        function(e){if(e&&e.code==="perm"){sync.careOk=false;return;}throw e;});
+    },function(e){if(e&&e.code==="perm"){sync.careKPolled=false;sync.careOk=false;return;}throw e;}).then(function(){return out;});
   }
   function pollAll(){subs.forEach(function(s){s.poll();});}
   try{document.addEventListener("visibilitychange",function(){if(!document.hidden)pollAll();});window.addEventListener("online",pollAll);}catch(e){}
@@ -1968,7 +1997,7 @@ function syncRestAdapter(){
         if(stopped||busy)return;
         if(document.hidden){again();return;}
         busy=true;clearTimeout(timer);
-        queryChanged(cur).then(function(r){busy=false;if(stopped)return;if(r.cursor)cur=r.cursor;onDocs(r.docs,r.cursor);again();},function(e){busy=false;if(!stopped)onErr(e);again();});
+        queryChanged(cur).then(function(r){return careFetch().then(function(x){r.docs=r.docs.concat(x);return r;});}).then(function(r){busy=false;if(stopped)return;if(r.cursor)cur=r.cursor;onDocs(r.docs,r.cursor);again();},function(e){busy=false;if(!stopped)onErr(e);again();});
       };
       subs.push(entry);entry.poll();
       return function(){stopped=true;clearTimeout(timer);var i=subs.indexOf(entry);if(i>=0)subs.splice(i,1);};
@@ -1995,7 +2024,7 @@ function syncRestAdapter(){
     },
     /* v37.4: read one item's current server copy (null if it does not exist) */
     get:function(c,id){
-      var url="https://firestore.googleapis.com/v1/projects/"+P+"/databases/(default)/documents/households/family/items/"+encodeURIComponent(c+"__"+id);
+      var url="https://firestore.googleapis.com/v1/projects/"+P+"/databases/(default)/documents/"+docPath(c,id);
       return areq(url,"GET").then(function(r){
         if(r.status===404)return null;
         if(r.status!==200||!r.json)throw httpErr(r);
@@ -2003,7 +2032,7 @@ function syncRestAdapter(){
       });
     },
     put:function(c,id,baseRev,json,del,stv){
-      var path="households/family/items/"+encodeURIComponent(c+"__"+id),url="https://firestore.googleapis.com/v1/projects/"+P+"/databases/(default)/documents/"+path;
+      var path=docPath(c,id),url="https://firestore.googleapis.com/v1/projects/"+P+"/databases/(default)/documents/"+path;
       function getCur(){
         return areq(url,"GET").then(function(r){
           if(r.status===404)return {cur:null,ut:null};
@@ -2015,8 +2044,11 @@ function syncRestAdapter(){
         var rev=g.cur?g.cur.rev:0;
         if(rev!==baseRev)return {ok:false,remote:g.cur?{rev:g.cur.rev,json:g.cur.json,deleted:g.cur.deleted,st:g.cur.st}:null};
         var nr=baseRev+1;
-        var w={update:{name:"projects/"+P+"/databases/(default)/documents/"+path,fields:{json:{stringValue:json||""},rev:{integerValue:String(nr)},deleted:{booleanValue:!!del}}},updateTransforms:[{fieldPath:"ts",setToServerValue:"REQUEST_TIME"}],currentDocument:g.ut?{updateTime:g.ut}:{exists:false}};
+        /* v39.2: a deleted item keeps no copy of its old content */
+        var w={update:{name:"projects/"+P+"/databases/(default)/documents/"+path,fields:{json:{stringValue:del?"":(json||"")},rev:{integerValue:String(nr)},deleted:{booleanValue:!!del}}},updateTransforms:[{fieldPath:"ts",setToServerValue:"REQUEST_TIME"}],currentDocument:g.ut?{updateTime:g.ut}:{exists:false}};
         if(c==="done")w.update.fields.st={stringValue:String(stv||"")};
+        else if(stv!==undefined&&stv!=="")w.update.fields.st={stringValue:String(stv)};
+        if(CARE_COLL[c]){var co=null;try{co=JSON.parse(json||"null");}catch(e){}w.update.fields.aud={stringValue:c==="careK"?"kid":"parent"};w.update.fields.own={stringValue:String((co&&co.own)||"")};}
         return areq("https://firestore.googleapis.com/v1/projects/"+P+"/databases/(default)/documents:commit","POST",{writes:[w]}).then(function(r2){
           if(r2.status===200)return {ok:true,rev:nr};
           var st=(r2.json&&r2.json.error&&r2.json.error.status)||"";
@@ -7474,6 +7506,193 @@ if(sync.user&&typeof acctOnAuth==="function"&&acctUid())acctOnAuth({uid:acctUid(
   var sl=syncLimitedInner;syncLimitedInner=function(){return acctStatusHtml()+sl.apply(this,arguments);};
   var sa=syncAdminHtml;syncAdminHtml=function(){return sa.apply(this,arguments)+acctAdminHtml();};
 })();
+/* ---- v39.2 ---- */
+/* ===== v39.2 (Stage 2): care items, statuses and their history =====
+   Care items = medicine schedules (Household medicine reminders), appointments (calendar events of type
+   Doctor) and dose logs (each dose marked taken or skipped). Each one is stored as its own document with
+   ownerPersonId ("own") and audience ("aud"): "kid" when it is only for children, otherwise "parent".
+   Kid care items go to households/family/careKid, parent care items to households/family/careParent, which the
+   database lets only parents read. On this device everything still appears in Household and Calendar as before.
+   This only starts once the new database rules are published (the app checks that parent care can be read). */
+var CARE_STORE="familyhub-care";
+(function(){try{var o=JSON.parse(localStorage.getItem(CARE_STORE)||"null");if(o&&o.cur&&typeof o.cur==="object")sync.careCur={K:String(o.cur.K||""),P:String(o.cur.P||"")};}catch(e){}})();
+(function(){var st0=syncStore;syncStore=function(){st0.apply(this,arguments);try{localStorage.setItem(CARE_STORE,JSON.stringify({cur:sync.careCur||{K:"",P:""}}));}catch(e){}};
+  var rk0=syncResetKnown;syncResetKnown=function(){rk0.apply(this,arguments);sync.careCur={K:"",P:""};sync.careOk=false;sync.careKPolled=false;};})();
+function careIsMed(x){return !!(x&&x.type==="medicine");}
+function careIsAppt(e){return !!(e&&e.kind==="doctor");}
+/* audience and owner from the people an item is for: "kid" only when every one of them is a child */
+function careAudOwn(people){
+  people=(people||[]).filter(function(id){return !!person(id);});
+  var kid=people.length>0&&people.every(function(id){var p=person(id);return p&&p.kid&&!p.pet;});
+  return {aud:kid?"kid":"parent",own:people.length?people[0]:"family",people:people};
+}
+function careItems(){
+  var out=[],meds={},cut=fd(addD(new Date(),-60));
+  (S.household||[]).forEach(function(x){if(!careIsMed(x)||typeof x.id!=="string")return;var a=careAudOwn(hhPeople(x));meds[x.id]=a;out.push({id:"med_"+x.id,kind:"med",aud:a.aud,own:a.own,people:a.people,v:x});});
+  (S.events||[]).forEach(function(e){if(!careIsAppt(e)||typeof e.id!=="string")return;var a=careAudOwn(attendees(e));out.push({id:"appt_"+e.id,kind:"appt",aud:a.aud,own:a.own,people:a.people,v:e});});
+  Object.keys(S.reminderLog||{}).forEach(function(k){
+    var q=k.split("|"),a=meds[q[0]];if(!a||q.length!==2||!hhDateValid(q[1])||q[1]<cut)return;
+    var e=S.reminderLog[k]||{};
+    out.push({id:"dose_"+q[0]+"_"+q[1],kind:"dose",aud:a.aud,own:a.own,people:a.people,v:{med:q[0],date:q[1],status:e.status||(e.skipped?"missed":"done"),reason:e.reason||"",at:e.at||"",kid:!!e.kidDevice,by:e.by||""}});
+  });
+  return out.filter(function(o){return SYNC_ID_RE.test(o.id);});
+}
+function careKnownLive(c,id){var k=sync.known[c]&&sync.known[c][id];return !!(k&&!k.deleted);}
+function careApply(c,obj){
+  var v=obj.v,other=c==="careK"?"careP":"careK";
+  if(obj.kind==="med"){S.household=(S.household||[]).filter(function(x){return !(x&&x.id===v.id);});S.household.push(v);return;}
+  if(obj.kind==="appt"){var l=(S.events||[]).slice(),i=-1;for(var n=0;n<l.length;n++)if(l[n]&&l[n].id===v.id){i=n;break;}if(i>=0)l[i]=v;else l.push(v);S.events=l;return;}
+  if(obj.kind==="dose"){S.reminderLog=S.reminderLog||{};var e={at:v.at,status:v.status};if(v.status==="missed")e.skipped=true;if(v.kid)e.kidDevice=true;if(v.reason)e.reason=v.reason;if(v.by)e.by=v.by;S.reminderLog[v.med+"|"+v.date]=e;}
+}
+function careRemove(c,id){
+  var other=c==="careK"?"careP":"careK";if(careKnownLive(other,id))return; /* it moved to the other folder */
+  var m=/^(med|appt|dose)_(.+)$/.exec(id);if(!m)return;
+  if(m[1]==="med")S.household=(S.household||[]).filter(function(x){return !(x&&x.id===m[2]&&careIsMed(x));});
+  else if(m[1]==="appt")S.events=(S.events||[]).filter(function(e){return !(e&&e.id===m[2]);});
+  else{var q=/^(.+)_(\d{4}-\d\d-\d\d)$/.exec(m[2]);if(q&&S.reminderLog)delete S.reminderLog[q[1]+"|"+q[2]];}
+}
+/* a wall or kids' device drops any parent care items it still has from before */
+function carePurge(){
+  if(syncRole()==="parent"||!sync.careKPolled)return false;
+  var ch=false,keepMed={};
+  S.household=(S.household||[]).filter(function(x){if(!careIsMed(x))return true;if(careKnownLive("careK","med_"+x.id)){keepMed[x.id]=1;return true;}ch=true;return false;});
+  S.events=(S.events||[]).filter(function(e){if(!careIsAppt(e)||careKnownLive("careK","appt_"+e.id))return true;ch=true;return false;});
+  var ids={};(S.household||[]).forEach(function(x){if(x&&x.id)ids[x.id]=x;});
+  Object.keys(S.reminderLog||{}).forEach(function(k){var q=k.split("|"),x=ids[q[0]];if(x&&careIsMed(x)&&!keepMed[q[0]]){delete S.reminderLog[k];ch=true;}});
+  return ch;
+}
+
+/* ---- statuses: Pending (default) | Done | Missed | Excused (+ Made up later) ---- */
+var STATUS_NAMES={pending:"Pending",done:"Done",missed:"Missed",excused:"Excused",madeup:"Made up"},STATUS_LETTER={pending:"p",done:"d",missed:"m",excused:"e",madeup:"u",couldnt:"c"};
+var EXCUSE_REASONS={sick:"Sick",away:"Away",notneeded:"Not needed today",other:"Other"};
+/* key = "date|personId|itemId" (the same key chores already use); medicine doses use "date|med|medicineId" */
+function statusOf(k){
+  var o=S.itemStatus&&S.itemStatus[k];if(o&&STATUS_NAMES[o.s])return o.s;
+  var q=String(k).split("|");if(q[1]==="med"){var e=(S.reminderLog||{})[q[2]+"|"+q[0]];if(e)return e.status||(e.skipped?"missed":"done");return "pending";}
+  var d=S.done&&S.done[k];return (d==="a"||d==="p"||d==="t")?"done":"pending";
+}
+function statusWho(){return (acct&&acct.personId&&acct.personId!=="none"?acct.personId:"")||unlockedBy||("device:"+devRole());}
+/* parents set a status; the change is saved and logged (who, when, old -> new) */
+function statusSet(k,s,reason,note){
+  if(!STATUS_NAMES[s])return false;
+  var old=statusOf(k);
+  S.itemStatus=S.itemStatus||{};
+  if(s==="pending")delete S.itemStatus[k];
+  else{var o={s:s,by:statusWho(),at:new Date().toISOString()};if(s==="excused"&&EXCUSE_REASONS[reason])o.r=reason;if(note)o.n=String(note).slice(0,200);S.itemStatus[k]=o;}
+  statusLogAdd(k,old,s,reason,"set");
+  return true;
+}
+function statusLogAdd(k,from,to,reason,src){
+  if(from===to&&src!=="couldnt")return;
+  S.statusLog=Array.isArray(S.statusLog)?S.statusLog:[];
+  var e={id:"l"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),k:k,from:from,to:to,by:statusWho(),dev:devRole(),at:new Date().toISOString()};
+  if(reason)e.r=reason;if(src)e.src=src;
+  S.statusLog.push(e);
+  if(S.statusLog.length>400)S.statusLog=S.statusLog.slice(-400);
+}
+/* every change to a check-off (from any screen) is noticed after it is saved and added to the history */
+var statusShadow=null;
+function statusSnapshot(){var m={};Object.keys(S.done||{}).concat(Object.keys(S.itemStatus||{})).forEach(function(k){var q=k.split("|");if(q.length===3)m[k]=statusOf(k);});
+  Object.keys(S.reminderLog||{}).forEach(function(rk){var q=rk.split("|");if(q.length===2)m[q[1]+"|med|"+q[0]]=statusOf(q[1]+"|med|"+q[0]);});return m;}
+function statusWatch(){
+  var now=statusSnapshot();
+  if(statusShadow&&!sync.applying){
+    var added=false,keys={};Object.keys(now).concat(Object.keys(statusShadow)).forEach(function(k){keys[k]=1;});
+    var setByParent={};(S.statusLog||[]).slice(-20).forEach(function(e){if(Date.now()-Date.parse(e.at)<2000)setByParent[e.k+"|"+e.to]=1;});
+    Object.keys(keys).forEach(function(k){var a=statusShadow[k]||"pending",b=now[k]||"pending";if(a!==b&&!setByParent[k+"|"+b]){statusLogAdd(k,a,b,"","check");added=true;}});
+    if(added){statusShadow=now;save();return;}
+  }
+  statusShadow=now;
+}
+(function(){var sv=window.syncAfterSave;window.syncAfterSave=function(){try{statusWatch();}catch(e){}if(sv)return sv.apply(this,arguments);};})();
+setTimeout(function(){try{if(!statusShadow)statusShadow=statusSnapshot();}catch(e){}},0);
+
+/* ---- sync: route care items and statuses ---- */
+(function(){
+  var sl0=syncList,sa0=syncApplyItem,sr0=syncRemoveItem,sv0=syncValidItem,sd0=syncDiff,ss0=syncSt,so0=syncOnDocs;
+  syncList=function(c){
+    if(c==="careK"||c==="careP"){if(!sync.careOk&&syncRole()==="parent")return [];var w=c==="careK"?"kid":"parent";return careItems().filter(function(o){return o.aud===w;});}
+    if(c==="stat"){var o=[];Object.keys(S.itemStatus||{}).forEach(function(k){var id=syncDoneId(k);if(syncDoneKey(id)&&SYNC_ID_RE.test(id))o.push({id:id,v:S.itemStatus[k]});});return o;}
+    if(c==="slog")return (S.statusLog||[]).filter(function(e){return e&&SYNC_ID_RE.test(e.id||"");});
+    if(c==="cant")return (S.cantReq||[]).filter(function(e){return e&&SYNC_ID_RE.test(e.id||"");});
+    var out=sl0(c);
+    if(sync.careOk){
+      if(c==="events")return out.filter(function(e){return !careIsAppt(e);});
+      if(c==="cfg")return out.map(function(o){return o.id==="blob_household"?{id:o.id,v:(o.v||[]).filter(function(x){return !careIsMed(x);})}:o;});
+    }
+    return out;
+  };
+  syncApplyItem=function(c,id,obj){
+    if(c==="careK"||c==="careP"){careApply(c,obj);return;}
+    if(c==="stat"){var k=syncDoneKey(id);if(k){S.itemStatus=S.itemStatus||{};S.itemStatus[k]=obj.v;}return;}
+    if(c==="slog"){S.statusLog=Array.isArray(S.statusLog)?S.statusLog:[];if(!S.statusLog.some(function(e){return e&&e.id===id;})){S.statusLog.push(obj);S.statusLog.sort(function(a,b){return a.at<b.at?-1:a.at>b.at?1:0;});if(S.statusLog.length>400)S.statusLog=S.statusLog.slice(-400);}return;}
+    if(c==="cant"){S.cantReq=(S.cantReq||[]).filter(function(e){return e&&e.id!==id;});S.cantReq.push(obj);return;}
+    if(c==="cfg"&&id==="blob_household"&&(sync.careOk||(syncRole()!=="parent"&&sync.careKPolled))){
+      /* parents keep their medicines and also take any that still arrive the old way (inside the household list) so
+         they move into the care folders instead of being lost; wall and kids' devices only keep kid medicines */
+      var par=syncRole()==="parent",keep=(S.household||[]).filter(function(x){return careIsMed(x)&&(par||careKnownLive("careK","med_"+x.id));}),have={};
+      keep.forEach(function(x){have[x.id]=1;});
+      if(par)((obj&&obj.v)||[]).forEach(function(x){if(careIsMed(x)&&x.id&&!have[x.id]&&!careKnownLive("careP","med_"+x.id)&&!careKnownLive("careK","med_"+x.id)&&!(sync.known.careP["med_"+x.id]||sync.known.careK["med_"+x.id])){keep.push(x);have[x.id]=1;}});
+      sa0(c,id,obj);S.household=(S.household||[]).filter(function(x){return !careIsMed(x);}).concat(keep);return;
+    }
+    sa0(c,id,obj);
+  };
+  syncRemoveItem=function(c,id){
+    if(c==="careK"||c==="careP"){careRemove(c,id);return;}
+    if(c==="stat"){var k=syncDoneKey(id);if(k&&S.itemStatus)delete S.itemStatus[k];return;}
+    if(c==="slog")return;
+    if(c==="cant"){S.cantReq=(S.cantReq||[]).filter(function(e){return e&&e.id!==id;});return;}
+    sr0(c,id);
+  };
+  syncValidItem=function(c,o,id){
+    if(c==="careK"||c==="careP"){
+      if(!o||typeof o!=="object"||o.id!==id||!SYNC_ID_RE.test(id)||["med","appt","dose"].indexOf(o.kind)<0||o.aud!==(c==="careK"?"kid":"parent")||typeof o.own!=="string"||!o.v||typeof o.v!=="object"||Array.isArray(o.v))return false;
+      if(o.kind==="med")return typeof o.v.id==="string"&&o.v.type==="medicine"&&id==="med_"+o.v.id;
+      if(o.kind==="appt")return typeof o.v.id==="string"&&typeof o.v.t==="string"&&id==="appt_"+o.v.id;
+      return typeof o.v.med==="string"&&hhDateValid(String(o.v.date))&&["done","missed","excused"].indexOf(o.v.status)>=0;
+    }
+    if(c==="stat")return !!(o&&o.id===id&&syncDoneKey(id)&&o.v&&STATUS_NAMES[o.v.s]&&o.v.s!=="pending");
+    if(c==="slog")return !!(o&&o.id===id&&typeof o.k==="string"&&o.k.length<=200&&(STATUS_NAMES[o.to]||o.to==="couldnt")&&typeof o.at==="string");
+    if(c==="cant")return !!(o&&o.id===id&&typeof o.k==="string"&&o.k.length<=200&&typeof o.at==="string");
+    return sv0(c,o,id);
+  };
+  syncSt=function(c,json,del){
+    if(c==="stat"||c==="slog"||c==="careK"||c==="careP"){
+      if(del)return "";var o=null;try{o=JSON.parse(json);}catch(e){return "";}
+      if(c==="stat")return STATUS_LETTER[o&&o.v&&o.v.s]||"";
+      if(c==="slog")return STATUS_LETTER[o&&o.to]||"";
+      return o&&o.kind==="dose"&&o.v?(o.v.kid&&syncRole()!=="parent"?"k":(STATUS_LETTER[o.v.status]||"")):"";
+    }
+    return ss0(c,json,del);
+  };
+  syncDiff=function(){
+    var jobs=sd0.apply(this,arguments);
+    return jobs.filter(function(j){
+      if(j.c==="careK"||j.c==="careP"){if(syncRole()!=="parent")return false; /* Stage 3 lets the tablet send kid-marked doses */ return !!sync.careOk;}
+      if(j.c==="stat"&&syncRole()!=="parent")return false;
+      return true;
+    });
+  };
+  syncOnDocs=function(docs,cursor){
+    var r=so0.apply(this,arguments);
+    try{if(carePurge()){sync.applying=true;try{save();}finally{sync.applying=false;}statusShadow=statusSnapshot();if(typeof syncRender==="function")syncRender();}}catch(e){}
+    return r;
+  };
+  /* wall/kids' devices take parent-made doses and statuses as they come, without re-logging them */
+})();
+
+/* ---- Parent area: latest status changes (to check the history is being kept) ---- */
+function statusLabel(k){
+  var q=String(k).split("|"),who=person(q[1]),t="";
+  if(q[1]==="med"){var x=(S.household||[]).filter(function(i){return i&&i.id===q[2];})[0];return "💊 "+(x?x.title:"Medicine")+" · "+q[0];}
+  if(who){var tk=(S.tasks[who.id]||[]).filter(function(i){return i&&i.id===q[2];})[0];t=tk?tk.t:"";}
+  return (who?who.n+": ":"")+(t||q[2])+" · "+q[0];
+}
+function statusHistoryHtml(){
+  var l=(S.statusLog||[]).slice(-30).reverse();
+  return "<h2>Status history</h2><div class='card'>"+(l.length?l.map(function(e){var w=person(e.by);return "<div class='row'><span class='t'><b>"+esc(statusLabel(e.k))+"</b><br><span class='note'>"+esc(STATUS_NAMES[e.from]||e.from)+" → "+esc(STATUS_NAMES[e.to]||(e.to==="couldnt"?"Couldn’t do it":e.to))+(e.r?" ("+esc(EXCUSE_REASONS[e.r]||e.r)+")":"")+" · "+esc(w?w.n:String(e.by||"").replace("device:",""))+" · "+esc(new Date(e.at).toLocaleString([],{weekday:"short",hour:"numeric",minute:"2-digit"}))+"</span></span></div>";}).join(""):"<p class='note'>No changes yet. Every check-off and status change will show here.</p>")+"</div>";
+}
+(function(){var sa=syncAdminHtml;syncAdminHtml=function(){return sa.apply(this,arguments)+statusHistoryHtml();};})();
 window.FH_READY=true;
 </script>
 

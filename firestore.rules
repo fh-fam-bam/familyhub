@@ -1,13 +1,14 @@
 rules_version = '2';
-// Family Hub Firestore rules – v39.1 (Stage 1: accounts and roles)
+// Family Hub Firestore rules – v39.2 (Stage 2: care items and statuses)
 // Paste into Firebase console › Firestore Database › Rules, then Publish.
 //
 // Who is who:
 //  - The two old shared logins below keep working exactly as before until you say they can go.
 //  - New accounts get their role from /users/{uid}: "parent", "display" (wall tablet) or "kid" (later).
 //    Only a parent can create or change /users records.
-// Stage 2 will narrow what "display" and "kid" can read (parent care items). For now they have the
-// same access as the old kids' login.
+// Care items (medicines, appointments, dose logs) live in two folders:
+//   careParent – parents only. The wall display and kids cannot read it at all.
+//   careKid    – parents, the wall display and the old kids' login; a "kid" account only its own items.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -28,6 +29,8 @@ service cloud.firestore {
     }
     function isParent() { return isLegacyParent() || hasRole('parent'); }
     function isKids()   { return isLegacyKids() || hasRole('display') || hasRole('kid'); }
+    function isKidRole() { return hasRole('kid'); }
+    function myPid()     { return get(userPath()).data.personId; }
 
     // ---- account records ----
     function validUser() {
@@ -87,15 +90,59 @@ service cloud.firestore {
 
       allow read: if isParent() || isKids();
 
+      // a kid account may only check off its own chores
+      function ownDone() {
+        return !isKidRole() || id.matches('^done__[0-9]{4}-[0-9]{2}-[0-9]{2}__' + myPid() + '__.+$');
+      }
+
       allow create, update: if goodShape() && (
-        (isParent() && id.matches('^(events|eventRequests|groc|req|boardreq|done|meals|cfg|ledger|hw)__[A-Za-z0-9_-]{1,120}$'))
+        (isParent() && id.matches('^(events|eventRequests|groc|req|boardreq|done|meals|cfg|ledger|hw|stat|slog|cant)__[A-Za-z0-9_-]{1,120}$'))
         ||
-        (isKids() && id.matches('^done__[A-Za-z0-9_-]{1,120}$') && kidDoneOk())
+        (isKids() && id.matches('^done__[A-Za-z0-9_-]{1,120}$') && kidDoneOk() && ownDone())
         ||
         (isKids() && id.matches('^(eventRequests|req|groc|boardreq|hw)__[A-Za-z0-9_-]{1,120}$')
                   && !('st' in request.resource.data.keys()))
+        ||
+        // status history: kids' devices may only add new entries for Done, "I couldn't do this" or undoing a check-off
+        (isKids() && resource == null && id.matches('^slog__[A-Za-z0-9_-]{1,120}$')
+                  && 'st' in request.resource.data.keys() && request.resource.data.st in ['d', 'c', 'p'])
+        ||
+        // "I couldn't do this" requests: kids' devices may only create new ones
+        (isKids() && resource == null && id.matches('^cant__[A-Za-z0-9_-]{1,120}$')
+                  && !('st' in request.resource.data.keys()))
       );
 
+      allow delete: if false;
+    }
+
+    // ---- care items ----
+    function careShape(aud) {
+      let d = request.resource.data;
+      return d.keys().hasAll(['json', 'rev', 'deleted', 'aud', 'own'])
+        && d.keys().hasOnly(['json', 'rev', 'deleted', 'ts', 'st', 'aud', 'own'])
+        && d.json is string && d.json.size() < 100000
+        && d.rev is int && d.deleted is bool
+        && d.rev == (resource == null ? 1 : resource.data.rev + 1)
+        && d.aud == aud
+        && d.own is string && d.own.size() <= 100
+        && (!('st' in d.keys()) || (d.st is string && d.st.size() <= 1));
+    }
+    match /households/family/careParent/{id} {
+      allow read: if isParent();
+      allow create, update: if isParent() && careShape('parent') && id.matches('^(med|appt|dose)_[A-Za-z0-9_-]{1,120}$');
+      allow delete: if false;
+    }
+    match /households/family/careKid/{id} {
+      allow read: if isParent() || (isKids() && !isKidRole())
+                  || (isKidRole() && resource.data.own == myPid());
+      allow create, update: if careShape('kid') && id.matches('^(med|appt|dose)_[A-Za-z0-9_-]{1,120}$') && (
+        isParent()
+        ||
+        // kids' devices: only a new dose marked taken by a child ("k"), never a change to an existing one
+        (isKids() && resource == null && id.matches('^dose_.+$')
+                  && request.resource.data.st == 'k' && request.resource.data.deleted == false
+                  && (!isKidRole() || request.resource.data.own == myPid()))
+      );
       allow delete: if false;
     }
 
