@@ -15,7 +15,7 @@ async function ctxFor(b,state){
     return r.abort();});
   return ctx;
 }
-async function page(ctx,file){await ctx.unroute('http://fh.test/**').catch(()=>{});await ctx.route('http://fh.test/**',r=>r.fulfill({path:file,contentType:'text/html'}));const pg=await ctx.newPage();pg.on('pageerror',e=>console.log('  PAGE ERROR',e.message));pg.on('dialog',d=>d.accept());await pg.addInitScript(()=>{window.FH_POLL_MS=700;});await pg.goto('http://fh.test/Family-Hub.html');await pg.waitForTimeout(700);return pg;}
+async function page(ctx,file){await ctx.unroute('http://fh.test/**').catch(()=>{});await ctx.route('http://fh.test/**',r=>r.fulfill({path:file,contentType:'text/html'}));const pg=await ctx.newPage();pg.on('pageerror',e=>console.log('  PAGE ERROR',e.message));pg.on('dialog',d=>d.accept());await pg.addInitScript(()=>{window.FH_POLL_MS=700;window.addEventListener('load',function(){try{if(window.S&&typeof statusCfg==='function'){S.statusCfg=Object.assign({},S.statusCfg||{},{cutoff:'23:59'});}}catch(e){}});});await pg.goto('http://fh.test/Family-Hub.html');await pg.waitForTimeout(700);return pg;}
 async function signIn(pg,email){await pg.evaluate(em=>{sync.on=true;syncStore();syncStart();return sync.adapter.signIn(em,'pw');},email);await pg.waitForTimeout(4000);}
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 (async()=>{const b=await chromium.launch();
@@ -38,7 +38,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  console.log('   tablet sees parent medicine:',await pt.evaluate(()=>JSON.stringify(S.household).includes('blood pressure')),'| therapist appt:',await pt.evaluate(()=>JSON.stringify(S.events).includes('therapist')));
  const tState=await T.storageState();await T.close();
  console.log('3) Dad\'s phone on v39.2 (new parent account) migrates');
- let A2=await ctxFor(b),pp=await page(A2,NEW);await signIn(pp,'dad@g');await pp.evaluate(()=>syncSchedule(10));await pp.waitForTimeout(6000);
+ let A2=await ctxFor(b),pp=await page(A2,NEW);await pp.evaluate(()=>{S.statusCfg={cutoff:'23:59',cost:false,since:today()};save();});await signIn(pp,'dad@g');await pp.evaluate(()=>syncSchedule(10));await pp.waitForTimeout(6000);
  console.log('   careOk:',await pp.evaluate(()=>sync.careOk),'role:',await pp.evaluate(()=>acctRole()),'state:',await pp.evaluate(()=>sync.state));
  const cp=await list('careParent'),ck=await list('careKid'),items=await list('items');
  console.log('   careParent:',cp.map(d=>d.id+'('+d.own+')').join(', '));

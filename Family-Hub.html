@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v39.6";
+var FH_BUILD="v39.7";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -7890,7 +7890,7 @@ setTimeout(function(){try{statusSweep();}catch(e){}},8000);
 /* a parent approving a make-up turns Missed into Made up */
 function statusMakeups(){
   if(devRole()!=="parent")return false;var ch=false;
-  Object.keys(S.itemStatus||{}).forEach(function(k){var o=S.itemStatus[k];if(o&&o.s==="missed"&&S.done&&S.done[k]==="a"){statusSet(k,"madeup","","");ch=true;}});
+  Object.keys(S.itemStatus||{}).forEach(function(k){var o=S.itemStatus[k],sb=S.submissions&&S.submissions[k];if(o&&o.s==="missed"&&S.done&&S.done[k]==="a"&&sb&&sb.makeup){statusSet(k,"madeup","","");ch=true;}});
   return ch;
 }
 (function(){var sv=window.syncAfterSave;window.syncAfterSave=function(){var r=sv?sv.apply(this,arguments):undefined;try{if(!sync.applying&&statusMakeups())save();}catch(e){}return r;};
@@ -8321,6 +8321,112 @@ document.addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target&&e.
   "#wsbar{position:fixed;left:0;right:0;top:0;z-index:8000;background:#1f6f3f;color:#fff;font-weight:bold;padding:calc(8px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px));display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:18px}#wsbar .btn{margin:0 0 0 auto;min-height:44px;background:#fff;color:#1f6f3f}"+
   "#wsreq{position:fixed;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));z-index:8500;background:var(--card);color:var(--ink);border:3px solid #d9822b;border-radius:16px;padding:12px 14px;box-shadow:0 6px 24px #0005;display:flex;flex-direction:column;gap:6px;font-size:18px}#wsreq .btn{margin:0;min-height:48px}"+
   "body.ws-on main{padding-top:64px}body.ws-on #side{padding-top:56px}";
+  document.head.appendChild(css);})();
+/* ---- v39.7 ---- */
+/* ===== v39.7 (Stage 7): kids' progress pages =====
+   "This week" on each kid's page: a meter of Done ÷ (Done + Missed), in the kid's own colour (Excused does not
+   count), today's result, a row of 7 day dots, light animations, and a plant that grows on each On-track day.
+   Zones: Great week (85%+), On track (60–84%), Needs a push (under 60%). The week resets every Monday;
+   parents can look back at earlier weeks. Animations only use transform and opacity, so they stay smooth on
+   older Fire tablets, and they are skipped for "reduced motion". */
+SYNC_BLOBS.push("progressCfg");
+function prCfg(){var c=S.progressCfg||{};return {plant:c.plant!==false};}
+function prZone(pct){if(pct===null)return null;return pct>=0.85?"great":pct>=0.6?"ontrack":"push";}
+var PR_ZONE={great:["🌟","Great week"],ontrack:["👍","On track"],push:["💪","Needs a push"]};
+function prKeys(pid,d){
+  var out=dueTasks(pid,d).map(function(t){return d+"|"+pid+"|"+t.id;});
+  try{if(typeof pcCfg==="function"&&pcCfg())pcItems(d).forEach(function(it){if(it.kid===pid)out.push(d+"|pc|"+it.id);});}catch(e){}
+  return out;
+}
+function prState(k){
+  var d=k.slice(0,10),s=statusOf(k);
+  if(s==="done"||s==="madeup")return "done";if(s==="excused")return "excused";if(s==="missed")return "missed";
+  var since=statusCfg().since||today();
+  return d>=since&&statusPastCutoff(d)?"missed":"pending";
+}
+function prDay(pid,d){
+  var r={d:d,done:0,missed:0,excused:0,pending:0,total:0,future:d>today(),final:statusPastCutoff(d)};
+  if(!r.future)prKeys(pid,d).forEach(function(k){r[prState(k)]++;r.total++;});
+  var c=r.done+r.missed;r.pct=c?r.done/c:null;r.zone=prZone(r.pct);return r;
+}
+function prWeek(pid,ws){
+  var days=[],done=0,missed=0;
+  for(var i=0;i<7;i++){var d=fd(addD(localDate(ws),i)),r=prDay(pid,d);days.push(r);done+=r.done;missed+=r.missed;}
+  var pct=(done+missed)?done/(done+missed):null,good=0,last=null;
+  days.forEach(function(r){if(r.final&&!r.future&&r.zone){if(r.zone!=="push")good++;last=r;}});
+  return {ws:ws,days:days,done:done,missed:missed,pct:pct,zone:prZone(pct),good:good,droop:!!(last&&last.zone==="push")};
+}
+function prPlant(w,col){
+  var g=Math.min(7,w.good),h=14+g*11,leaves="",i;
+  for(i=0;i<Math.min(g,6);i++){var y=96-18-(i+1)*(h/(Math.min(g,6)+1)),s=i%2?1:-1;leaves+="<path class='pr-leaf' d='M50 "+y.toFixed(1)+" q"+(s*16)+" -10 "+(s*22)+" -2 q"+(s*-10)+" 10 "+(s*-22)+" 2z' fill='#4caf50'/>";}
+  var top=96-18-h,bloom=g>=5?"<g class='pr-bloom'>"+[0,72,144,216,288].map(function(a){return "<ellipse cx='50' cy='"+(top-7)+"' rx='4.5' ry='8' fill='"+col+"' transform='rotate("+a+" 50 "+top+")'/>";}).join("")+"<circle cx='50' cy='"+top+"' r='4.5' fill='#ffd54f'/></g>":g===0?"<ellipse cx='50' cy='"+(top+1)+"' rx='5' ry='3' fill='#7cb342'/>":"";
+  return "<svg class='pr-plant"+(w.droop?" droop":"")+"' viewBox='0 0 100 100' role='img' aria-label='Plant: "+g+" good day"+(g===1?"":"s")+" this week'>"+
+    "<g class='pr-grow'><path d='M50 78 L50 "+top+"' stroke='#388e3c' stroke-width='3.5' stroke-linecap='round' fill='none'/>"+leaves+bloom+"</g>"+
+    "<path d='M30 78 h40 l-5 18 h-30z' fill='"+col+"'/><rect x='27' y='74' width='46' height='7' rx='3' fill='"+col+"' opacity='.85'/></svg>";
+}
+var prOffset={},prLast={};
+function prHtml(p){
+  if(!p||!p.kid)return "";
+  var par=devRole()==="parent",off=par?(prOffset[p.id]||0):0,ws=fd(addD(localDate(weekStartOf(today())),off*7)),w=prWeek(p.id,ws),cur=off===0;
+  var pct=w.pct===null?0:Math.round(w.pct*100),z=w.zone?PR_ZONE[w.zone]:null,td=cur?prDay(p.id,today()):null;
+  var h="<section class='card pr-card' style='--kc:"+p.c+"' data-prp='"+esc(p.id)+"'><div class='pr-head'><h2>"+(cur?"This week":"Week of "+esc(niceDate(ws)))+"</h2>";
+  if(par)h+="<span class='pr-nav'><button class='btn n' data-a='nxprwk' data-p='"+esc(p.id)+"' data-d='-1' aria-label='Earlier week'>◀</button>"+(off<0?"<button class='btn n' data-a='nxprwk' data-p='"+esc(p.id)+"' data-d='1' aria-label='Later week'>▶</button>":"")+"</span>";
+  h+="</div><div class='pr-row'><div class='pr-left'>";
+  h+="<div class='pr-meter' role='meter' aria-valuemin='0' aria-valuemax='100' aria-valuenow='"+pct+"' aria-label='Done this week'><i style='transform:scaleX("+(pct/100)+")'></i><span class='pr-mark pr-m60'></span><span class='pr-mark pr-m85'></span></div>";
+  h+="<div class='pr-zone'>"+(z?"<b>"+z[0]+" "+z[1]+"</b> · "+pct+"%":"<b>🌱 Your week starts here</b>")+"<span class='note'> · "+w.done+" done"+(w.missed?" · "+w.missed+" missed":"")+"</span></div>";
+  if(td)h+="<div class='pr-today note'>Today: "+(td.total?(td.final&&td.zone?esc(PR_ZONE[td.zone][1])+" · "+Math.round(td.pct*100)+"%":td.done+" done"+(td.pending?" · "+td.pending+" to go":"")+(td.excused?" · "+td.excused+" excused":"")):"no chores")+"</div>";
+  h+="<div class='pr-dots' role='list' aria-label='Each day this week'>"+w.days.map(function(r){var n=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][(localDate(r.d).getDay()+6)%7],cls=r.future?"future":!r.total?"none":r.zone&&r.final?r.zone:r.final?"none":"open",t=r.future?"later":!r.total?"no chores":r.zone&&r.final?PR_ZONE[r.zone][1]+" ("+Math.round(r.pct*100)+"%)":r.final?"not counted":"in progress";
+    return "<span class='pr-dot "+cls+(r.d===today()?" today":"")+"' role='listitem' aria-label='"+n+": "+esc(t)+"'><i></i><small>"+n.slice(0,2)+"</small></span>";}).join("")+"</div>";
+  h+="</div>";
+  if(prCfg().plant)h+="<div class='pr-right'>"+prPlant(w,p.c)+"<div class='note pr-pl'>"+(w.good?w.good+" good day"+(w.good===1?"":"s"):"Grows on every On-track day")+"</div></div>";
+  h+="</div>"+(par&&off<0?"<p class='note'>Older weeks show what this phone has saved.</p>":"")+"</section>";
+  return h;
+}
+/* place it right under the kid's name */
+(function(){var pr=pers;pers=function(){var h=pr.apply(this,arguments),p=person(pid);if(!p||!p.kid)return h;
+  var i=h.indexOf('class="personal-hero'),j=i>=0?h.indexOf("</section>",i):-1;
+  return j>=0?h.slice(0,j+10)+prHtml(p)+h.slice(j+10):h+prHtml(p);};})();
+/* animations: a star burst and a fill when something is marked Done, a gentle dip when something becomes Missed */
+function prAnimate(){
+  var el=document.querySelector(".pr-card");if(!el)return;var pid=el.getAttribute("data-prp"),p=person(pid);if(!p)return;
+  if((prOffset[pid]||0)!==0)return;
+  var w=prWeek(pid,weekStartOf(today())),last=prLast[pid];prLast[pid]={done:w.done,missed:w.missed,good:w.good,pct:w.pct};
+  if(!last)return;
+  var calm=(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches),lite=/(^| )lite( |$)/.test(document.documentElement.className);
+  var bar=el.querySelector(".pr-meter i"),from=last.pct===null?0:last.pct,to=w.pct===null?0:w.pct;
+  if(bar&&from!==to&&!calm){bar.style.transition="none";bar.style.transform="scaleX("+from+")";requestAnimationFrame(function(){requestAnimationFrame(function(){bar.style.transition="";bar.style.transform="scaleX("+to+")";});});}
+  if(w.done>last.done&&!calm){
+    var m=el.querySelector(".pr-meter"),n=lite?3:6,s="";
+    for(var i=0;i<n;i++){var a=(i/n)*Math.PI*2,dx=Math.round(Math.cos(a)*40),dy=Math.round(Math.sin(a)*28);s+="<span class='pr-star' style='left:"+Math.round(to*100)+"%;--dx:"+dx+"px;--dy:"+dy+"px;animation-delay:"+(i*30)+"ms'>"+(i%2?"✨":"⭐")+"</span>";}
+    m.insertAdjacentHTML("beforeend",s);setTimeout(function(){var st=m.querySelectorAll(".pr-star");for(var j=0;j<st.length;j++)st[j].parentNode.removeChild(st[j]);},1100);
+  }
+  if(w.missed>last.missed&&!calm){var mm=el.querySelector(".pr-meter");mm.classList.remove("pr-dip");void mm.offsetWidth;mm.classList.add("pr-dip");}
+  if(w.good>last.good&&!calm){var pl=el.querySelector(".pr-grow");if(pl){pl.classList.remove("pr-pop");void pl.getBoundingClientRect();pl.classList.add("pr-pop");}}
+}
+(function(){var r0=render;render=function(){var r=r0.apply(this,arguments);try{if(view==="person")prAnimate();}catch(e){}return r;};})();
+/* ---- parents: week navigation and the plant setting ---- */
+function prCfgHtml(){var c=prCfg();return "<h2>Kids’ progress pages</h2><div class='card'><label><input type='checkbox' id='prplant'"+(c.plant?" checked":"")+"> Show the growing plant on the kids’ pages</label><p class='note'>The plant grows on each day a child is On track or better (60% or more) and droops a little on a Needs-a-push day. It starts again every Monday.</p><button class='btn' data-a='nxprcfg'>Save</button></div>";}
+(function(){var sa=syncAdminHtml;syncAdminHtml=function(){return prCfgHtml()+sa.apply(this,arguments);};})();
+document.addEventListener("click",function(e){
+  var n=e.target;while(n&&n!==document&&!(n.getAttribute&&n.getAttribute("data-a")))n=n.parentNode;if(!n||n===document)return;
+  var a=n.getAttribute("data-a");if(a!=="nxprwk"&&a!=="nxprcfg")return;e.preventDefault();e.stopPropagation();
+  if(devRole()!=="parent")return;
+  if(a==="nxprwk"){var p=n.getAttribute("data-p"),o=(prOffset[p]||0)+(+n.getAttribute("data-d"));prOffset[p]=Math.max(-8,Math.min(0,o));render();return;}
+  if(a==="nxprcfg"&&unlocked){var snap=JSON.stringify(S);S.progressCfg=Object.assign({},S.progressCfg||{},{plant:!!(document.getElementById("prplant")||{}).checked});if(commitOr(snap)){statusMessage("Saved");render();}}
+},true);
+(function(){var css=document.createElement("style");css.textContent=
+  ".pr-card{position:relative}.pr-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.pr-head h2{margin:0}.pr-nav .btn{margin:0 0 0 6px;min-height:44px;min-width:44px}"+
+  ".pr-row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:8px}.pr-left{flex:1 1 260px;min-width:0}.pr-right{flex:0 0 120px;text-align:center}"+
+  ".pr-meter{position:relative;height:22px;border-radius:11px;background:var(--line);overflow:visible}.pr-meter i{position:absolute;left:0;top:0;bottom:0;width:100%;border-radius:11px;background:var(--kc);transform-origin:left center;transition:transform .7s cubic-bezier(.2,.8,.2,1)}"+
+  ".pr-mark{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--card);opacity:.9}.pr-m60{left:60%}.pr-m85{left:85%}"+
+  ".pr-zone{margin-top:8px;font-size:18px}.pr-today{margin-top:2px}"+
+  ".pr-dots{display:flex;gap:6px;margin-top:10px}.pr-dot{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1}.pr-dot i{width:22px;height:22px;border-radius:50%;border:2px solid var(--kc);display:block;box-sizing:border-box}"+
+  ".pr-dot.great i{background:var(--kc)}.pr-dot.ontrack i{background:var(--kc);opacity:.55}.pr-dot.push i{background:#f3c58a;border-color:#e0a458}.pr-dot.none i{border-color:var(--line);border-style:dashed}.pr-dot.future i{border-color:var(--line)}.pr-dot.open i{background:linear-gradient(90deg,var(--kc) 50%,transparent 50%)}.pr-dot.today small{font-weight:bold}.pr-dot small{font-size:12px;color:var(--mute)}"+
+  ".pr-plant{width:110px;height:110px;display:block;margin:0 auto}.pr-grow{transform-origin:50px 78px;transition:transform .8s ease}.pr-plant.droop .pr-grow{transform:rotate(7deg)}.pr-plant.droop .pr-leaf{opacity:.8}.pr-pl{font-size:13px}"+
+  ".pr-star{position:absolute;top:-6px;font-size:18px;pointer-events:none;animation:prburst .9s ease-out forwards}@keyframes prburst{from{transform:translate(-50%,0) scale(.4);opacity:1}to{transform:translate(calc(-50% + var(--dx)),var(--dy)) scale(1.1);opacity:0}}"+
+  ".pr-dip{animation:prdip .6s ease}@keyframes prdip{0%{transform:translateY(0)}40%{transform:translateY(4px)}100%{transform:translateY(0)}}"+
+  ".pr-pop{animation:prpop .7s ease}@keyframes prpop{0%{transform:scale(.85)}60%{transform:scale(1.06)}100%{transform:scale(1)}}"+
+  "@media (prefers-reduced-motion:reduce){.pr-meter i,.pr-grow{transition:none}.pr-star,.pr-dip,.pr-pop{animation:none}}";
   document.head.appendChild(css);})();
 window.FH_READY=true;
 </script>
