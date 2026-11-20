@@ -99,4 +99,8 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  await pp.evaluate(k=>statusParentSet(k,'excused','sick'),tk);await pp.waitForTimeout(3000);
  const it=await list('items');console.log('   status doc:',it.filter(d=>d.id.startsWith('stat__')&&d.id.includes('emilio')).map(d=>d.st).join(','),'| request cleared in database:',it.filter(d=>d.id.startsWith('cant__')).every(d=>d.deleted));
  await pt.waitForTimeout(3000);console.log('   tablet shows:',await pt.evaluate(k=>statusOf(k),tk),'| tablet requests left:',await pt.evaluate(()=>(S.cantReq||[]).length));
+ console.log('9) Stage 5: To review');
+ await pp.evaluate(()=>{view='home';render();});console.log('   Dad\'s Home button:',await pp.evaluate(()=>(document.querySelector('.rv-home')||{}).textContent));
+ await pp.evaluate(()=>{view='review';render();});console.log('   groups:',await pp.evaluate(()=>[...document.querySelectorAll('.rv-group h2')].map(h=>h.textContent.trim()).join(' | ')||'(none)'));
+ console.log('   tablet has no To review:',await pt.evaluate(()=>{view='home';render();return !document.querySelector('.rv-home');}));
  await b.close();})().catch(e=>{console.error(e);process.exit(1);});

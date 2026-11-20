@@ -49,3 +49,19 @@
 - **Automatic end of day:** at the cut-off time (default 9:00 PM, set in Parent > Family sync > Chore statuses), a parent device marks everything still Pending as Missed. A medicine dose that wasn't marked is recorded as missed and moves on to its next date. Done and Excused are left alone, and recurring items start fresh the next day. It only counts from the day v39.4 first runs, so older days aren't marked.
 - **Make-up:** on a kid's page, "Make up a missed chore" lists chores missed earlier the same week (Monday to Sunday). The kid sends one in for half points, and once a parent approves it, it shows **Made up**.
 - **Points:** Missed doesn't take points away by default. The new setting "Missed chores cost points" (off by default) takes the chore's points away when it's marked Missed, and gives them back if it's changed to Excused or Done.
+
+### v39.5 – Stage 5: "To review" inbox for parents
+- **One button:** "📥 To review", with a count badge, at the top of the Home screen on parent devices. The Parent menu badge uses the same count.
+- **Everything waiting, in groups:**
+  - chore approvals (points can be changed, plus Half / +1 / Send back as before)
+  - reward requests
+  - kids' calendar suggestions
+  - family board requests
+  - AI suggestions
+  - doses a child marked on the tablet
+  - items the end of day marked Missed
+  - "I couldn't do this" requests
+  - "Needs a quick look" events in the next 7 days, from Care, Activities and Calendar (no driver chosen yet, or newly added from a synced calendar)
+  - notes from the other parent
+- **Actions:** each item has a one-tap Approve / OK / Looks good / Got it, Excuse for missed items, and Change. Each group has "Approve all" (or OK all / All look fine / Got them all / Excuse all). Handled items leave the list.
+- **Moved out of the Parent area:** the approval sections (Waiting for approval, Reward requests, Calendar change requests, Board requests, AI suggestions) are gone from the Parent area. Its "Needs you" tiles are now one To review tile plus Medicine due. "Recent approvals" (undo an approval) and sending a note to the other parent stay there for now; Stage 9 reviews them.
