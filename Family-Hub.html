@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v40.1";
+var FH_BUILD="v40.2";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -8876,6 +8876,22 @@ document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e
   if(!confirm("Sign this phone out of the shared family login and sign in with your own Google account?\n\nPick YOUR Google account on the next screen (not "+sync.user+")."))return;
   /* stay on the shared login until Google answers; the shared login is only replaced by a different account */
   acctGoogle();},true);
+/* ---- v40.2: iPhone puts the bottom bar back after the keyboard closes ----
+   Home-screen apps on iPhone sometimes leave fixed bars where they were while the keyboard was up
+   (most often when a sign-in redraws the page under the keyboard). When typing ends, nudge the page so
+   iOS lays it out again. Cheap: one short timer, nothing runs while someone is typing. */
+(function(){
+  var t=0;
+  function typing(){var a=document.activeElement;return !!a&&(a.tagName==="TEXTAREA"||a.tagName==="SELECT"||(a.tagName==="INPUT"&&!/^(checkbox|radio|button|submit|range|color)$/.test(a.type)));}
+  function settle(){clearTimeout(t);t=setTimeout(function(){
+    if(typing())return;
+    var x=window.pageXOffset,y=window.pageYOffset;window.scrollTo(x,y+1);window.scrollTo(x,y);
+    var s=document.getElementById("side");if(s){s.style.transform="translateZ(0)";requestAnimationFrame(function(){s.style.transform="";});}
+  },150);}
+  document.addEventListener("focusout",settle,true);
+  if(window.visualViewport)window.visualViewport.addEventListener("resize",settle);
+  var r0=render;render=function(){var v=r0.apply(this,arguments);settle();return v;};
+})();
 window.FH_READY=true;
 </script>
 
