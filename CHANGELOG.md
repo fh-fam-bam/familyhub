@@ -40,3 +40,12 @@
 - **Wall tablet and kids' devices:** Care shows only Julian and Emilio, with no add or edit buttons.
 - **Kids marking doses:** a child taps "I took it" on the tablet. The dose counts at once, with no waiting for approval, and is saved as kid-marked, needing review. Parents see "Julian marked it on the tablet · needs review" and can tap **Looks good**. The parent phone then moves the medicine on to its next date.
 - **"Care today" cards:** on the Home screen and the wall display. The wall shows the kids only.
+
+### v39.4 – Stage 4: statuses everywhere and automatic end of day
+- **A "⋯" button next to every check-off:** chores, to-dos, routine steps, pet chores, pet-care shifts and medicine doses (in Care and in Household).
+  - Parents: Done, Missed, Excused (Sick, Away, Not needed today, Other) and Back to pending.
+  - Kids: "I couldn't do this", with an optional reason. It goes to the parents, who can Excuse it, mark it Missed or Dismiss it (for now in Parent > Family sync; it moves to "To review" in Stage 5).
+- **Status chips:** items show a small Missed / Excused · reason / Made up / Sent to a parent chip.
+- **Automatic end of day:** at the cut-off time (default 9:00 PM, set in Parent > Family sync > Chore statuses), a parent device marks everything still Pending as Missed. A medicine dose that wasn't marked is recorded as missed and moves on to its next date. Done and Excused are left alone, and recurring items start fresh the next day. It only counts from the day v39.4 first runs, so older days aren't marked.
+- **Make-up:** on a kid's page, "Make up a missed chore" lists chores missed earlier the same week (Monday to Sunday). The kid sends one in for half points, and once a parent approves it, it shows **Made up**.
+- **Points:** Missed doesn't take points away by default. The new setting "Missed chores cost points" (off by default) takes the chore's points away when it's marked Missed, and gives them back if it's changed to Excused or Done.
