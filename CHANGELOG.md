@@ -133,6 +133,9 @@
 - **Kid pages:** on phones the person switcher is one row that scrolls sideways, and there's a one-line legend under the 7-day dots.
 - **Not used from Gemini's code:** its separate theme-switch script (it would have fought the existing per-person theme settings), and its plain dark-mode selector (it would have broken Pastel on phones set to dark mode).
 
+### v40.2 – iPhone bottom bar fix
+- iPhone: the bottom bar no longer stays stuck in the middle of the screen after typing (for example after signing in). When the keyboard closes, the page is nudged so iOS puts the bar back at the bottom.
+
 ### v40.1 – easier Google sign-in for the second parent
 - **Google button in Family sync:** "Sign in with Google" now also shows in Family sync (📱 This phone) whenever a parent phone isn't signed in, not only on the locked Parent screen.
 - **One-tap switch:** a parent phone still on the old shared family login shows **"Use my own Google account"**, both on the locked Parent screen and in Family sync. It switches that phone to the person's own Google account. Nothing saved on the phone is lost.
