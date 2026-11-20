@@ -133,6 +133,9 @@
 - **Kid pages:** on phones the person switcher is one row that scrolls sideways, and there's a one-line legend under the 7-day dots.
 - **Not used from Gemini's code:** its separate theme-switch script (it would have fought the existing per-person theme settings), and its plain dark-mode selector (it would have broken Pastel on phones set to dark mode).
 
+### v40.3 – Spin page fits the phone
+- **Fix:** on iPhone the Spin page was zoomed out, with the page squeezed to one side. The long "No repeats" checkbox line couldn't wrap, which made the page wider than the screen. Checkbox lines now wrap on every page.
+
 ### v40.2 – iPhone bottom bar fix
 - iPhone: the bottom bar no longer stays stuck in the middle of the screen after typing (for example after signing in). When the keyboard closes, the page is nudged so iOS puts the bar back at the bottom.
 
