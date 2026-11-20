@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v39.3";
+var FH_BUILD="v39.4";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -7725,9 +7725,10 @@ setTimeout(function(){try{if(!statusShadow)statusShadow=statusSnapshot();}catch(
 /* ---- Parent area: latest status changes (to check the history is being kept) ---- */
 function statusLabel(k){
   var q=String(k).split("|"),who=person(q[1]),t="";
-  if(q[1]==="med"){var x=(S.household||[]).filter(function(i){return i&&i.id===q[2];})[0];return "💊 "+(x?x.title:"Medicine")+" · "+q[0];}
+  if(q[1]==="med"){var x=(S.household||[]).filter(function(i){return i&&i.id===q[2];})[0];return "💊 "+(x?x.title:"Medicine")+" · "+niceDate(q[0]);}
+  if(q[1]==="pc"){var pi=(typeof pcItems==="function"?pcItems(q[0]):[]).filter(function(i){return i.id===q[2];})[0];return "🐾 "+(pi?pi.label:"Pet care")+" · "+niceDate(q[0]);}
   if(who){var tk=(S.tasks[who.id]||[]).filter(function(i){return i&&i.id===q[2];})[0];t=tk?tk.t:"";}
-  return (who?who.n+": ":"")+(t||q[2])+" · "+q[0];
+  return (who?who.n+": ":"")+(t||q[2])+" · "+niceDate(q[0]);
 }
 function statusHistoryHtml(){
   var l=(S.statusLog||[]).slice(-30).reverse();
@@ -7757,7 +7758,7 @@ function careKidNote(e,x){var w=person(e.by)||person((hhPeople(x)||[])[0]);retur
 function careMedRow(x){
   var d=careDoseToday(x),par=devRole()==="parent",h="<div class='row care-row' style='flex-wrap:wrap'><span class='t'><b>💊 "+esc(x.title)+"</b>"+(careWhen(x)?" · "+esc(careWhen(x)):"")+"<br><span class='note'>";
   if(d.st==="done")h+="✅ Taken"+(d.e&&d.e.kidDevice?" · "+careKidNote(d.e,x)+(d.e.review?" · <b>needs review</b>":" · reviewed"):(d.e&&d.e.at?" · "+esc(new Date(d.e.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})):""));
-  else if(d.st==="missed")h+="⏭️ Not taken (skipped)";
+  else if(d.st==="missed")h+=d.e&&d.e.auto?"⏭️ Missed (not marked by the end of the day)":"⏭️ Missed (not taken)";
   else if(d.st==="excused")h+="🟦 Excused";
   else if(d.st==="due")h+=d.overdue?"⏰ Due since "+esc(niceDate(x.date)):"⏰ Due today";
   else h+="Next: "+esc(niceDate(x.date));
@@ -7826,6 +7827,200 @@ document.addEventListener("click",function(e){
     Object.keys(S.reminderLog||{}).forEach(function(k){var q=k.split("|"),en=S.reminderLog[k];if(q[0]===id&&en&&en.kidDevice&&en.review){en.review=false;en.reviewedBy=statusWho();ch=true;}});
     if(ch&&commitOr(snap))render();return;}
 },true);
+/* ---- v39.4 ---- */
+/* ===== v39.4 (Stage 4): statuses everywhere, automatic end of day, make-up, missed points =====
+   Every check-off gets a small "⋯" button:
+     parents: Done / Missed / Excused (Sick, Away, Not needed today, Other) / Back to pending
+     kids (tablet): "I couldn't do this" (goes to the parents to review), and "Make up" for a missed chore
+   At the cut-off time (default 9:00 PM) a parent device marks everything still Pending as Missed.
+   A missed chore can be made up later the same week (Monday to Sunday) for half points; it then shows "Made up".
+   Missed chores only cost points if a parent turns that on. */
+SYNC_BLOBS.push("statusCfg");
+function statusCfg(){var c=S.statusCfg||{};return {cutoff:/^\d\d:\d\d$/.test(c.cutoff||"")?c.cutoff:"21:00",cost:c.cost===true,since:/^\d{4}-\d\d-\d\d$/.test(c.since||"")?c.since:""};}
+function nowHM(){var q=laParts(Date.now());return p2(q.h)+":"+p2(q.mi);}
+function statusPastCutoff(ds){var t=today();return ds<t||(ds===t&&nowHM()>=statusCfg().cutoff);}
+/* pet-care shifts: "date|pc|itemId" */
+(function(){var so=statusOf;statusOf=function(k){
+  var q=String(k).split("|");
+  if(q[1]==="pc"){var o=S.itemStatus&&S.itemStatus[k];if(o&&STATUS_NAMES[o.s])return o.s;
+    var ix=typeof pcIdx==="function"?pcIdx():{};if((ix[q[0]+"|"+q[2]]||[]).length)return "done";
+    var c=typeof pcCfg==="function"?pcCfg():null;if(c&&c.res&&c.res[q[0]+"|"+q[2]])return "excused";return "pending";}
+  return so(k);};})();
+/* what to show: still-Pending items after the cut-off already count as Missed */
+function statusEff(k){var s=statusOf(k);if(s==="pending"&&statusPastCutoff(String(k).split("|")[0]))return "missed";return s;}
+/* chore points for a key (children only) */
+function statusChore(k){var q=String(k).split("|"),p=person(q[1]);if(!p||q.length!==3||q[1]==="med"||q[1]==="pc")return null;var t=(S.tasks[p.id]||[]).filter(function(x){return x&&x.id===q[2];})[0];return t?{p:p,t:t,pts:chorePoints(p.id,t)}:null;}
+/* "Missed chores cost points": take the points when an item becomes Missed, give them back if that changes */
+(function(){var ss=statusSet;statusSet=function(k,s,reason,note){
+  var prev=S.itemStatus&&S.itemStatus[k],prevCost=prev&&prev.cost||0,r=ss.apply(this,arguments);if(!r)return r;
+  var ch=statusChore(k),cur=S.itemStatus&&S.itemStatus[k];
+  if(ch&&ch.p.kid&&devRole()==="parent"){
+    if(prevCost&&!(cur&&cur.s==="missed")){S.stars[ch.p.id]=(S.stars[ch.p.id]||0)+prevCost;}
+    else if(cur&&cur.s==="missed"){if(prevCost)cur.cost=prevCost;else if(statusCfg().cost&&ch.pts>0&&ch.t.rp!==false){cur.cost=ch.pts;S.stars[ch.p.id]=(S.stars[ch.p.id]||0)-ch.pts;}}
+  }
+  return r;};})();
+
+/* ---- automatic end of day (parent devices only; every device shows the result) ---- */
+var SWEEP_KEY="familyhub-sweep";
+function statusSweep(){
+  if(devRole()!=="parent"||initialDataProblem||storageConflict)return false;
+  if(sync.on&&sync.user&&!sync.ready)return false; /* wait for the family's latest data first */
+  var t=today(),last="";try{last=localStorage.getItem(SWEEP_KEY)||"";}catch(e){}
+  /* the end of day only counts from the day this version first ran in the family (no surprise "Missed" for older days) */
+  if(!statusCfg().since){S.statusCfg=Object.assign({},S.statusCfg||{},{since:t});save();}
+  var from=fd(addD(localDate(t),-6));if(statusCfg().since>from)from=statusCfg().since;if(last&&last>=from)from=fd(addD(localDate(last),1));
+  var to=nowHM()>=statusCfg().cutoff?t:fd(addD(localDate(t),-1)),ch=false;
+  for(var d=from;d<=to;d=fd(addD(localDate(d),1))){
+    (S.members||P).forEach(function(p){if(p.archived)return;dueTasks(p.id,d).forEach(function(tk){var k=d+"|"+p.id+"|"+tk.id;if(statusOf(k)==="pending"){statusSet(k,"missed","","");markAuto(k);ch=true;}});});
+    if(typeof pcItems==="function"&&typeof pcCfg==="function"&&pcCfg())pcItems(d).forEach(function(it){var k=d+"|pc|"+it.id;if(statusOf(k)==="pending"){statusSet(k,"missed","","");markAuto(k);ch=true;}});
+    (S.household||[]).forEach(function(x){
+      if(!careIsMed(x)||x.completed||(x.date&&x.date<statusCfg().since))return;var guard=0;
+      while(x.date&&x.date<=d&&!x.completed&&guard++<40){var rk=x.id+"|"+x.date;if((S.reminderLog||{})[rk])break;
+        S.reminderLog=S.reminderLog||{};S.reminderLog[rk]={at:new Date().toISOString(),status:"missed",skipped:true,auto:true};statusLogAdd(x.date+"|med|"+x.id,"pending","missed","","auto");
+        x.lastSkipped=x.date;if(x.repeat&&x.repeat!=="none"){x.anchorDay=x.anchorDay||+x.date.slice(8,10);var nd=hhNextDate(x);if(nd<=x.date)break;x.date=nd;}else{x.completed=x.date;x.skipped=true;}ch=true;}
+    });
+  }
+  if(to>=from)try{localStorage.setItem(SWEEP_KEY,to);}catch(e){}
+  if(ch){save();if(view!=="par"||!syncUiBusy())render();}
+  return ch;
+}
+function markAuto(k){var o=S.itemStatus&&S.itemStatus[k];if(o)o.auto=true;var l=S.statusLog||[],e=l[l.length-1];if(e&&e.k===k)e.src="auto";}
+setInterval(function(){try{statusSweep();}catch(e){}},60000);
+setTimeout(function(){try{statusSweep();}catch(e){}},8000);
+/* a parent approving a make-up turns Missed into Made up */
+function statusMakeups(){
+  if(devRole()!=="parent")return false;var ch=false;
+  Object.keys(S.itemStatus||{}).forEach(function(k){var o=S.itemStatus[k];if(o&&o.s==="missed"&&S.done&&S.done[k]==="a"){statusSet(k,"madeup","","");ch=true;}});
+  return ch;
+}
+(function(){var sv=window.syncAfterSave;window.syncAfterSave=function(){var r=sv?sv.apply(this,arguments):undefined;try{if(!sync.applying&&statusMakeups())save();}catch(e){}return r;};
+  var so=syncOnDocs;syncOnDocs=function(){var r=so.apply(this,arguments);try{if(statusMakeups()){save();}statusSweep();}catch(e){}return r;};})();
+
+/* ---- make-up: a missed chore from earlier this week, for half points ---- */
+function statusMakeupList(pid){
+  var t=today(),ws=weekStartOf(t),out=[];
+  for(var d=ws;d<t;d=fd(addD(localDate(d),1))){dueTasks(pid,d).forEach(function(tk){var k=d+"|"+pid+"|"+tk.id;if(statusEff(k)==="missed")out.push({k:k,d:d,t:tk});});}
+  return out;
+}
+function statusMakeupSend(k){
+  var ch=statusChore(k);if(!ch||!ch.p.kid||S.done[k])return;
+  var d=k.split("|")[0];if(d<weekStartOf(today())||d>=today())return;
+  var snap=JSON.stringify(S),half=Math.floor(ch.pts)/2;
+  S.done[k]="p";S.submissions=S.submissions||{};S.submissions[k]={title:ch.t.t+" (made up)",group:ch.t.g,makeup:true};
+  S.pendingPoints=S.pendingPoints||{};S.pendingPoints[k]=ch.t.rp===false?0:half;
+  statusLogAdd(k,"missed","done","","makeup");
+  if(commitOr(snap)){statusShadow=statusSnapshot();render();statusMessage("Sent to a parent · "+(half?half+" point"+(half===1?"":"s")+" when approved":"no points"));}
+}
+function statusMakeupHtml(pid){
+  var p=person(pid);if(!p||!p.kid)return "";var l=statusMakeupList(pid),w=S.done||{};if(!l.length)return "";
+  return "<div class='card st-makeup'><h2 style='margin-top:0'>↩️ Make up a missed chore</h2><p class='note'>Missed earlier this week? Do it now for half points. A parent checks it.</p>"+
+    l.map(function(x){var sent=w[x.k]==="p";return "<div class='row'><span class='t'>"+esc(x.t.e||"")+" "+esc(x.t.t)+"<div class='note'>"+esc(niceDate(x.d))+"</div></span>"+(sent?"<span class='note'>⏳ Waiting for a parent</span>":"<button class='btn g' data-a='nxstmk' data-k='"+esc(x.k)+"'>Make up · ½ ⭐</button>")+"</div>";}).join("")+"</div>";
+}
+(function(){var pr=pers;pers=function(){var h=pr.apply(this,arguments);try{h+=statusMakeupHtml(pid);}catch(e){}return h;};})();
+
+/* ---- "I couldn't do this" ---- */
+function statusCant(k,reason){
+  var snap=JSON.stringify(S),q=String(k).split("|");
+  S.cantReq=(S.cantReq||[]).filter(function(c){return c&&c.k!==k;});
+  S.cantReq.push({id:"c"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),k:k,r:EXCUSE_REASONS[reason]?reason:"",by:(person(q[1])&&q[1])||statusWho(),at:new Date().toISOString()});
+  statusLogAdd(k,statusOf(k),"couldnt",reason,"couldnt");
+  if(commitOr(snap)){render();statusMessage("Sent to a parent to review.");}
+}
+function statusCantHtml(){
+  var l=(S.cantReq||[]).filter(function(c){return c&&c.k;});if(!l.length)return "";
+  return "<h2>“I couldn’t do this” · "+l.length+"</h2><div class='card'>"+l.map(function(c){var w=person(c.by);return "<div class='row' style='flex-wrap:wrap'><span class='t'><b>"+esc(statusLabel(c.k))+"</b><br><span class='note'>"+esc(w?w.n:"Someone")+(c.r?" · "+esc(EXCUSE_REASONS[c.r]):"")+" · "+esc(new Date(c.at).toLocaleString([],{weekday:"short",hour:"numeric",minute:"2-digit"}))+"</span></span>"+
+    "<button class='btn g' data-a='nxstcant' data-id='"+esc(c.id)+"' data-s='excused'>Excuse</button><button class='btn n' data-a='nxstcant' data-id='"+esc(c.id)+"' data-s='missed'>Missed</button><button class='btn n' data-a='nxstcant' data-id='"+esc(c.id)+"' data-s=''>Dismiss</button></div>";}).join("")+"</div>";
+}
+/* ---- parent settings ---- */
+function statusCfgHtml(){var c=statusCfg();return "<h2>Chore statuses</h2><div class='card'><label for='stcut'>End of the day (anything still Pending becomes Missed)</label><input id='stcut' type='time' value='"+esc(c.cutoff)+"'><label style='display:block;margin-top:10px'><input type='checkbox' id='stcost'"+(c.cost?" checked":"")+"> Missed chores cost points</label><p class='note'>Off: a missed chore just earns nothing. On: its points are taken away, and given back if you later change it to Excused or Done. Missed chores can be made up the same week for half points.</p><button class='btn' data-a='nxstcfg'>Save</button></div>";}
+(function(){var sa=syncAdminHtml;syncAdminHtml=function(){return statusCantHtml()+statusCfgHtml()+sa.apply(this,arguments);};})();
+
+/* ---- the "⋯" button next to every check-off, and the small menu it opens ---- */
+var ST_CHIP={missed:"Missed",excused:"Excused",madeup:"Made up"};
+function statusKeyFor(b){
+  var a=b.getAttribute("data-a");
+  if(a==="tick"&&b.getAttribute("data-p")&&b.getAttribute("data-t"))return today()+"|"+b.getAttribute("data-p")+"|"+b.getAttribute("data-t");
+  if(a==="hhcomplete"){var x=(S.household||[]).filter(function(i){return i&&i.id===b.getAttribute("data-id");})[0];return x&&careIsMed(x)?b.getAttribute("data-date")+"|med|"+x.id:"";}
+  if(a==="pcpick")return b.getAttribute("data-d")+"|pc|"+b.getAttribute("data-i");
+  return "";
+}
+function statusDecorate(){
+  var app=document.getElementById("app");if(!app)return;
+  var bs=app.querySelectorAll("[data-a='tick'],[data-a='hhcomplete'],[data-a='pcpick']");
+  for(var i=0;i<bs.length;i++){var b=bs[i];if(b.getAttribute("data-stk"))continue;var k=statusKeyFor(b);if(!k)continue;b.setAttribute("data-stk",k);
+    var s=statusEff(k),o=S.itemStatus&&S.itemStatus[k],chip="";
+    if(ST_CHIP[s])chip="<span class='st-chip st-"+s+"'>"+ST_CHIP[s]+(s==="excused"&&o&&o.r?" · "+esc(EXCUSE_REASONS[o.r]):"")+"</span>";
+    else if((S.cantReq||[]).some(function(c){return c&&c.k===k;}))chip="<span class='st-chip st-cant'>Sent to a parent</span>";
+    b.insertAdjacentHTML("afterend","<button type='button' class='st-more' data-a='nxstmenu' data-k='"+esc(k)+"' aria-label='More choices'>⋯</button>"+chip);}
+}
+(function(){var r0=render;render=function(){var r=r0.apply(this,arguments);try{statusDecorate();}catch(e){}return r;};})();
+function statusMenuClose(){var m=document.getElementById("stmenu");if(m)m.parentNode.removeChild(m);}
+function statusMenu(k,step){
+  statusMenuClose();
+  var par=devRole()==="parent"&&unlocked,s=statusEff(k),h="<div class='st-sheet' role='dialog' aria-label='Choices'><div class='st-title'>"+esc(statusLabel(k))+"<br><span class='note'>Now: "+esc(STATUS_NAMES[s]||s)+"</span></div>";
+  if(step==="excuse"||step==="cant"){
+    h+="<div class='st-sub'>"+(step==="cant"?"Why couldn’t you do it?":"Excused because…")+"</div>";
+    Object.keys(EXCUSE_REASONS).forEach(function(r){h+="<button class='btn' data-a='"+(step==="cant"?"nxstcantgo":"nxstset")+"' data-k='"+esc(k)+"' data-s='excused' data-r='"+r+"'>"+EXCUSE_REASONS[r]+"</button>";});
+  }else if(par){
+    if(s!=="done"&&s!=="madeup")h+="<button class='btn g' data-a='nxstset' data-k='"+esc(k)+"' data-s='done'>✓ Done</button>";
+    if(s!=="missed")h+="<button class='btn' data-a='nxstset' data-k='"+esc(k)+"' data-s='missed'>Missed</button>";
+    h+="<button class='btn' data-a='nxstmenu' data-k='"+esc(k)+"' data-step='excuse'>Excused…</button>";
+    if(s!=="pending"&&!statusPastCutoff(k.split("|")[0]))h+="<button class='btn n' data-a='nxstset' data-k='"+esc(k)+"' data-s='pending'>Back to pending</button>";
+    else if(s!=="pending"&&s!=="missed")h+="<button class='btn n' data-a='nxstset' data-k='"+esc(k)+"' data-s='missed'>Undo (back to Missed)</button>";
+  }else{
+    if(s!=="done"&&s!=="excused"&&s!=="madeup")h+="<button class='btn' data-a='nxstmenu' data-k='"+esc(k)+"' data-step='cant'>I couldn’t do this</button>";
+    var ch=statusChore(k),d=k.split("|")[0];if(ch&&ch.p.kid&&s==="missed"&&d<today()&&d>=weekStartOf(today())&&!S.done[k])h+="<button class='btn g' data-a='nxstmk' data-k='"+esc(k)+"'>Make up · ½ ⭐</button>";
+    if(h.indexOf("data-a='nx")<0)h+="<p class='note'>Nothing to change here.</p>";
+  }
+  h+="<button class='btn n st-close' data-a='nxstclose'>Close</button></div>";
+  var m=document.createElement("div");m.id="stmenu";m.className="st-back";m.innerHTML=h;document.body.appendChild(m);
+  var f=m.querySelector("button");if(f)f.focus();
+}
+/* a parent sets a status; Done also gives the chore's points the usual way */
+function statusParentSet(k,s,r){
+  var snap=JSON.stringify(S),q=k.split("|"),ch=statusChore(k);
+  if(s==="done"&&ch&&!S.done[k]){
+    if(ch.p.kid){S.done[k]="p";S.pendingPoints=S.pendingPoints||{};S.pendingPoints[k]=ch.t.rp===false?0:(S.itemStatus&&S.itemStatus[k]&&S.itemStatus[k].s==="missed"?Math.floor(ch.pts)/2:ch.pts);S.submissions=S.submissions||{};S.submissions[k]={title:ch.t.t,group:ch.t.g};
+      if(!approveChore(k,String(S.pendingPoints[k]))){rollbackTo(snap);return;}}
+    else S.done[k]="a";
+    if(S.itemStatus&&S.itemStatus[k]&&S.itemStatus[k].s==="missed"){statusSet(k,"madeup","","");}else if(S.itemStatus)delete S.itemStatus[k];
+  }else if(s==="done"&&q[1]==="med"){
+    var x=(S.household||[]).filter(function(i){return i&&i.id===q[2];})[0];S.reminderLog=S.reminderLog||{};
+    S.reminderLog[q[2]+"|"+q[0]]={at:new Date().toISOString(),status:"done",by:statusWho()};
+    if(x&&x.date===q[0]){x.lastDone=q[0];if(x.repeat&&x.repeat!=="none"){x.anchorDay=x.anchorDay||+x.date.slice(8,10);x.date=hhNextDate(x);}else x.completed=today();}
+    statusSet(k,"done","","");
+  }else{
+    if(s==="pending"&&S.done&&S.done[k]==="p"){delete S.done[k];if(S.pendingPoints)delete S.pendingPoints[k];}
+    statusSet(k,s,r||"","");
+    if(q[1]==="med"&&s!=="done"){var e=(S.reminderLog||{})[q[2]+"|"+q[0]];if(e){e.status=s==="pending"?"done":s;if(s==="missed")e.skipped=true;else delete e.skipped;if(r)e.reason=r;}}
+  }
+  (S.cantReq||[]).forEach(function(c){if(c&&c.k===k)c.handled=true;});S.cantReq=(S.cantReq||[]).filter(function(c){return c&&!c.handled;});
+  if(commitOr(snap)){statusShadow=statusSnapshot();render();}
+}
+document.addEventListener("click",function(e){
+  var bk=e.target&&e.target.id==="stmenu";if(bk){statusMenuClose();return;}
+  var n=e.target;while(n&&n!==document&&!(n.getAttribute&&n.getAttribute("data-a")))n=n.parentNode;if(!n||n===document)return;
+  var a=n.getAttribute("data-a");if(a.indexOf("nxst")!==0)return;
+  e.preventDefault();e.stopPropagation();
+  var k=n.getAttribute("data-k")||"",par=devRole()==="parent"&&unlocked;
+  if(a==="nxstclose"){statusMenuClose();return;}
+  if(a==="nxstmenu"){statusMenu(k,n.getAttribute("data-step")||"");return;}
+  if(a==="nxstset"){statusMenuClose();if(!par){view="par";render();return;}statusParentSet(k,n.getAttribute("data-s"),n.getAttribute("data-r")||"");return;}
+  if(a==="nxstcantgo"){statusMenuClose();statusCant(k,n.getAttribute("data-r")||"");return;}
+  if(a==="nxstmk"){statusMenuClose();statusMakeupSend(k);return;}
+  if(a==="nxstcfg"){if(!par)return;var snap=JSON.stringify(S),cut=(document.getElementById("stcut")||{}).value||"21:00";S.statusCfg={cutoff:/^\d\d:\d\d$/.test(cut)?cut:"21:00",cost:!!(document.getElementById("stcost")||{}).checked,since:statusCfg().since||today()};if(commitOr(snap)){statusMessage("Saved · the day ends at "+niceTime(S.statusCfg.cutoff));render();}return;}
+  if(a==="nxstcant"){if(!par)return;var c=(S.cantReq||[]).filter(function(x){return x&&x.id===n.getAttribute("data-id");})[0];if(!c)return;var st=n.getAttribute("data-s");
+    if(st)statusParentSet(c.k,st,st==="excused"?c.r:"");else{var sn=JSON.stringify(S);S.cantReq=S.cantReq.filter(function(x){return x!==c;});if(commitOr(sn))render();}return;}
+},true);
+document.addEventListener("keydown",function(e){if(e.key==="Escape")statusMenuClose();});
+(function(){var css=document.createElement("style");css.textContent=
+  ".st-more{min-width:40px;min-height:40px;margin-left:6px;border-radius:12px;border:2px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:20px;line-height:1;padding:0 8px;flex:none;cursor:pointer}"+
+  ".st-chip{display:inline-block;margin-left:6px;padding:3px 9px;border-radius:999px;font-size:13px;font-weight:bold;white-space:nowrap;background:var(--line);color:var(--ink)}"+
+  ".st-chip.st-missed{background:#f6d7c3;color:#7a3a0d}.st-chip.st-excused{background:#d6e4f5;color:#1d4a7a}.st-chip.st-madeup{background:#d9f0d9;color:#1f5e25}.st-chip.st-cant{background:#efe3f7;color:#5b2a7a}"+
+  ".st-back{position:fixed;left:0;right:0;top:0;bottom:0;background:rgba(0,0,0,.35);z-index:9000;display:flex;align-items:flex-end;justify-content:center}"+
+  ".st-sheet{background:var(--card);color:var(--ink);width:100%;max-width:520px;border-radius:18px 18px 0 0;padding:16px max(16px,env(safe-area-inset-left,0px)) calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px;box-shadow:0 -4px 20px #0004}"+
+  ".st-sheet .btn{width:100%;margin:0;min-height:50px}.st-title{font-weight:bold;font-size:18px;margin-bottom:4px}.st-sub{font-weight:bold;margin-top:4px}";
+  document.head.appendChild(css);})();
 window.FH_READY=true;
 </script>
 
