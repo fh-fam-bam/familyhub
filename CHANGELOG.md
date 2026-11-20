@@ -72,3 +72,13 @@
 - **6b, "Unlock from my phone":** the tablet sends an unlock request. A parent's phone with Family Hub open shows "🔓 Unlock wall tablet?" with Approve and Ignore. Approve opens a 5-minute session. The database checks that a parent approved it and that it hasn't expired.
 - **Limits while unlocked:** the tablet still can't read parent care items, PIN hashes, private settings or accounts. A medicine marked on the tablet still goes through the kids' path, and the tablet never sends its own copy of the Household list or device settings.
 - **Rules:** database rules for unlock requests, unlock sessions and the wall PIN, plus 29 new rule tests (91 in total) and an end-to-end parent-mode test.
+
+### v39.7 – Stage 7: kids' progress pages
+- **"This week" card** under each kid's name on their page:
+  - **Meter:** Done ÷ (Done + Missed), in the kid's own colour, with marks at 60% and 85%. Excused doesn't count. Made up counts as Done. Chores, routine steps and the kid's pet-care shifts are included.
+  - **Zones:** 🌟 Great week (85%+), 👍 On track (60–84%), 💪 Needs a push (under 60%). There are no sad faces or scolding words.
+  - **Today's result**, and a **7-day row of dots**, one per day, coloured by that day's result.
+- **Animations:** a star burst and a smooth fill when something is marked Done, and a gentle dip of the meter when something becomes Missed. They only move and fade (no heavy effects), use 3 stars instead of 6 on Fire tablets, and switch off for "reduced motion".
+- **Plant:** it grows a little on each day the kid was On track or better, blooms after 5 good days, and droops slightly after a Needs-a-push day. Parents can turn it off in Parent > Family sync > Kids' progress pages.
+- **Weekly reset:** the week starts fresh every Monday. On parent phones, ◀ ▶ shows earlier weeks (up to 8 back, from what that phone has saved). Days before the family's start date show as "not counted".
+- **Fix (from Stage 4):** marking an already-approved chore as Missed no longer turns it into "Made up". Only a make-up the kid actually sent in becomes Made up.
