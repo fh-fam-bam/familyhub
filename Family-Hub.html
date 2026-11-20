@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v39.5";
+var FH_BUILD="v39.6";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -8156,6 +8156,171 @@ document.addEventListener("click",function(e){
   ".rv-home{display:flex;align-items:center;gap:10px;width:100%;margin:0 0 12px;padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:20px;font-weight:bold;cursor:pointer;text-align:left;min-height:60px}"+
   ".rv-home.hot{border:2px solid #d9822b}.rv-n{margin-left:auto;min-width:34px;height:34px;padding:0 10px;border-radius:17px;background:#d63939;color:#fff;line-height:34px;text-align:center;font-size:18px}.rv-ok{font-weight:normal;color:var(--mute);font-size:16px}"+
   ".rv-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:space-between}.rv-head h2{margin:0;font-size:20px}.rv-head .btn{margin:0;min-height:44px}.rv-body{margin-top:6px}.rv-body h2{display:none}";
+  document.head.appendChild(css);})();
+/* ---- v39.6 ---- */
+/* ===== v39.6 (Stage 6): parent actions on the wall tablet =====
+   Parent mode on the tablet lasts 5 minutes and then locks itself. Two ways in:
+   6a  Wall PIN: a parent sets it on their phone. Only a hash is stored, in a place the tablet cannot read.
+       The tablet sends a proof; the database itself checks it against the hash.
+   6b  "Unlock from my phone": the tablet asks, a parent's phone shows "Unlock wall tablet?", and Approve writes a
+       5-minute unlock session. The database checks that a parent approved it and that it has not expired.
+   While unlocked the tablet can do parent actions (approvals, points, statuses, To review), but it still cannot
+   read parent care items, PIN hashes or accounts. */
+var WS={on:false,until:0,by:"",kind:"",wait:0,msg:"",req:null,reqT:0,reqOff:0};
+function wsOn(){return WS.on&&Date.now()<WS.until;}
+function wsLeft(){var s=Math.max(0,Math.round((WS.until-Date.now())/1000));return Math.floor(s/60)+":"+p2(s%60);}
+function wsBaseRole(){return syncRole();}
+/* the tablet looks like a parent device in parent mode; its syncing stays a wall display's, except for sending */
+(function(){var sr=syncRole;syncRole=function(){if(window.__wsPush&&wsOn())return "parent";return sr.apply(this,arguments);};
+  devRole=function(){var r=syncRole();if(r!=="parent"&&wsOn()&&!window.__wsNoUI)return "parent";return r;};
+  /* a medicine marked on the tablet always goes the kids' way (it syncs from the tablet that way) */
+  var ha=hhAction;hhAction=function(a){if(wsOn()&&(a==="hhcomplete"||a==="hhskip")){window.__wsNoUI=true;try{return ha.apply(this,arguments);}finally{window.__wsNoUI=false;}}return ha.apply(this,arguments);};})();
+function wsTs(){return new Date().toISOString();}
+function wsDoc(path,fields){return fsCall(path,"PATCH",{fields:fields});}
+function wsF(o){var f={};Object.keys(o).forEach(function(k){var v=o[k];f[k]=(k==="until"||k==="at")?{timestampValue:v}:{stringValue:String(v)};});return f;}
+function wsGetF(d,k){var f=d&&d.fields&&d.fields[k];return f?(f.stringValue!==undefined?f.stringValue:f.timestampValue||""):"";}
+
+/* ---- the tablet ---- */
+function wsStart(until,by,kind){
+  WS.on=true;WS.until=until;WS.by=by||"";WS.kind=kind;WS.wait=0;WS.msg="";
+  unlocked=true;unlockedBy=person(WS.by)?WS.by:"";limitedUnlock=false;
+  try{devApply();}catch(e){}view="review";render();statusMessage("Parent mode for 5 minutes");
+}
+function wsEnd(why){
+  if(!WS.on)return;WS.on=false;WS.until=0;unlocked=false;unlockedBy="";statusMenuClose&&statusMenuClose();
+  try{devApply();}catch(e){}view="home";render();statusMessage(why||"Parent mode ended. The tablet is locked again.");
+}
+setInterval(function(){
+  if(WS.on){if(Date.now()>=WS.until)wsEnd();else{var b=document.getElementById("wsbar");if(b){var t=b.querySelector(".ws-left");if(t)t.textContent=wsLeft();}else wsBar();}}
+},1000);
+function wsBar(){
+  var old=document.getElementById("wsbar");if(old)old.parentNode.removeChild(old);document.body.classList.toggle("ws-on",wsOn());if(!wsOn())return;
+  var d=document.createElement("div");d.id="wsbar";d.setAttribute("role","status");
+  d.innerHTML="🔓 Parent mode"+(person(WS.by)?" · "+esc(person(WS.by).n):"")+" · <b class='ws-left'>"+wsLeft()+"</b> left <button class='btn' data-a='nxwslock'>Lock now</button>";
+  document.body.appendChild(d);
+}
+(function(){var r0=render;render=function(){var r=r0.apply(this,arguments);try{wsBar();}catch(e){}return r;};})();
+/* 6a: wall PIN */
+function wsPinUnlock(){
+  var pin=((document.getElementById("wspin")||{}).value||"").trim();
+  var li=pinLockInfo(),now=Date.now();if(li.until>now){WS.msg="Too many wrong tries. Try again in "+Math.ceil((li.until-now)/1000)+" seconds.";render();return;}
+  if(!/^\d{6,8}$/.test(pin)){WS.msg="The wall PIN has 6 to 8 digits.";render();return;}
+  if(!sync.user){WS.msg="This tablet needs to be signed in to family sync.";render();return;}
+  WS.msg="Checking…";render();
+  var uid=acctUid();
+  fsCall("households/family/wall/pinSalt").then(function(r){
+    if(r.status===404)throw new Error("No wall PIN has been set yet. A parent sets it on their phone (Parent › Wall tablet).");
+    if(r.status!==200)throw new Error("Could not check the PIN (status "+r.status+").");
+    var salt=wsGetF(r.json,"salt"),setBy=wsGetF(r.json,"setBy"),proof=pinHash(salt,pin),until=new Date(Date.now()+290000).toISOString();
+    return wsDoc("households/family/unlockSession/"+encodeURIComponent(uid),wsF({kind:"pin",proof:proof,by:setBy,approvedBy:"",until:until,at:wsTs()})).then(function(w){
+      if(w.status===200){try{localStorage.removeItem("familyhub-pinlock");}catch(e){}wsStart(Date.parse(until),setBy,"pin");return;}
+      if(w.status===403){li.n=li.n+1;if(li.n>=5){li.until=Date.now()+60000;li.n=0;}try{localStorage.setItem("familyhub-pinlock",JSON.stringify(li));}catch(e){}throw new Error("That PIN is not correct.");}
+      throw new Error("Could not unlock (status "+w.status+").");
+    });
+  }).catch(function(e){WS.msg=e.message;render();});
+}
+/* 6b: ask a parent's phone */
+function wsAsk(){
+  if(!sync.user){WS.msg="This tablet needs to be signed in to family sync.";render();return;}
+  var uid=acctUid();
+  wsDoc("households/family/unlockReq/"+encodeURIComponent(uid),wsF({name:"Wall tablet",at:wsTs()})).then(function(r){
+    if(r.status!==200){WS.msg="Could not send the request (status "+r.status+"). The new database rules may not be published yet.";render();return;}
+    WS.wait=Date.now()+120000;WS.msg="Waiting for a parent’s phone… (open Family Hub on your phone)";render();wsPoll();
+  },function(){WS.msg="Could not send the request. Check the Wi-Fi.";render();});
+}
+function wsPoll(){
+  if(!WS.wait||WS.on)return;
+  if(Date.now()>WS.wait){WS.wait=0;WS.msg="No answer from a parent’s phone. Try again, or use the wall PIN.";render();return;}
+  fsCall("households/family/unlockSession/"+encodeURIComponent(acctUid())).then(function(r){
+    if(r.status===200){var u=Date.parse(wsGetF(r.json,"until"));if(wsGetF(r.json,"kind")==="phone"&&u>Date.now()){wsStart(u,wsGetF(r.json,"by"),"phone");return;}}
+    setTimeout(wsPoll,2000);
+  },function(){setTimeout(wsPoll,3000);});
+}
+function wsLock(){
+  var uid=acctUid();wsEnd("Locked.");
+  if(uid)fsCall("households/family/unlockSession/"+encodeURIComponent(uid),"DELETE").catch(function(){});
+}
+function wsUnlockHtml(){
+  if(wsBaseRole()==="parent")return "";
+  var h="<h1>Parent mode</h1><div class='card ws-card'><p>Parent mode lets a parent approve chores, set statuses and handle To review on this tablet for <b>5 minutes</b>. Then it locks itself.</p>";
+  h+="<p><button class='btn g' data-a='nxwsask' style='min-height:56px;font-size:20px'>📱 Unlock from my phone</button></p>";
+  h+="<label for='wspin'>Or enter the wall PIN</label><div><input id='wspin' type='password' inputmode='numeric' autocomplete='off' maxlength='8' placeholder='6 to 8 digits' style='max-width:220px'> <button class='btn' data-a='nxwspin'>Unlock</button></div>";
+  if(WS.msg)h+="<p class='note' role='status'><b>"+esc(WS.msg)+"</b></p>";
+  return h+"</div><p class='note'>Device settings for this tablet (its own device PIN) are below.</p>";
+}
+(function(){var lp=limitedParentHtml;limitedParentHtml=function(){return wsUnlockHtml()+lp.apply(this,arguments);};})();
+/* in parent mode, points and approvals made here are sent right away */
+(function(){
+  var sv=window.syncAfterSave;window.syncAfterSave=function(){try{if(wsOn()&&sync.starsInit){syncLedgerScan();syncStore();}}catch(e){}return sv?sv.apply(this,arguments):undefined;};
+  var sd=syncDiff;syncDiff=function(){
+    if(!wsOn())return sd.apply(this,arguments);
+    window.__wsPush=true;var jobs;try{jobs=sd.apply(this,arguments);}finally{window.__wsPush=false;}
+    /* never send the tablet's copy of care-related or device-specific settings */
+    return jobs.filter(function(j){return !(j.c==="cfg"&&(j.id==="blob_household"||j.id==="blob_prefs"||j.id==="blob_kidsAccount"||j.id==="members"));});
+  };
+})();
+
+/* ---- a parent's phone ---- */
+function wsMine(){return wsBaseRole()==="parent"&&!!sync.user&&sync.ready;}
+function wsCheckReq(){
+  if(!wsMine()||document.hidden||Date.now()<WS.reqOff)return;
+  fsCall("households/family/unlockReq?pageSize=10").then(function(r){
+    if(r.status===403||r.status===404){WS.reqOff=Date.now()+300000;return;}
+    if(r.status!==200)return;
+    var docs=((r.json&&r.json.documents)||[]).map(function(d){return {uid:fsIdOf(d),name:wsGetF(d,"name"),at:Date.parse(wsGetF(d,"at"))};}).filter(function(q){return Date.now()-q.at<120000;});
+    var q=docs[0]||null,had=!!WS.req;WS.req=q;
+    if(!!q!==had||(q&&had))wsReqBanner();
+  },function(){});
+}
+setInterval(wsCheckReq,5000);setTimeout(wsCheckReq,4000);
+document.addEventListener("visibilitychange",function(){if(!document.hidden)setTimeout(wsCheckReq,500);});
+function wsReqBanner(){
+  var old=document.getElementById("wsreq");if(old)old.parentNode.removeChild(old);if(!WS.req)return;
+  var d=document.createElement("div");d.id="wsreq";d.setAttribute("role","alertdialog");d.setAttribute("aria-label","Unlock wall tablet?");
+  d.innerHTML="<b>🔓 Unlock wall tablet?</b><span class='note'>"+esc(WS.req.name||"The wall tablet")+" asked "+Math.max(1,Math.round((Date.now()-WS.req.at)/1000))+" s ago · 5 minutes of parent mode</span><span><button class='btn g' data-a='nxwsok'>Approve</button> <button class='btn n' data-a='nxwsno'>Ignore</button></span>";
+  document.body.appendChild(d);
+}
+function wsApprove(ok){
+  var q=WS.req;if(!q)return;WS.req=null;wsReqBanner();
+  var me=acctUid(),pid=(acct&&acct.personId&&person(acct.personId))?acct.personId:(unlockedBy||"");
+  var p=ok?wsDoc("households/family/unlockSession/"+encodeURIComponent(q.uid),wsF({kind:"phone",approvedBy:me,by:pid,proof:"",until:new Date(Date.now()+290000).toISOString(),at:wsTs()})):Promise.resolve({status:200});
+  p.then(function(r){
+    fsCall("households/family/unlockReq/"+encodeURIComponent(q.uid),"DELETE").catch(function(){});
+    if(ok)statusMessage(r.status===200?"Wall tablet unlocked for 5 minutes.":"Could not unlock the tablet (status "+r.status+").");
+  });
+}
+/* ---- a parent sets the wall PIN on their phone ---- */
+function wsPinSetHtml(){
+  if(wsBaseRole()!=="parent")return "";
+  return "<h2>Wall tablet</h2><div class='card'><p>Parent mode on the wall tablet lasts 5 minutes. Unlock it from this phone when the tablet asks, or with the wall PIN.</p>"+
+    "<label for='wsp1'>New wall PIN (6 to 8 digits)</label><input id='wsp1' type='password' inputmode='numeric' autocomplete='off' maxlength='8'><label for='wsp2'>Type it again</label><input id='wsp2' type='password' inputmode='numeric' autocomplete='off' maxlength='8'><button class='btn' data-a='nxwsset'>Save wall PIN</button>"+
+    "<p class='note'>Only a scrambled version (a hash) is stored, where the tablet cannot read it. The database checks the PIN itself, so it cannot be skipped from the tablet. After 5 wrong tries the tablet waits a minute.</p>"+(WS.msg&&!wsOn()?"<p class='note' role='status'><b>"+esc(WS.msg)+"</b></p>":"")+"</div>";
+}
+function wsPinSet(){
+  var a=(document.getElementById("wsp1")||{}).value||"",b=(document.getElementById("wsp2")||{}).value||"";
+  if(!/^\d{6,8}$/.test(a)){alert("Use 6 to 8 digits.");return;}if(a!==b){alert("The two PINs do not match.");return;}
+  if(!sync.user){alert("Sign in to family sync first.");return;}
+  var salt="";for(var i=0;i<16;i++)salt+=Math.floor(Math.random()*16).toString(16);
+  var pid=(acct&&acct.personId&&person(acct.personId))?acct.personId:(unlockedBy||"");
+  WS.msg="Saving…";render();
+  wsDoc("households/family/wallSecret/pin",wsF({hash:pinHash(salt,a),setBy:pid,at:wsTs()})).then(function(r){
+    if(r.status!==200)throw new Error(r.status===403?"Not allowed. Publish the v39.6 database rules first.":"status "+r.status);
+    return wsDoc("households/family/wall/pinSalt",wsF({salt:salt,setBy:pid,at:wsTs()}));
+  }).then(function(r){if(r.status!==200)throw new Error("status "+r.status);WS.msg="Wall PIN saved.";render();},function(e){WS.msg="Could not save the wall PIN: "+e.message;render();});
+}
+(function(){var sa=syncAdminHtml;syncAdminHtml=function(){return wsPinSetHtml()+sa.apply(this,arguments);};})();
+document.addEventListener("click",function(e){
+  var n=e.target;while(n&&n!==document&&!(n.getAttribute&&n.getAttribute("data-a")))n=n.parentNode;if(!n||n===document)return;
+  var a=n.getAttribute("data-a");if(a.indexOf("nxws")!==0)return;e.preventDefault();e.stopPropagation();
+  if(a==="nxwspin")wsPinUnlock();else if(a==="nxwsask")wsAsk();else if(a==="nxwslock")wsLock();
+  else if(a==="nxwsok")wsApprove(true);else if(a==="nxwsno")wsApprove(false);
+  else if(a==="nxwsset"&&unlocked&&wsBaseRole()==="parent")wsPinSet();
+},true);
+document.addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target&&e.target.id==="wspin")wsPinUnlock();});
+(function(){var css=document.createElement("style");css.textContent=
+  "#wsbar{position:fixed;left:0;right:0;top:0;z-index:8000;background:#1f6f3f;color:#fff;font-weight:bold;padding:calc(8px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px));display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:18px}#wsbar .btn{margin:0 0 0 auto;min-height:44px;background:#fff;color:#1f6f3f}"+
+  "#wsreq{position:fixed;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));z-index:8500;background:var(--card);color:var(--ink);border:3px solid #d9822b;border-radius:16px;padding:12px 14px;box-shadow:0 6px 24px #0005;display:flex;flex-direction:column;gap:6px;font-size:18px}#wsreq .btn{margin:0;min-height:48px}"+
+  "body.ws-on main{padding-top:64px}body.ws-on #side{padding-top:56px}";
   document.head.appendChild(css);})();
 window.FH_READY=true;
 </script>
