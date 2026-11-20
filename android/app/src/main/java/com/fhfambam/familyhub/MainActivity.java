@@ -67,6 +67,12 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
+        // 1.3: let a computer read the page with DevTools over USB, only while USB debugging is on.
+        try {
+            WebView.setWebContentsDebuggingEnabled(android.provider.Settings.Global.getInt(
+                    getContentResolver(), android.provider.Settings.Global.ADB_ENABLED, 0) == 1);
+        } catch (Exception e) { /* leave debugging off */ }
+
         web = new WebView(this);
         setContentView(web);
 
