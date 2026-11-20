@@ -91,3 +91,24 @@
   - "Changes this week": old → new status, who made the change and when
 - **Wording:** single days now read "Great day" instead of "Great week". Days before tracking started read "Not counted".
 - **Tablet:** the wall tablet shows no summary cards and can't open the history.
+
+### v39.9 – Stage 9: a tidier Parent area (the parent's choices)
+- **New "📱 This phone" screen** (button at the top of the Parent area): device type, return to Home after idle, night dimming, light/dark, Family sync sign-in and connection check, AI helper without the PIN, and Display effects. These only change the device in your hand.
+- **To review now also holds:**
+  - a "Send a note to the other parent" box
+  - "↩️ Recently approved", to undo an approval
+  - "😕 Tough days", when a child picked Tough in the last 3 days
+- **Each child's history page** shows the mood they picked for each day.
+- **Removed from the Parent area:**
+  - the older chore editors ("Add a chore or task", "Manage tasks"), replaced by one "Open the Chore Manager" button; the "Add a chore" quick action opens it too
+  - the family-wide Status history (each child's history page has it)
+  - the Medicine due tile (Care covers it)
+  - the "ask" part of the AI helper box (the ✨ AI button does it; the address setup stays)
+  - the Kids' account email field (existing settings keep working)
+  - the Rewards trial section once the trial is over
+- **Merged:** "Challenges" (Family + Team challenge) and "Chores & progress" (Chore statuses + Kids' progress pages).
+- **Cloud backup:** the full cloud backup button is now in **Backup**.
+- **Kept, as asked:** Parent PINs, Change PIN and Lock (now in one "PIN and lock" section).
+- **Fix:** the "No backup downloaded yet" reminder is back in the Parent area. v39.5 had dropped it by mistake.
+- **iPhone bottom menu:** it now scrolls only left and right. It can no longer be pushed up or down, and its height now includes the iPhone's home-indicator gap, so the icons are never cut off.
+- **Sign-in message:** after signing in, a clear message stays on screen until you tap OK, or for about 10 seconds. While Google sign-in finishes it says "⏳ Finishing Google sign-in…". Then it says "✅ You're signed in with Google as …", with what happens next: Parent account / waiting for a parent to approve / wall display. Cancelled or failed sign-ins also show a message.

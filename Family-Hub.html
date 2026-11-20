@@ -547,7 +547,7 @@ function st(p,t){return S.done[today()+"|"+p+"|"+t]||""}
 function nav(){var v=[["home","🏠","Home"],["cal","📅","Calendar"],["hw","📚","Homework"],["chores","🧹","Chores"],["groc","🛒","Groceries"],["meals","🍽️","Meals"],["house","🏡","Household"],["care","💊","Care"],["goal","🎯","Goal"],["spin","🎲","Spin"],["photos","🖼️","Photos"],["par","🔒","Parent"]];
 if(devRole()!=="parent")v=v.filter(function(x){return x[0]!=="par";});document.getElementById("side").innerHTML=v.map(function(x){var on=view===x[0]||((view==="person"||view==="routine"||view==="mgr"||view==="pets")&&x[0]==="chores");return '<button data-a="'+(x[0]==="photos"?"pfnow":"go")+'" data-v="'+x[0]+'" class="'+(on?"on":"")+'"><i>'+x[1]+'</i><span>'+x[2]+"</span></button>"}).join("")}
 function render(){statCache=null;nav();applyTheme();var h="";
-if(view==="home")h=home();else if(view==="house")h=household();else if(view==="person")h=pers();else if(view==="cal")h=cal();else if(view==="hw")h=(typeof hwHtml==="function"?hwHtml():"");else if(view==="groc")h=groc();else if(view==="meals")h=meals();else if(view==="spin")h=spin();else if(view==="routine"&&rt)h=routine();else if(view==="mgr")h=mgrHtml();else if(view==="pets")h=pcHtml();else if(view==="care")h=careHtml();else if(view==="review")h=rvHtml();else if(view==="khist")h=psHistHtml();else if(view==="goal")h=goal();else if(view==="chores")h=chores();else h=parent();
+if(view==="home")h=home();else if(view==="house")h=household();else if(view==="person")h=pers();else if(view==="cal")h=cal();else if(view==="hw")h=(typeof hwHtml==="function"?hwHtml():"");else if(view==="groc")h=groc();else if(view==="meals")h=meals();else if(view==="spin")h=spin();else if(view==="routine"&&rt)h=routine();else if(view==="mgr")h=mgrHtml();else if(view==="pets")h=pcHtml();else if(view==="care")h=careHtml();else if(view==="review")h=rvHtml();else if(view==="khist")h=psHistHtml();else if(view==="devset")h=tdPhoneHtml();else if(view==="goal")h=goal();else if(view==="chores")h=chores();else h=parent();
 h+=aiPanelHtml();document.getElementById("app").innerHTML=h;aiBtnSync();
 if(view==="spin")drawWheel();else if(wheelBusy)cancelWheel();
 showKidNews();uiAfterRender();wxRefresh();fitMonth();}
@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v39.8";
+var FH_BUILD="v39.9";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -7397,13 +7397,14 @@ function acctGoogleReturn(){
   if(!pl||pl.nonce!==st.nonce){acct.msg="That sign-in could not be checked. Please tap Sign in with Google again.";return;}
   acct.msg="Finishing sign-in…";
   if(!acctSyncOn())return;
+  if(typeof fhToast==="function")fhToast("⏳ Finishing Google sign-in…",true);
   fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key="+FH_CLOUD_CONFIG.apiKey,{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({postBody:"id_token="+encodeURIComponent(tok)+"&providerId=google.com",requestUri:acctReturnUrl(),returnSecureToken:true,returnIdpCredential:true})})
   .then(function(r){return r.json().then(function(j){
     if(r.status!==200||!j.refreshToken){var m=(j.error&&j.error.message)||("status "+r.status);throw new Error(/OPERATION_NOT_ALLOWED/.test(m)?"Google sign-in is turned off in Firebase (Authentication › Sign-in method › Google).":/INVALID_IDP_RESPONSE|audience/i.test(m)?"Firebase did not accept the Google sign-in. Check the Web client ID in the app matches Firebase › Authentication › Google › Web SDK configuration.":"Firebase said: "+m);}
-    sync.viaGoogle=true;sync.gname=j.displayName||pl.name||"";
+    sync.viaGoogle=true;sync.gname=j.displayName||pl.name||"";sync.justSignedIn="google";
     return sync.adapter.adopt({refresh:j.refreshToken,uid:j.localId,email:j.email||pl.email||""});
-  });}).then(function(){acct.msg="";render();},function(e){acct.msg="Google sign-in did not finish: "+((e&&e.message)||e);render();});
+  });}).then(function(){acct.msg="";render();},function(e){acct.msg="Google sign-in did not finish: "+((e&&e.message)||e);render();if(typeof fhToast==="function")fhToast("⚠️ "+esc(acct.msg));});
 }
 /* older pop-up sign-in, used only until the Web client ID is filled in; it now gives up after 25 seconds */
 function acctGooglePopup(){
@@ -7435,7 +7436,7 @@ function acctEmailSignIn(){
   if(!em||!pw){alert("Enter the tablet account’s email and password.");return;}
   if(!acctSyncOn())return;
   sync.viaGoogle=false;acct.msg="Signing in…";render();
-  sync.adapter.signIn(em,pw).then(function(){acct.msg="";render();},function(e){acct.msg=(e&&e.message)||"That email or password was not accepted.";render();});
+  sync.justSignedIn="email";sync.adapter.signIn(em,pw).then(function(){acct.msg="";render();},function(e){acct.msg=(e&&e.message)||"That email or password was not accepted.";render();});
 }
 function acctSignInHtml(){
   if(sync.user)return "";
@@ -7535,7 +7536,7 @@ function acctAction(a,el){
 document.addEventListener("change",function(e){var t=e.target,pid=t&&t.getAttribute&&t.getAttribute("data-acctrole");if(!pid)return;var p=document.getElementById(pid);if(p)p.innerHTML=acctPeopleOpts(t.value,"");});
 document.addEventListener("click",function(e){var n=e.target;while(n&&n!==document&&!(n.getAttribute&&n.getAttribute("data-a")))n=n.parentNode;if(!n||n===document)return;var a=n.getAttribute("data-a");if(a&&a.indexOf("nxacct")===0){if(acctAction(a,n)){e.preventDefault();e.stopPropagation();}}},true);
 if(sync.user&&typeof acctOnAuth==="function"&&acctUid())acctOnAuth({uid:acctUid(),email:sync.user});
-try{if(/[#&](id_token|error)=/.test(location.hash||"")){acctGoogleReturn();render();}}catch(e){}
+try{if(/[#&](id_token|error)=/.test(location.hash||"")){acctGoogleReturn();render();if(acct.msg&&acct.msg!=="Finishing sign-in…"&&typeof fhToast==="function")setTimeout(function(){fhToast("⚠️ "+esc(acct.msg));},0);}}catch(e){}
 
 (function(){
   var pl=pinLockScreen;pinLockScreen=function(){return pl.apply(this,arguments)+acctSignInHtml();};
@@ -8496,6 +8497,112 @@ document.addEventListener("click",function(e){
   ".ps-bar{display:block;height:8px;border-radius:4px;background:var(--line);overflow:hidden}.ps-bar i{display:block;height:100%;background:var(--kc);transform-origin:left center}"+
   ".ps-sub{font-size:15px}.ps-day h2{margin:0 0 4px;font-size:19px}.ps-st{font-size:20px;width:30px;text-align:center}";
   document.head.appendChild(css);})();
+/* ---- v39.9 ---- */
+
+/* v39.9: phone menu bar scrolls only left and right; its height includes the iPhone home-indicator gap */
+(function(){var css=document.createElement("style");css.textContent=
+  "@media (max-width:700px){#side{height:calc(64px + env(safe-area-inset-bottom,0px));overflow-y:hidden;overscroll-behavior:contain;touch-action:pan-x;align-items:center;-webkit-overflow-scrolling:touch}#side button{max-height:56px}body{padding-bottom:calc(72px + env(safe-area-inset-bottom,0px))}}"+
+  "#fhtoast{position:fixed;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));z-index:9500;max-width:560px;margin:0 auto;background:var(--card);color:var(--ink);border:3px solid #2e9d5b;border-radius:16px;padding:14px 16px;box-shadow:0 6px 24px #0005;font-size:18px;line-height:1.4;display:flex;gap:12px;align-items:flex-start}#fhtoast.wait{border-color:#3b5bdb}#fhtoast span{flex:1}#fhtoast .btn{margin:0;min-height:44px}";
+  document.head.appendChild(css);})();
+/* v39.9: a clear message after signing in (Google comes back to the app very quickly) */
+var fhToastT=null;
+function fhToast(html,wait){var t=document.getElementById("fhtoast");if(!t){t=document.createElement("div");t.id="fhtoast";t.setAttribute("role","status");t.setAttribute("aria-live","assertive");document.body.appendChild(t);}
+  t.className=wait?"wait":"";t.innerHTML="<span>"+html+"</span>"+(wait?"":"<button class='btn g' data-a='nxtoastok'>OK</button>");clearTimeout(fhToastT);if(!wait)fhToastT=setTimeout(function(){var x=document.getElementById("fhtoast");if(x)x.parentNode.removeChild(x);},10000);}
+document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e.target.closest("[data-a='nxtoastok']"):null;if(!b)return;e.preventDefault();e.stopPropagation();var x=document.getElementById("fhtoast");if(x)x.parentNode.removeChild(x);},true);
+(function(){var aa=acctApply;acctApply=function(){var r=aa.apply(this,arguments);try{if(sync.justSignedIn&&acct.state!=="loading"){var how=sync.justSignedIn,em=esc(sync.user||""),ro=acctRole(),who=person(acct.personId);sync.justSignedIn="";
+    var h="✅ <b>You’re signed in"+(how==="google"?" with Google":"")+"</b> as "+em+".<br>";
+    h+=ro==="parent"?"Parent account"+(who?" ("+esc(who.n)+")":"")+". The Parent area opens without a PIN.":ro==="display"?"This tablet is now the wall display.":ro==="kid"?"Kid account"+(who?" ("+esc(who.n)+")":"")+".":acct.state==="norole"&&how==="google"?"One more step: a parent approves this account once in <b>Parent › Accounts</b>. Until then it can’t see family data.":acct.state==="error"||acct.state==="offline"?"Couldn’t check the account’s role yet. It will try again.":"Family data is syncing.";
+    fhToast(h);}}catch(e){}return r;};})();
+/* ===== v39.9 (Stage 9 decisions): a tidier Parent area =====
+   - "📱 This phone" screen for settings that only affect this device (device type, idle and dimming, family
+     sync sign-in, AI without the PIN, display effects, appearance).
+   - To review also holds: sending a note to the other parent, recently approved (undo), and Tough days.
+   - Removed: the older chore editors (the Chore Manager does it), the family-wide status history (each child's
+     history page has it), the Medicine due tile, the "ask" part of the AI helper box (the ✨ AI button does it),
+     the kids' account email field, and the rewards trial section once the trial is over.
+   - Merged: Family + Team challenge, Chore statuses + Kids' progress pages.
+   - Parent PINs, Change PIN and Lock stay in the Parent area. */
+RV_MOVE["recent-approvals"]=1;RV_MOVE["updates-between-parents"]=1;RV_MOVE["how-the-kids-felt"]=1;
+function tdSplit(html){var parts=String(html).split(/(?=<h2[ >])/),head=parts.shift(),list=[];parts.forEach(function(p){var m=/^<h2[^>]*>([\s\S]*?)<\/h2>([\s\S]*)$/.exec(p);if(m)list.push({key:secKey(m[1]),title:m[1],body:m[2]});else head+=p;});return {head:head,list:list};}
+function tdTrialOver(){var t=trial();if(!t||!t.start)return false;if(!t.on)return true;var d=Math.round((localDate(today())-localDate(t.start))/86400000);return d>30;}
+function tdPinsCard(body){var i=body.indexOf("<p><b>Parent PINs.</b>");return i<0?"":"<div class='card'>"+body.slice(i);}
+function tdDeviceCard(){
+  var h=deviceAdminHtml(),a=h.indexOf("<hr><label for='kidsacct'"),b=a>=0?h.indexOf("</p>",a):-1;if(a>=0&&b>=0)h=h.slice(0,a)+h.slice(b+4);
+  var c=h.indexOf("<hr><p><b>Parent PINs.</b>");if(c>=0)h=h.slice(0,c)+"</div>";
+  return h.replace("<h2>This device and PINs</h2>","<h2>This device</h2>");
+}
+(function(){
+  var ps=parentSections;parentSections=function(html){
+    var sp=tdSplit(html),out=[],by={};sp.list.forEach(function(s){by[s.key]=s;});
+    var DROP={"family-sync":1,"ai-helper-without-the-pin":1,"display-effects":1,"add-a-chore-or-task":1,"manage-tasks":1,"status-history":1,"how-the-kids-felt":1,"kids-progress-pages":1,"team-challenge":1};
+    sp.list.forEach(function(s){
+      if(DROP[s.key])return;
+      if(s.key==="rewards-trial"&&tdTrialOver())return;
+      if(s.key==="this-device-and-pins"){var pc=tdPinsCard(s.body);if(pc)out.push({title:"Parent PINs",body:pc});return;}
+      if(s.key==="settings"){out.push({title:"PIN and lock",body:s.body.replace(/<label for='hubtheme'>[\s\S]*?<\/select><br>/,"")});return;}
+      if(s.key==="chore-statuses"){out.push({title:"Chores &amp; progress",body:s.body+(by["kids-progress-pages"]?by["kids-progress-pages"].body:"")});return;}
+      if(s.key==="family-challenge"){out.push({title:"Challenges",body:s.body+(by["team-challenge"]?"<h3>🤝 Team challenge</h3>"+by["team-challenge"].body:"")});return;}
+      out.push(s);
+    });
+    out.push({title:"Chores",body:"<div class='card'><p>Add, edit, schedule and archive chores and routines in the Chore Manager.</p><button class='btn g' data-a='go' data-v='mgr' style='min-height:52px'>✏️ Open the Chore Manager</button></div>"});
+    return ps.call(this,sp.head+out.map(function(s){return "<h2>"+s.title+"</h2>"+s.body;}).join(""));
+  };
+  /* tiles: To review, plus the backup reminder (which v39.5 had dropped by mistake) */
+  pqTilesHtml=function(){var n=rvCountQuick(),d=backupAgeDays(),h="<div class='pqtiles' role='navigation' aria-label='Needs you'><div class='pqt"+(n?" hot":"")+"'><button class='pqtb' data-a='nxrv'><span class='pqi' aria-hidden='true'>📥</span><b class='pqn'>"+n+"</b><span class='pql'>To review</span></button></div></div>";
+    if(d<0||d>=30)h+="<div class='card pqbk'><p><b>💾 "+(d<0?"No backup downloaded on this device yet.":"Last backup was "+d+" days ago.")+"</b> A backup protects the chores, points, calendar and settings if something goes wrong. Photos are not included.</p><button class='btn g' style='min-height:48px' data-a='hhbackup'>Download backup</button></div>";
+    return h;};
+  pqQuickHtml=function(){return "<div class='pqquick' aria-label='Quick actions'><button class='btn' data-a='go' data-v='mgr'>➕ Add a chore</button><button class='btn' data-a='nxhnnewev'>📅 Add an event</button><button class='btn' data-a='nxtdnote'>✍️ Note to the other parent</button><button class='btn' data-a='nxtdphone'>📱 This phone</button></div>";};
+  /* the AI helper box in the Parent area only sets the helper up; asking is done with the ✨ AI button */
+  var ab=aiBoxInner;aiBoxInner=function(){var h=ab.apply(this,arguments);if(view!=="par"||aiPanelOpen)return h;var i=h.indexOf("<label for='aitask'");if(i<0)return h;return h.slice(0,i)+"<p class='note'>To ask the helper, tap <b>✨ AI</b> at the top of the screen.</p>"+(aiMsg?"<p class='note' role='status'>"+esc(aiMsg)+"</p>":"");};
+  /* cloud backup lives with the other backups */
+  var sb=syncBoxInner;syncBoxInner=function(){return sb.apply(this,arguments).replace(/<p><button class='btn' data-a='nxsyncbackup'>[\s\S]*?Keep it somewhere private\.<\/p>/,"");};
+  var hb=hhBackupHtml;hhBackupHtml=function(){var h=hb.apply(this,arguments);if(devRole()==="parent"&&sync.user)h=h.replace("<div id='backupfallback'></div></div>","<div id='backupfallback'></div><hr><p><b>Cloud backup</b> · an exact copy of everything in the family database.</p><button class='btn' data-a='nxsyncbackup'>Download full cloud backup</button><pre id='cloudbklog' style='white-space:pre-wrap;word-break:break-word;font-size:14px'>"+esc(sync.testLog||"")+"</pre></div>");return h;};
+  var sr=syncRefreshAdmin;syncRefreshAdmin=function(){var r=sr.apply(this,arguments);var el=document.getElementById("cloudbklog");if(el)el.textContent=sync.testLog||"";return r;};
+  /* the family-wide status history now lives on each child's history page */
+  statusHistoryHtml=function(){return "";};
+})();
+/* ---- 📱 This phone ---- */
+function tdPhoneHtml(){
+  var h="<div class='personal-switch'><button class='btn n' data-a='go' data-v='par'>← Parent area</button></div><h1>📱 This phone</h1><p class='sub'>These settings only change this device.</p>";
+  if(devRole()!=="parent")return h+"<div class='card'><p class='note'>This device’s settings are in its own Parent screen.</p></div>";
+  if(!unlocked)return h+pinLockScreen();
+  var th=S.theme||"auto";
+  h+=tdDeviceCard();
+  h+="<h2>Appearance</h2><div class='card'><label for='hubtheme'>Light or dark</label><select id='hubtheme'><option value='auto'"+(th==="auto"?" selected":"")+">Automatic</option><option value='light'"+(th==="light"?" selected":"")+">Light</option><option value='dark'"+(th==="dark"?" selected":"")+">Dark</option></select><p class='note'>The 🌙 / ☀️ button at the top does the same.</p></div>";
+  h+="<h2>Family sync</h2><div class='card' id='syncbox'>"+syncBoxInner()+"</div>";
+  var pr="";try{pr=parentRaw();}catch(e){}var sp=tdSplit(pr),ai=sp.list.filter(function(s){return s.key==="ai-helper-without-the-pin";})[0];
+  if(ai)h+="<h2>"+ai.title+"</h2>"+ai.body;
+  h+=displayFxHtml();
+  return h;
+}
+/* ---- To review: send a note, recently approved, tough days ---- */
+function tdTough(){
+  var out=[];if(typeof moodGet!=="function")return out;
+  (S.members||P).filter(function(p){return p.kid&&!p.archived;}).forEach(function(k){var m=moodGet(k.id);for(var i=0;i<3;i++){var d=fd(addD(localDate(today()),-i));if(m[d]==="😕"&&!rvSeen("mood|"+k.id+"|"+d))out.push({k:"mood|"+k.id+"|"+d,p:k,d:d});}});
+  return out;
+}
+(function(){
+  var rg=rvGroups;rvGroups=function(){var g=rg.apply(this,arguments),t=tdTough();
+    if(t.length)g.push({id:"tough",icon:"😕",title:"Tough days",n:t.length,all:"look",html:t.map(function(o){return "<div class='row' style='flex-wrap:wrap'><span class='t'><b>"+esc(o.p.e)+" "+esc(o.p.n)+"</b> picked 😕 Tough<div class='note'>"+esc(o.d===today()?"Today":niceDate(o.d))+" · maybe check in</div></span><button class='btn g' data-a='nxrvlook' data-k='"+esc(o.k)+"'>Seen</button><button class='btn n' data-a='nxpsopen' data-p='"+esc(o.p.id)+"'>Open history</button></div>";}).join("")});
+    return g;};
+  var rq=rvCountQuick;rvCountQuick=function(){return rq.apply(this,arguments)+(devRole()==="parent"?tdTough().length:0);};
+  var rv=rvAll;rvAll=function(gid){if(gid==="look"&&document.getElementById("rv-tough")&&!document.getElementById("rv-look")){var snap=JSON.stringify(S);S.reviewSeen=S.reviewSeen||{};tdTough().forEach(function(o){S.reviewSeen[o.k]=today();});if(commitOr(snap))render();return;}
+    if(gid==="look"){S.reviewSeen=S.reviewSeen||{};tdTough().forEach(function(o){S.reviewSeen[o.k]=today();});}return rv.apply(this,arguments);};
+  var rh=rvHtml;rvHtml=function(){var h=rh.apply(this,arguments);if(devRole()!=="parent"||!unlocked)return h;
+    var adults=(S.members||P).filter(function(p){return !p.kid&&!p.pet&&!p.archived;}),me=rvMe();
+    h+="<section class='card rv-group' id='rv-send'><div class='rv-head'><h2>✉️ Send a note to the other parent</h2></div><div class='rv-body'><label for='pnfrom'>From</label><select id='pnfrom'>"+adults.map(function(p){return "<option value='"+p.id+"'"+(p.id===me?" selected":"")+">"+esc(p.n)+"</option>";}).join("")+"</select><label for='pntext'>Note</label><input id='pntext' maxlength='300' style='width:100%' placeholder='For example: Moved soccer pickup to 5:30'><button class='btn g' style='min-height:48px' data-a='nxnotesend'>Send note</button></div></section>";
+    var ra=rvParts()["recent-approvals"];if(ra&&/data-a=/.test(ra.body))h+="<details class='card rv-group' id='rv-recent'><summary><b>↩️ Recently approved</b> <span class='note'>· undo an approval</span></summary><div class='rv-body'>"+ra.body+"</div></details>";
+    return h;};
+})();
+/* each day on a child's history page shows the mood they picked */
+(function(){var ph=psHistHtml;psHistHtml=function(){var h=ph.apply(this,arguments),p=person(psPid);if(!p||typeof moodGet!=="function")return h;var m=moodGet(p.id);
+  return h.replace(/<div class='card ps-day'><h2>([^<]*)/g,function(all,lab){var d=null;for(var i=0;i<7;i++){var x=fd(addD(localDate(weekStartOf(today())),((prOffset[p.id]||0)*7)+i));if((x===today()?"Today":esc(niceDate(x)))===lab.trim()){d=x;break;}}return d&&m[d]?all.replace(/\s+$/,"")+" <span class='chip' title='How the day went'>"+m[d]+"</span> ":all;});};})();
+document.addEventListener("click",function(e){
+  var n=e.target;while(n&&n!==document&&!(n.getAttribute&&n.getAttribute("data-a")))n=n.parentNode;if(!n||n===document)return;
+  var a=n.getAttribute("data-a");if(a!=="nxtdphone"&&a!=="nxtdnote")return;e.preventDefault();e.stopPropagation();
+  if(a==="nxtdphone"){view="devset";render();try{window.scrollTo(0,0);}catch(x){}return;}
+  view="review";render();var t=document.getElementById("pntext");if(t){if(t.scrollIntoView)t.scrollIntoView({block:"center"});try{t.focus();}catch(x){}}
+},true);
 window.FH_READY=true;
 </script>
 
