@@ -112,3 +112,23 @@
 - **Fix:** the "No backup downloaded yet" reminder is back in the Parent area. v39.5 had dropped it by mistake.
 - **iPhone bottom menu:** it now scrolls only left and right. It can no longer be pushed up or down, and its height now includes the iPhone's home-indicator gap, so the icons are never cut off.
 - **Sign-in message:** after signing in, a clear message stays on screen until you tap OK, or for about 10 seconds. While Google sign-in finishes it says "⏳ Finishing Google sign-in…". Then it says "✅ You're signed in with Google as …", with what happens next: Parent account / waiting for a parent to approve / wall display. Cancelled or failed sign-ins also show a message.
+
+## v40 – visual refresh
+
+### v40.0 – new look (design from Gemini, adapted to fit the app)
+- **Colours:** new light and dark colours with stronger text contrast. There are two new themes. **Pastel** is soft and light. **Techno** is dark with cyan.
+  - Choose them for the whole phone in 📱 This phone, or for one person's page in Customize, which now has theme buttons.
+  - Each new theme is built on top of light or dark, so every screen that already adapts to dark mode keeps working.
+- **Line icons:** they replace the emoji in the menu, the top buttons (AI, camera, light/dark), To review, ⋯, the status chips and the calendar event types.
+  - The Household icon was redrawn as a clipboard, because Gemini's version looked like the Parent lock.
+- **Avatar art:** new art for all 9 avatar packs × 6 levels, in the Chores & Wins card and on the kids' buddy card.
+- **Plant:** new plant pictures for stages 0–7, plus a droopy stage 3. The pot uses the child's colour.
+- **Classic emoji:** Parent › **Look** switches everything back to the old emoji. Moods and celebrations always stay emoji.
+- **Patterns and cosmetics:** background patterns are lighter. Gemini's star and wave patterns had a broken address and are fixed. The cosmetic frames and glows no longer use heavy shadows, which is easier on the Fire tablet.
+- **Wall display:**
+  - text is about 10% larger, with bolder, darker headings and more space between rows
+  - each child's chore card has a thick bar in their colour
+  - rows no longer squeeze into each other, and the clock and date stay on one line
+- **Idle screen:** the clock, date and info pills always have a dark backing, so bright photos never wash out the text.
+- **Kid pages:** on phones the person switcher is one row that scrolls sideways, and there's a one-line legend under the 7-day dots.
+- **Not used from Gemini's code:** its separate theme-switch script (it would have fought the existing per-person theme settings), and its plain dark-mode selector (it would have broken Pastel on phones set to dark mode).
