@@ -65,3 +65,10 @@
   - notes from the other parent
 - **Actions:** each item has a one-tap Approve / OK / Looks good / Got it, Excuse for missed items, and Change. Each group has "Approve all" (or OK all / All look fine / Got them all / Excuse all). Handled items leave the list.
 - **Moved out of the Parent area:** the approval sections (Waiting for approval, Reward requests, Calendar change requests, Board requests, AI suggestions) are gone from the Parent area. Its "Needs you" tiles are now one To review tile plus Medicine due. "Recent approvals" (undo an approval) and sending a note to the other parent stay there for now; Stage 9 reviews them.
+
+### v39.6 – Stage 6: parent actions on the wall tablet
+- **Parent mode:** on the wall tablet's Parent screen, a parent can approve chores and points, set statuses and use To review for **5 minutes**. A green bar shows the time left and has **Lock now**. When the time is up, the tablet locks itself and goes back to the wall display.
+- **6a, wall PIN:** a parent sets a 6–8 digit wall PIN in Parent > Family sync > Wall tablet on their phone. Only a scrambled version (a hash) is stored, somewhere the tablet can't read. The database checks the PIN itself, so it can't be bypassed from the tablet. After 5 wrong tries the tablet waits a minute.
+- **6b, "Unlock from my phone":** the tablet sends an unlock request. A parent's phone with Family Hub open shows "🔓 Unlock wall tablet?" with Approve and Ignore. Approve opens a 5-minute session. The database checks that a parent approved it and that it hasn't expired.
+- **Limits while unlocked:** the tablet still can't read parent care items, PIN hashes, private settings or accounts. A medicine marked on the tablet still goes through the kids' path, and the tablet never sends its own copy of the Household list or device settings.
+- **Rules:** database rules for unlock requests, unlock sessions and the wall PIN, plus 29 new rule tests (91 in total) and an end-to-end parent-mode test.

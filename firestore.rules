@@ -1,5 +1,5 @@
 rules_version = '2';
-// Family Hub Firestore rules – v39.2 (Stage 2: care items and statuses)
+// Family Hub Firestore rules – v39.6 (Stage 6: parent mode on the wall tablet)
 // Paste into Firebase console › Firestore Database › Rules, then Publish.
 //
 // Who is who:
@@ -9,6 +9,9 @@ rules_version = '2';
 // Care items (medicines, appointments, dose logs) live in two folders:
 //   careParent – parents only. The wall display and kids cannot read it at all.
 //   careKid    – parents, the wall display and the old kids' login; a "kid" account only its own items.
+// Parent mode on the wall tablet: a 5-minute unlock session, either approved by a parent's phone or opened
+// with the wall PIN (checked here against a hash the tablet cannot read). While it lasts, the tablet may make
+// the same changes to shared family data as a parent, but still cannot read parent care, PINs or accounts.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -31,6 +34,23 @@ service cloud.firestore {
     function isKids()   { return isLegacyKids() || hasRole('display') || hasRole('kid'); }
     function isKidRole() { return hasRole('kid'); }
     function myPid()     { return get(userPath()).data.personId; }
+
+    // ---- parent mode on the wall tablet ----
+    function sessPath()  { return /databases/$(database)/documents/households/family/unlockSession/$(request.auth.uid); }
+    function wallHash()  { return get(/databases/$(database)/documents/households/family/wallSecret/pin).data.hash; }
+    function approverIsParent(a) {
+      return a in ['wL2GTwTYn7Ngjtnyy0NkQ5IKlsZ2']
+        || (exists(/databases/$(database)/documents/users/$(a))
+            && get(/databases/$(database)/documents/users/$(a)).data.role == 'parent');
+    }
+    function inSession() {
+      return request.auth != null && isKids() && exists(sessPath())
+        && get(sessPath()).data.until > request.time
+        && (get(sessPath()).data.kind == 'pin'
+              ? get(sessPath()).data.proof == wallHash()
+              : approverIsParent(get(sessPath()).data.approvedBy));
+    }
+    function isParentAct() { return isParent() || inSession(); }
 
     // ---- account records ----
     function validUser() {
@@ -96,7 +116,7 @@ service cloud.firestore {
       }
 
       allow create, update: if goodShape() && (
-        (isParent() && id.matches('^(events|eventRequests|groc|req|boardreq|done|meals|cfg|ledger|hw|stat|slog|cant)__[A-Za-z0-9_-]{1,120}$'))
+        (isParentAct() && id.matches('^(events|eventRequests|groc|req|boardreq|done|meals|cfg|ledger|hw|stat|slog|cant)__[A-Za-z0-9_-]{1,120}$'))
         ||
         (isKids() && id.matches('^done__[A-Za-z0-9_-]{1,120}$') && kidDoneOk() && ownDone())
         ||
@@ -143,6 +163,58 @@ service cloud.firestore {
                   && request.resource.data.st == 'k' && request.resource.data.deleted == false
                   && (!isKidRole() || request.resource.data.own == myPid()))
       );
+      allow delete: if false;
+    }
+
+    // ---- wall tablet: unlock requests, unlock sessions, wall PIN ----
+    match /households/family/unlockReq/{uid} {
+      allow read, delete: if isParent() || (request.auth != null && request.auth.uid == uid);
+      allow create, update: if request.auth != null && request.auth.uid == uid && isKids()
+        && request.resource.data.keys().hasOnly(['name', 'at'])
+        && request.resource.data.name is string && request.resource.data.name.size() <= 40
+        && request.resource.data.at is timestamp;
+    }
+    match /households/family/unlockSession/{uid} {
+      function sessShape() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['kind', 'proof', 'by', 'approvedBy', 'until', 'at'])
+          && d.keys().hasAll(['kind', 'proof', 'by', 'approvedBy', 'until'])
+          && d.until is timestamp
+          && d.until > request.time
+          && d.until <= request.time + duration.value(301, 's')
+          && d.by is string && d.by.size() <= 100
+          && d.proof is string && d.proof.size() <= 100
+          && d.approvedBy is string && d.approvedBy.size() <= 128;
+      }
+      // the tablet may read only phone-approved sessions (a PIN session holds the PIN's proof)
+      allow get: if isParent()
+        || (request.auth != null && request.auth.uid == uid && resource.data.kind == 'phone');
+      allow list: if isParent();
+      allow delete: if isParent() || (request.auth != null && request.auth.uid == uid);
+      allow create, update: if sessShape() && (
+        (isParent() && request.resource.data.kind == 'phone'
+                    && request.resource.data.approvedBy == request.auth.uid)
+        ||
+        (request.auth != null && request.auth.uid == uid && isKids()
+                    && request.resource.data.kind == 'pin'
+                    && request.resource.data.approvedBy == ''
+                    && request.resource.data.proof == wallHash())
+      );
+    }
+    match /households/family/wall/{doc} {
+      allow read: if isParent() || isKids();
+      allow create, update: if isParent() && doc == 'pinSalt'
+        && request.resource.data.keys().hasOnly(['salt', 'setBy', 'at'])
+        && request.resource.data.salt is string && request.resource.data.salt.size() <= 64
+        && request.resource.data.setBy is string && request.resource.data.setBy.size() <= 100;
+      allow delete: if false;
+    }
+    match /households/family/wallSecret/{doc} {
+      allow read: if false;
+      allow create, update: if isParent() && doc == 'pin'
+        && request.resource.data.keys().hasOnly(['hash', 'setBy', 'at'])
+        && request.resource.data.hash is string && request.resource.data.hash.size() == 64
+        && request.resource.data.setBy is string && request.resource.data.setBy.size() <= 100;
       allow delete: if false;
     }
 
