@@ -33,3 +33,10 @@
 - **Home-screen fix:** "Sign in with Google" now goes to Google in the same window and comes back to the app, then hands Google's answer to Firebase. This works in iPhone home-screen apps, where Firebase's pop-up sign-in never reported back and the app stayed on "Opening Google sign-in…".
 - **One public setting:** the Web client ID from Firebase > Authentication > Google > Web SDK configuration is now set in the app (`GOOGLE_CLIENT_ID`). The app address is allowed in Google Cloud > Google Auth Platform > Clients.
 - **No more hanging:** the pop-up sign-in gives up after 25 seconds with a clear message.
+
+### v39.3 – Stage 3: Care section by role
+- **New Care section** (💊 in the menu): each person's medicines, today's dose and the next 30 days of Doctor appointments.
+- **Parent phones:** Care shows everyone. "+ Add medicine", "+ Add appointment" and Edit open the existing Household and Calendar editors, with the type already chosen. Parents can mark a dose Taken or Skip it.
+- **Wall tablet and kids' devices:** Care shows only Julian and Emilio, with no add or edit buttons.
+- **Kids marking doses:** a child taps "I took it" on the tablet. The dose counts at once, with no waiting for approval, and is saved as kid-marked, needing review. Parents see "Julian marked it on the tablet · needs review" and can tap **Looks good**. The parent phone then moves the medicine on to its next date.
+- **"Care today" cards:** on the Home screen and the wall display. The wall shows the kids only.

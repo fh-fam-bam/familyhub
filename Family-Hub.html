@@ -544,10 +544,10 @@ function msToMidnight(){var q=laParts(Date.now()),left=((23-q.h)*3600+(59-q.mi)*
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function person(id){return (S.members||P).filter(function(p){return p.id===id})[0]}
 function st(p,t){return S.done[today()+"|"+p+"|"+t]||""}
-function nav(){var v=[["home","🏠","Home"],["cal","📅","Calendar"],["hw","📚","Homework"],["chores","🧹","Chores"],["groc","🛒","Groceries"],["meals","🍽️","Meals"],["house","🏡","Household"],["goal","🎯","Goal"],["spin","🎲","Spin"],["photos","🖼️","Photos"],["par","🔒","Parent"]];
+function nav(){var v=[["home","🏠","Home"],["cal","📅","Calendar"],["hw","📚","Homework"],["chores","🧹","Chores"],["groc","🛒","Groceries"],["meals","🍽️","Meals"],["house","🏡","Household"],["care","💊","Care"],["goal","🎯","Goal"],["spin","🎲","Spin"],["photos","🖼️","Photos"],["par","🔒","Parent"]];
 if(devRole()!=="parent")v=v.filter(function(x){return x[0]!=="par";});document.getElementById("side").innerHTML=v.map(function(x){var on=view===x[0]||((view==="person"||view==="routine"||view==="mgr"||view==="pets")&&x[0]==="chores");return '<button data-a="'+(x[0]==="photos"?"pfnow":"go")+'" data-v="'+x[0]+'" class="'+(on?"on":"")+'"><i>'+x[1]+'</i><span>'+x[2]+"</span></button>"}).join("")}
 function render(){statCache=null;nav();applyTheme();var h="";
-if(view==="home")h=home();else if(view==="house")h=household();else if(view==="person")h=pers();else if(view==="cal")h=cal();else if(view==="hw")h=(typeof hwHtml==="function"?hwHtml():"");else if(view==="groc")h=groc();else if(view==="meals")h=meals();else if(view==="spin")h=spin();else if(view==="routine"&&rt)h=routine();else if(view==="mgr")h=mgrHtml();else if(view==="pets")h=pcHtml();else if(view==="goal")h=goal();else if(view==="chores")h=chores();else h=parent();
+if(view==="home")h=home();else if(view==="house")h=household();else if(view==="person")h=pers();else if(view==="cal")h=cal();else if(view==="hw")h=(typeof hwHtml==="function"?hwHtml():"");else if(view==="groc")h=groc();else if(view==="meals")h=meals();else if(view==="spin")h=spin();else if(view==="routine"&&rt)h=routine();else if(view==="mgr")h=mgrHtml();else if(view==="pets")h=pcHtml();else if(view==="care")h=careHtml();else if(view==="goal")h=goal();else if(view==="chores")h=chores();else h=parent();
 h+=aiPanelHtml();document.getElementById("app").innerHTML=h;aiBtnSync();
 if(view==="spin")drawWheel();else if(wheelBusy)cancelWheel();
 showKidNews();uiAfterRender();wxRefresh();fitMonth();}
@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v39.2.1";
+var FH_BUILD="v39.3";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -2859,6 +2859,7 @@ function wallHome(){
   if(S.goal){var gg=S.goal;rw+="<div>"+esc(gg.e||"🎯")+" "+esc(gg.n)+": <b>"+gg.p+"</b>/"+gg.t+"</div>";}
   var wn=(Array.isArray(S.fridgeNotes)?S.fridgeNotes:[]).filter(fnShow).slice(-2).reverse(),wb=(Array.isArray(S.bounties)?S.bounties:[]).filter(function(x){return x&&x.status==='open';});
   if(wn.length||wb.length)h+="<button class='w-box' data-a='nxwallfull'><h2>📝 Notes · 🏆 "+wb.length+" bounties</h2><div class='w-small'>"+wn.map(function(n){return "<b>"+esc((person(n.from)||{}).n||'Family')+":</b> "+esc(String(n.text).slice(0,60));}).join("<br>")+(wb.length?(wn.length?"<br>":"")+wb.slice(0,2).map(function(x){return "⭐ "+esc(String(p2Pts(x)))+" "+esc(x.title);}).join(" · "):"")+"</div></button>";
+  if(typeof careWallBoxHtml==="function")h+=careWallBoxHtml();
   h+="<button class='w-box' data-a='go' data-v='goal'><h2>🏆 Rewards</h2><div class='w-small'>"+(rw||"No reward goals set")+"</div></button>";
   h+="</section></div><footer class='w-foot'><button class='w-link' data-a='nxwallfull'>Full home page</button></footer></div>";
   return h;
@@ -3900,7 +3901,9 @@ function hhAction(a,b){
       if(x.type==='bill')return;
       var kk=x.date+'|hh|'+x.id;if(S.done[kk])return;
       if(x.type==='medicine'&&!confirm('Mark '+x.title+' as taken?'))return;
-      var snapK=JSON.stringify(S);S.done[kk]='t';if(!commitOr(snapK))return;render();return;
+      var snapK=JSON.stringify(S);S.done[kk]='t';
+      if(x.type==='medicine'){S.reminderLog=S.reminderLog||{};var rk=x.id+'|'+x.date;if(!S.reminderLog[rk])S.reminderLog[rk]={at:new Date().toISOString(),status:'done',kidDevice:true,review:true,by:(hhPeople(x)[0]||'')};}
+      if(!commitOr(snapK))return;render();return;
     }
     if(x.type==='bill'&&!unlocked){view='par';render();return;}
     var occurrence=x.id+'|'+x.date;if(S.reminderLog[occurrence])return;
@@ -6874,7 +6877,7 @@ function hhReconcile(){
     var a=k.split('|');if(a.length!==3||a[1]!=='hh'||S.done[k]!=='t')return;
     var x=S.household.filter(function(i){return i&&i.id===a[2];})[0];
     if(!x||x.completed||x.date!==a[0]||x.type==='bill'||x.type==='contact'||x.type==='countdown')return;
-    S.reminderLog=S.reminderLog||{};S.reminderLog[x.id+'|'+x.date]={at:new Date().toISOString(),kidDevice:true};
+    S.reminderLog=S.reminderLog||{};S.reminderLog[x.id+'|'+x.date]=Object.assign({at:new Date().toISOString(),kidDevice:true,status:'done',review:x.type==='medicine'},S.reminderLog[x.id+'|'+x.date]||{});
     x.lastDone=today();
     if(x.repeat&&x.repeat!=='none'){x.anchorDay=x.anchorDay||+x.date.slice(8,10);x.date=hhNextDate(x);}else x.completed=today();
     ch=true;
@@ -7568,7 +7571,7 @@ function careItems(){
   Object.keys(S.reminderLog||{}).forEach(function(k){
     var q=k.split("|"),a=meds[q[0]];if(!a||q.length!==2||!hhDateValid(q[1])||q[1]<cut)return;
     var e=S.reminderLog[k]||{};
-    out.push({id:"dose_"+q[0]+"_"+q[1],kind:"dose",aud:a.aud,own:a.own,people:a.people,v:{med:q[0],date:q[1],status:e.status||(e.skipped?"missed":"done"),reason:e.reason||"",at:e.at||"",kid:!!e.kidDevice,by:e.by||""}});
+    out.push({id:"dose_"+q[0]+"_"+q[1],kind:"dose",aud:a.aud,own:a.own,people:a.people,v:{med:q[0],date:q[1],status:e.status||(e.skipped?"missed":"done"),reason:e.reason||"",at:e.at||"",kid:!!e.kidDevice,by:e.by||"",review:!!e.review,rby:e.reviewedBy||""}});
   });
   return out.filter(function(o){return SYNC_ID_RE.test(o.id);});
 }
@@ -7577,7 +7580,7 @@ function careApply(c,obj){
   var v=obj.v,other=c==="careK"?"careP":"careK";
   if(obj.kind==="med"){S.household=(S.household||[]).filter(function(x){return !(x&&x.id===v.id);});S.household.push(v);return;}
   if(obj.kind==="appt"){var l=(S.events||[]).slice(),i=-1;for(var n=0;n<l.length;n++)if(l[n]&&l[n].id===v.id){i=n;break;}if(i>=0)l[i]=v;else l.push(v);S.events=l;return;}
-  if(obj.kind==="dose"){S.reminderLog=S.reminderLog||{};var e={at:v.at,status:v.status};if(v.status==="missed")e.skipped=true;if(v.kid)e.kidDevice=true;if(v.reason)e.reason=v.reason;if(v.by)e.by=v.by;S.reminderLog[v.med+"|"+v.date]=e;}
+  if(obj.kind==="dose"){S.reminderLog=S.reminderLog||{};var e={at:v.at,status:v.status};if(v.status==="missed")e.skipped=true;if(v.kid)e.kidDevice=true;if(v.reason)e.reason=v.reason;if(v.by)e.by=v.by;if(v.review)e.review=true;else if(v.kid)e.review=false;if(v.rby)e.reviewedBy=v.rby;S.reminderLog[v.med+"|"+v.date]=e;}
 }
 function careRemove(c,id){
   var other=c==="careK"?"careP":"careK";if(careKnownLive(other,id))return; /* it moved to the other folder */
@@ -7703,7 +7706,10 @@ setTimeout(function(){try{if(!statusShadow)statusShadow=statusSnapshot();}catch(
   syncDiff=function(){
     var jobs=sd0.apply(this,arguments);
     return jobs.filter(function(j){
-      if(j.c==="careK"||j.c==="careP"){if(syncRole()!=="parent")return false; /* Stage 3 lets the tablet send kid-marked doses */ return !!sync.careOk;}
+      if(j.c==="careK"||j.c==="careP"){
+        /* v39.3: a wall or kids' device may only send a new dose a child marked taken */
+        if(syncRole()!=="parent")return j.c==="careK"&&!j.del&&!j.base&&/^dose_/.test(j.id)&&!!sync.careKPolled&&/"kid":true/.test(j.json||"");
+        return !!sync.careOk;}
       if(j.c==="stat"&&syncRole()!=="parent")return false;
       return true;
     });
@@ -7728,6 +7734,98 @@ function statusHistoryHtml(){
   return "<h2>Status history</h2><div class='card'>"+(l.length?l.map(function(e){var w=person(e.by);return "<div class='row'><span class='t'><b>"+esc(statusLabel(e.k))+"</b><br><span class='note'>"+esc(STATUS_NAMES[e.from]||e.from)+" → "+esc(STATUS_NAMES[e.to]||(e.to==="couldnt"?"Couldn’t do it":e.to))+(e.r?" ("+esc(EXCUSE_REASONS[e.r]||e.r)+")":"")+" · "+esc(w?w.n:String(e.by||"").replace("device:",""))+" · "+esc(new Date(e.at).toLocaleString([],{weekday:"short",hour:"numeric",minute:"2-digit"}))+"</span></span></div>";}).join(""):"<p class='note'>No changes yet. Every check-off and status change will show here.</p>")+"</div>";
 }
 (function(){var sa=syncAdminHtml;syncAdminHtml=function(){return sa.apply(this,arguments)+statusHistoryHtml();};})();
+/* ---- v39.3 ---- */
+/* ===== v39.3 (Stage 3): Care section by role =====
+   Parent phones: everyone's medicines and appointments, with add and edit.
+   Wall tablet and kids' devices: only the children (parent care items are not on those devices at all, see v39.2).
+   A child marking a dose taken on the tablet counts at once and is logged "kid-marked, needs review". */
+function carePeople(){
+  var l=(S.members||P).filter(function(p){return p&&!p.archived&&!p.pet;});
+  return devRole()==="parent"?l:l.filter(function(p){return p.kid;});
+}
+function careMeds(){return (S.household||[]).filter(function(x){return careIsMed(x)&&!x.completed;});}
+function careDoseToday(x){
+  var ds=today(),e=(S.reminderLog||{})[x.id+"|"+ds];
+  if(!e&&x.date&&x.date<=ds)e=(S.reminderLog||{})[x.id+"|"+x.date];
+  if(e)return {st:e.status||(e.skipped?"missed":"done"),e:e};
+  if(hhKidTaken(x))return {st:"done",e:{kidDevice:true,review:true}};
+  if(x.date&&x.date<=ds)return {st:"due",overdue:x.date<ds};
+  return {st:"later"};
+}
+function careWhen(x){return x.time?niceTime(x.time):"";}
+function careKidNote(e,x){var w=person(e.by)||person((hhPeople(x)||[])[0]);return (w?esc(w.n)+" marked it on the tablet":"Marked on a kids’ device")+(e.at?" · "+esc(new Date(e.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})):"");}
+function careMedRow(x){
+  var d=careDoseToday(x),par=devRole()==="parent",h="<div class='row care-row' style='flex-wrap:wrap'><span class='t'><b>💊 "+esc(x.title)+"</b>"+(careWhen(x)?" · "+esc(careWhen(x)):"")+"<br><span class='note'>";
+  if(d.st==="done")h+="✅ Taken"+(d.e&&d.e.kidDevice?" · "+careKidNote(d.e,x)+(d.e.review?" · <b>needs review</b>":" · reviewed"):(d.e&&d.e.at?" · "+esc(new Date(d.e.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})):""));
+  else if(d.st==="missed")h+="⏭️ Not taken (skipped)";
+  else if(d.st==="excused")h+="🟦 Excused";
+  else if(d.st==="due")h+=d.overdue?"⏰ Due since "+esc(niceDate(x.date)):"⏰ Due today";
+  else h+="Next: "+esc(niceDate(x.date));
+  h+=(x.repeat&&x.repeat!=="none"?" · repeats "+esc(x.repeat):"")+"</span></span><span class='care-act'>";
+  if(d.st==="due")h+="<button class='btn g' style='min-height:48px' data-a='hhcomplete' data-id='"+esc(x.id)+"' data-date='"+esc(x.date)+"'>"+(par?"Taken":"I took it")+"</button>"+(par&&unlocked?"<button class='btn n' style='min-height:48px' data-a='hhskip' data-id='"+esc(x.id)+"' data-date='"+esc(x.date)+"'>Skip</button>":"");
+  if(par&&d.st==="done"&&d.e&&d.e.kidDevice&&d.e.review)h+="<button class='btn' style='min-height:48px' data-a='nxcarereview' data-id='"+esc(x.id)+"'>Looks good</button>";
+  if(par)h+="<button class='btn n' style='min-height:48px' data-a='nxcaremed' data-id='"+esc(x.id)+"' aria-label='Edit "+esc(x.title)+"'>Edit</button>";
+  return h+"</span></div>";
+}
+function careAppts(days){return (typeof eventsAhead==="function"?eventsAhead(today(),days):[]).filter(careIsAppt);}
+function careApptRow(e){
+  var par=devRole()==="parent";
+  return "<div class='row care-row' style='flex-wrap:wrap'><span class='t'><b>🩺 "+esc(e.t)+"</b><br><span class='note'>"+esc(e.d===today()?"Today":niceDate(e.d))+(e.m?" · "+esc(niceTime(e.m)):"")+(e.loc?" · 📍 "+esc(e.loc):"")+"</span></span>"+
+    (par?"<span class='care-act'><button class='btn n' style='min-height:48px' data-a='nxcareappt' data-id='"+esc(e.series||e.id)+"' data-day='"+esc(e.d)+"'>Edit</button></span>":"")+"</div>";
+}
+function careHtml(){
+  var par=devRole()==="parent",people=carePeople(),meds=careMeds(),appts=careAppts(30),h="<h1>💊 Care</h1><p class='sub'>"+(par?"Medicines and appointments for everyone.":"Medicines and appointments for "+esc(people.map(function(p){return p.n;}).join(" and ")||"the kids")+".")+"</p>";
+  if(par)h+="<p><button class='btn g' data-a='nxcaremed' data-id='' style='min-height:52px'>+ Add medicine</button> <button class='btn g' data-a='nxcareappt' data-id='' style='min-height:52px'>+ Add appointment</button></p>";
+  var seenM={},seenA={};
+  people.forEach(function(p){
+    var pm=meds.filter(function(x){return hhPeople(x).indexOf(p.id)>=0;}),pa=appts.filter(function(e){return attendees(e).indexOf(p.id)>=0;});
+    pm.forEach(function(x){seenM[x.id]=1;});pa.forEach(function(e){seenA[e.id+"|"+e.d]=1;});
+    h+="<div class='cd care-person'><div class='ch' style='background:"+p.c+"'>"+esc(p.e)+" "+esc(p.n)+"</div><div class='cb'>";
+    h+=pm.length?pm.map(careMedRow).join(""):"<p class='note'>No medicines.</p>";
+    if(pa.length)h+="<p class='note' style='margin:10px 0 0'><b>Next 30 days</b></p>"+pa.map(careApptRow).join("");
+    h+="</div></div>";
+  });
+  if(par){
+    var om=meds.filter(function(x){return !seenM[x.id];}),oa=appts.filter(function(e){return !seenA[e.id+"|"+e.d];});
+    if(om.length||oa.length)h+="<div class='cd care-person'><div class='ch' style='background:var(--bar);color:var(--barink)'>👪 Not assigned to anyone</div><div class='cb'>"+om.map(careMedRow).join("")+oa.map(careApptRow).join("")+"</div></div>";
+  }
+  if(!par)h+="<p class='note'>Tap “I took it” after taking a medicine. A parent sees it straight away.</p>";
+  return h;
+}
+/* short summary for the Home card and the wall */
+function careTodayLines(){
+  var people=carePeople(),meds=careMeds(),ap=careAppts(1).filter(function(e){return e.d===today();}),out=[];
+  people.forEach(function(p){
+    meds.filter(function(x){return hhPeople(x).indexOf(p.id)>=0;}).forEach(function(x){var d=careDoseToday(x);if(d.st==="later")return;
+      out.push("<div class='li'>"+esc(p.e)+" <b>"+esc(p.n)+"</b> · 💊 "+esc(x.title)+" · "+(d.st==="done"?"✅ taken":d.st==="missed"?"not taken":d.st==="excused"?"excused":"⏰ "+(careWhen(x)||"due"))+"</div>");});
+    ap.filter(function(e){return attendees(e).indexOf(p.id)>=0;}).forEach(function(e){out.push("<div class='li'>"+esc(p.e)+" <b>"+esc(p.n)+"</b> · 🩺 "+esc(e.t)+(e.m?" · "+esc(niceTime(e.m)):"")+"</div>");});
+  });
+  return out;
+}
+function careHomeCard(){var l=careTodayLines();return card("💊 Care today","care",l.length?l.slice(0,5).join("")+(l.length>5?"<p class='note'>+"+(l.length-5)+" more · Open Care</p>":""):"<span class='note'>No medicines or appointments today.</span>");}
+function careWallBoxHtml(){var l=careTodayLines();return "<button class='w-box' data-a='go' data-v='care'><h2>💊 Care today</h2><div class='w-small'>"+(l.length?l.slice(0,3).map(function(s){return s.replace(/<\/?div[^>]*>/g,"");}).join("<br>")+(l.length>3?" …":""):"Nothing today")+"</div></button>";}
+(function(){var pc=pcHomeCard;pcHomeCard=function(){return careHomeCard()+pc.apply(this,arguments);};})();
+/* a parent device moves a kid-marked medicine on to its next date once the tablet's mark arrives */
+function careAdvanceKidDoses(){
+  if(devRole()!=="parent")return false;var ch=false;
+  careMeds().forEach(function(x){var e=(S.reminderLog||{})[x.id+"|"+x.date];if(!e||!e.kidDevice||x.date>today())return;
+    x.lastDone=x.date;if(x.repeat&&x.repeat!=="none"){x.anchorDay=x.anchorDay||+x.date.slice(8,10);x.date=hhNextDate(x);}else x.completed=today();ch=true;});
+  return ch;
+}
+(function(){var so=syncOnDocs;syncOnDocs=function(){var r=so.apply(this,arguments);try{if(careAdvanceKidDoses()){sync.applying=true;try{save();}finally{sync.applying=false;}if(typeof syncRender==="function")syncRender();}}catch(e){}return r;};})();
+document.addEventListener("click",function(e){
+  var n=e.target;while(n&&n!==document&&!(n.getAttribute&&n.getAttribute("data-a")))n=n.parentNode;if(!n||n===document)return;
+  var a=n.getAttribute("data-a"),id=n.getAttribute("data-id")||"";if(a.indexOf("nxcare")!==0)return;
+  e.preventDefault();e.stopPropagation();
+  if(devRole()!=="parent")return;
+  if(!unlocked){view="par";render();return;}
+  if(a==="nxcaremed"){view="house";hhFilter="medicine";hhFormType="medicine";hhEdit=id;render();var f=document.getElementById("hhtitle");if(f){if(f.scrollIntoView)f.scrollIntoView({block:"center"});f.focus();}return;}
+  if(a==="nxcareappt"){view="cal";if(typeof calDetail!=="undefined")calDetail="";if(typeof calSheet!=="undefined")calSheet="";evFormOpen=true;eventEdit=id;eventDay=n.getAttribute("data-day")||today();eventScope="one";render();
+    if(!id){var k=document.getElementById("ekind");if(k)k.value="doctor";}var ed=document.getElementById("event-editor");if(ed&&ed.scrollIntoView)ed.scrollIntoView();var et=document.getElementById("et");if(et)et.focus();return;}
+  if(a==="nxcarereview"){var x=careMeds().concat((S.household||[]).filter(careIsMed)).filter(function(i){return i.id===id;})[0];if(!x)return;var snap=JSON.stringify(S),ch=false;
+    Object.keys(S.reminderLog||{}).forEach(function(k){var q=k.split("|"),en=S.reminderLog[k];if(q[0]===id&&en&&en.kidDevice&&en.review){en.review=false;en.reviewedBy=statusWho();ch=true;}});
+    if(ch&&commitOr(snap))render();return;}
+},true);
 window.FH_READY=true;
 </script>
 
