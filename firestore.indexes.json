@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "careKid",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "own", "order": "ASCENDING" },
+        { "fieldPath": "ts", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
