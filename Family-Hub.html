@@ -547,7 +547,7 @@ function st(p,t){return S.done[today()+"|"+p+"|"+t]||""}
 function nav(){var v=[["home","🏠","Home"],["cal","📅","Calendar"],["hw","📚","Homework"],["chores","🧹","Chores"],["groc","🛒","Groceries"],["meals","🍽️","Meals"],["house","🏡","Household"],["care","💊","Care"],["goal","🎯","Goal"],["spin","🎲","Spin"],["photos","🖼️","Photos"],["par","🔒","Parent"]];
 if(devRole()!=="parent")v=v.filter(function(x){return x[0]!=="par";});document.getElementById("side").innerHTML=v.map(function(x){var on=view===x[0]||((view==="person"||view==="routine"||view==="mgr"||view==="pets")&&x[0]==="chores");return '<button data-a="'+(x[0]==="photos"?"pfnow":"go")+'" data-v="'+x[0]+'" class="'+(on?"on":"")+'"><i>'+x[1]+'</i><span>'+x[2]+"</span></button>"}).join("")}
 function render(){statCache=null;nav();applyTheme();var h="";
-if(view==="home")h=home();else if(view==="house")h=household();else if(view==="person")h=pers();else if(view==="cal")h=cal();else if(view==="hw")h=(typeof hwHtml==="function"?hwHtml():"");else if(view==="groc")h=groc();else if(view==="meals")h=meals();else if(view==="spin")h=spin();else if(view==="routine"&&rt)h=routine();else if(view==="mgr")h=mgrHtml();else if(view==="pets")h=pcHtml();else if(view==="care")h=careHtml();else if(view==="goal")h=goal();else if(view==="chores")h=chores();else h=parent();
+if(view==="home")h=home();else if(view==="house")h=household();else if(view==="person")h=pers();else if(view==="cal")h=cal();else if(view==="hw")h=(typeof hwHtml==="function"?hwHtml():"");else if(view==="groc")h=groc();else if(view==="meals")h=meals();else if(view==="spin")h=spin();else if(view==="routine"&&rt)h=routine();else if(view==="mgr")h=mgrHtml();else if(view==="pets")h=pcHtml();else if(view==="care")h=careHtml();else if(view==="review")h=rvHtml();else if(view==="goal")h=goal();else if(view==="chores")h=chores();else h=parent();
 h+=aiPanelHtml();document.getElementById("app").innerHTML=h;aiBtnSync();
 if(view==="spin")drawWheel();else if(wheelBusy)cancelWheel();
 showKidNews();uiAfterRender();wxRefresh();fitMonth();}
@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v39.4";
+var FH_BUILD="v39.5";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -8020,6 +8020,142 @@ document.addEventListener("keydown",function(e){if(e.key==="Escape")statusMenuCl
   ".st-back{position:fixed;left:0;right:0;top:0;bottom:0;background:rgba(0,0,0,.35);z-index:9000;display:flex;align-items:flex-end;justify-content:center}"+
   ".st-sheet{background:var(--card);color:var(--ink);width:100%;max-width:520px;border-radius:18px 18px 0 0;padding:16px max(16px,env(safe-area-inset-left,0px)) calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px;box-shadow:0 -4px 20px #0004}"+
   ".st-sheet .btn{width:100%;margin:0;min-height:50px}.st-title{font-weight:bold;font-size:18px;margin-bottom:4px}.st-sub{font-weight:bold;margin-top:4px}";
+  document.head.appendChild(css);})();
+/* ---- v39.5 ---- */
+/* ===== v39.5 (Stage 5): one "To review" inbox for parents =====
+   A "📥 To review" button with a count on the Home screen of parent devices opens one list of everything waiting:
+   chore approvals (points can be changed), reward requests, kids' calendar suggestions, family board requests,
+   AI suggestions, doses a child marked on the tablet, items the end of day marked Missed, "I couldn't do this"
+   requests, calendar events that need a quick look, and notes from the other parent.
+   Each item has a one-tap Approve (or OK / Looks good / Got it), Excuse for missed items, and Change.
+   Each group has "Approve all". Handled items leave the list. These approvals are no longer in the Parent area. */
+SYNC_BLOBS.push("reviewSeen");
+var RV_MOVE={"waiting-for-approval":1,"reward-requests":1,"calendar-change-requests":1,"family-board-requests":1,"waiting-for-your-approval":1};
+function rvParts(){
+  var out={};if(devRole()!=="parent"||!unlocked)return out;
+  var html="";try{html=parentRaw();}catch(e){return out;}
+  html.split(/(?=<h2[ >])/).forEach(function(p){var m=/^<h2[^>]*>([\s\S]*?)<\/h2>([\s\S]*)$/.exec(p);if(!m)return;var k=secKey(m[1]);if(RV_MOVE[k]&&!out[k])out[k]={title:m[1],body:m[2]};});
+  return out;
+}
+function rvCountIn(body,re){var r=String(body||"").match(re);return r?r.length:0;}
+function rvMe(){return (acct&&acct.personId&&person(acct.personId)?acct.personId:"")||unlockedBy||"";}
+function rvDoses(){
+  var out=[],cut=fd(addD(new Date(),-14)),meds={};(S.household||[]).forEach(function(x){if(careIsMed(x))meds[x.id]=x;});
+  Object.keys(S.reminderLog||{}).forEach(function(k){var q=k.split("|"),e=S.reminderLog[k],x=meds[q[0]];if(!x||!e||!e.kidDevice||!e.review||q[1]<cut)return;out.push({k:k,x:x,d:q[1],e:e});});
+  return out.sort(function(a,b){return a.d<b.d?1:-1;});
+}
+function rvMissed(){
+  var cut=fd(addD(new Date(),-7));
+  return Object.keys(S.itemStatus||{}).filter(function(k){var o=S.itemStatus[k];return o&&o.s==="missed"&&o.auto&&!o.seen&&k.slice(0,10)>=cut;}).sort().reverse();
+}
+function rvSeen(k){return !!(S.reviewSeen&&S.reviewSeen[k]);}
+function rvLook(){
+  var out=[];if(typeof eventsAhead!=="function")return out;
+  var evs=eventsAhead(today(),7),kids={};
+  evs.forEach(function(e){
+    var cat=careIsAppt(e)?"Care":(e.kind==="sports"||e.kind==="lesson")?"Activities":"Calendar";
+    if(typeof needsDriver==="function"&&needsDriver(e)){var k="drv|"+(e.series||e.id)+"|"+e.d;if(!rvSeen(k))out.push({k:k,e:e,cat:cat,why:"No driver chosen yet"});}
+    if(e.src){var k2="new|"+(e.series||e.id);if(!rvSeen(k2)&&!kids[k2]){kids[k2]=1;out.push({k:k2,e:e,cat:cat,why:"New from a synced calendar"});}}
+  });
+  return out;
+}
+/* the first time, events already in the calendar are not "new" */
+function rvLookInit(){
+  if(devRole()!=="parent"||(S.reviewSeen&&S.reviewSeen._init))return false;
+  S.reviewSeen=S.reviewSeen||{};(S.events||[]).forEach(function(e){if(e&&e.src)S.reviewSeen["new|"+e.id]=today();});S.reviewSeen._init=today();return true;
+}
+function rvNotes(){var me=rvMe();return (S.parentNotes||[]).filter(function(n){return n&&!n.ack&&(!me||n.from!==me);});}
+function rvGroups(){
+  var parts=rvParts(),g=[];
+  function part(key,id,icon,title,re,all){var p=parts[key];if(!p)return;var n=rvCountIn(p.body,re);if(n)g.push({id:id,icon:icon,title:title,n:n,html:p.body,all:all});}
+  part("waiting-for-approval","chores","✅","Chores to approve",/data-a='appr'/g,"chores");
+  part("reward-requests","rewards","🎁","Reward requests",/data-a='rok'/g,"rewards");
+  part("calendar-change-requests","calreq","📅","Calendar suggestions from the kids",/data-a='nxevapprove'/g,"calreq");
+  part("family-board-requests","board","📌","Family board requests",/data-a='bqapprove'/g,"board");
+  var ai=parts["waiting-for-your-approval"];if(ai){var an=secCount("waiting-for-your-approval",ai.body);if(an)g.push({id:"ai",icon:"✨",title:"AI suggestions",n:an,html:ai.body,all:""});}
+  var ds=rvDoses();if(ds.length)g.push({id:"doses",icon:"💊",title:"Doses marked on the tablet",n:ds.length,all:"doses",html:ds.map(function(o){var w=person(o.e.by)||person(hhPeople(o.x)[0]);
+    return "<div class='row' style='flex-wrap:wrap'><span class='t'><b>"+esc(o.x.title)+"</b><div class='note'>"+esc(w?w.n:"A child")+" marked it taken · "+esc(niceDate(o.d))+(o.e.at?" "+esc(new Date(o.e.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})):"")+"</div></span><button class='btn g' data-a='nxcarereview' data-id='"+esc(o.x.id)+"'>Looks good</button><button class='btn n' data-a='nxrvgo' data-v='care'>Change</button></div>";}).join("")});
+  var ms=rvMissed();if(ms.length)g.push({id:"missed",icon:"🌙",title:"Missed at the end of the day",n:ms.length,all:"missed",html:ms.map(function(k){
+    return "<div class='row' style='flex-wrap:wrap'><span class='t'><b>"+esc(statusLabel(k))+"</b><div class='note'>Still pending at "+esc(niceTime(statusCfg().cutoff))+", so it was marked Missed.</div></span><button class='btn g' data-a='nxrvok' data-k='"+esc(k)+"'>OK</button><button class='btn' data-a='nxstmenu' data-k='"+esc(k)+"' data-step='excuse'>Excuse</button><button class='btn n' data-a='nxstmenu' data-k='"+esc(k)+"'>Change</button></div>";}).join("")});
+  var cr=(S.cantReq||[]).filter(function(c){return c&&c.k;});if(cr.length)g.push({id:"cant",icon:"🙋",title:"“I couldn’t do this”",n:cr.length,all:"cant",html:cr.map(function(c){var w=person(c.by);
+    return "<div class='row' style='flex-wrap:wrap'><span class='t'><b>"+esc(statusLabel(c.k))+"</b><div class='note'>"+esc(w?w.n:"Someone")+(c.r?" · "+esc(EXCUSE_REASONS[c.r]):"")+" · "+esc(new Date(c.at).toLocaleString([],{weekday:"short",hour:"numeric",minute:"2-digit"}))+"</div></span><button class='btn g' data-a='nxstcant' data-id='"+esc(c.id)+"' data-s='excused'>Excuse</button><button class='btn' data-a='nxstcant' data-id='"+esc(c.id)+"' data-s='missed'>Missed</button><button class='btn n' data-a='nxstmenu' data-k='"+esc(c.k)+"'>Change</button></div>";}).join("")});
+  var lk=rvLook();if(lk.length)g.push({id:"look",icon:"👀",title:"Needs a quick look",n:lk.length,all:"look",html:lk.map(function(o){
+    return "<div class='row' style='flex-wrap:wrap'><span class='t'><b>"+kindIcon(o.e.kind)+esc(o.e.t)+"</b><div class='note'>"+esc(o.cat)+" · "+esc(o.e.d===today()?"Today":niceDate(o.e.d))+(o.e.m?" "+esc(niceTime(o.e.m)):"")+" · "+esc(o.why)+"</div></span><button class='btn g' data-a='nxrvlook' data-k='"+esc(o.k)+"'>Looks fine</button><button class='btn n' data-a='nxcareappt' data-id='"+esc(o.e.series||o.e.id)+"' data-day='"+esc(o.e.d)+"'>Change</button></div>";}).join("")});
+  var nt=rvNotes();if(nt.length)g.push({id:"notes",icon:"✉️",title:"Notes from the other parent",n:nt.length,all:"notes",html:nt.map(function(n){var f=person(n.from);
+    return "<div class='row' style='flex-wrap:wrap'><span class='t'><b>"+esc(f?f.n:"Calendar")+"</b> <span class='note'>"+esc(n.at?new Date(n.at).toLocaleString([],{weekday:"short",hour:"numeric",minute:"2-digit"}):"")+"</span><div>"+esc(n.text)+"</div></span><button class='btn g' data-a='nxnoteack' data-id='"+esc(n.id)+"'>Got it</button></div>";}).join("")});
+  return g;
+}
+function rvCount(){if(devRole()!=="parent")return 0;var n=0;try{rvGroups().forEach(function(g){n+=g.n;});}catch(e){}return n;}
+/* the count also needs approvals when the Parent area is locked, so count those directly */
+function rvCountQuick(){
+  if(devRole()!=="parent")return 0;
+  var n=0;try{Object.keys(S.done||{}).forEach(function(k){if(S.done[k]!=="p")return;if((S.petClaims||{})[k]&&S.petClaims[k].zero)return;var a=k.split("|"),p=person(a[1]),t=(S.tasks[a[1]]||[]).filter(function(x){return x.id===a[2];})[0]||petClaimTask(k);if(p&&p.kid&&t)n++;});
+    n+=(S.req||[]).length+(S.eventRequests||[]).length+(typeof bqPending==="function"?bqPending().length:0)+(typeof aiProps!=="undefined"&&Array.isArray(aiProps)?aiProps.length:0)+rvDoses().length+rvMissed().length+(S.cantReq||[]).length+rvLook().length+rvNotes().length;}catch(e){}
+  return n;
+}
+function rvHtml(){
+  var h="<h1>📥 To review</h1>";
+  if(devRole()!=="parent")return h+"<div class='card'><p>To review is on parents’ phones.</p></div>";
+  if(!unlocked)return h+"<p class='sub'>Unlock to see what is waiting.</p>"+pinLockScreen();
+  var g=rvGroups();
+  if(!g.length)return h+"<div class='card'><p class='pqclear'>All caught up ✅</p><p class='note'>New approvals, kids’ requests and anything missed will show up here.</p></div>";
+  var total=0;g.forEach(function(x){total+=x.n;});
+  h+="<p class='sub'>"+total+" thing"+(total===1?"":"s")+" waiting. Handled items leave the list.</p>";
+  g.forEach(function(x){
+    h+="<section class='card rv-group' id='rv-"+x.id+"'><div class='rv-head'><h2>"+x.icon+" "+esc(x.title)+" <span class='secbadge'>"+x.n+"</span></h2>"+(x.all&&x.n>1?"<button class='btn g' data-a='nxrvall' data-g='"+x.all+"'>"+(x.all==="missed"?"OK all":x.all==="look"?"All look fine":x.all==="notes"?"Got them all":x.all==="cant"?"Excuse all":x.all==="doses"?"All look good":"Approve all")+" "+x.n+"</button>":"")+"</div><div class='rv-body'>"+x.html+"</div></section>";
+  });
+  return h;
+}
+function rvHomeBtn(){if(devRole()!=="parent")return "";var n=rvCountQuick();return "<button class='rv-home"+(n?" hot":"")+"' data-a='nxrv'><span aria-hidden='true'>📥</span> To review"+(n?" <b class='rv-n'>"+(n>99?"99+":n)+"</b>":" <span class='rv-ok'>· all caught up</span>")+"</button>";}
+(function(){
+  var h0=home;home=function(){return rvHomeBtn()+h0.apply(this,arguments);};
+  /* the Parent area keeps its settings; its approval sections moved to To review */
+  var ps=parentSections;parentSections=function(html){
+    var parts=String(html).split(/(?=<h2[ >])/),keep=[parts.shift()];
+    parts.forEach(function(p){var m=/^<h2[^>]*>([\s\S]*?)<\/h2>/.exec(p);if(m&&RV_MOVE[secKey(m[1])])return;keep.push(p);});
+    return ps.call(this,keep.join(""));
+  };
+  pqTilesHtml=function(){var n=rvCountQuick(),med=pqMedDue();
+    return "<div class='pqtiles' role='navigation' aria-label='Needs you'><div class='pqt"+(n?" hot":"")+"'><button class='pqtb' data-a='nxrv'><span class='pqi' aria-hidden='true'>📥</span><b class='pqn'>"+n+"</b><span class='pql'>To review</span></button></div>"+
+      "<div class='pqt"+(med?" hot":"")+"'><button class='pqtb' data-pq='med'><span class='pqi' aria-hidden='true'>💊</span><b class='pqn'>"+med+"</b><span class='pql'>Medicine due</span></button></div></div>";};
+  pqBadgeCount=function(){return devRole()==="parent"?rvCountQuick():0;};
+  /* Stage 4's temporary "I couldn't do this" card now lives in To review */
+  statusCantHtml=function(){return "";};
+  var r0=render;render=function(){if(rvLookInit())save();return r0.apply(this,arguments);};
+})();
+function rvAll(gid){
+  var snap=JSON.stringify(S),n=0;
+  function clickAll(sel){for(var i=0;i<80;i++){var b=document.querySelector("#rv-"+gid+" "+sel);if(!b)break;b.click();n++;}return n;}
+  if(gid==="chores"){pqApproveAll();return;}
+  if(gid==="rewards"){if(!confirm("Approve every reward request?"))return;clickAll("[data-a='rok']");return;}
+  if(gid==="calreq"){if(!confirm("Approve every calendar suggestion?"))return;clickAll("[data-a='nxevapprove']");return;}
+  if(gid==="board"){if(!confirm("Approve every board request?"))return;clickAll("[data-a='bqapprove']");return;}
+  if(gid==="doses"){rvDoses().forEach(function(o){o.e.review=false;o.e.reviewedBy=statusWho();n++;});}
+  else if(gid==="missed"){rvMissed().forEach(function(k){S.itemStatus[k].seen=true;n++;});}
+  else if(gid==="look"){S.reviewSeen=S.reviewSeen||{};rvLook().forEach(function(o){S.reviewSeen[o.k]=today();n++;});}
+  else if(gid==="notes"){rvNotes().forEach(function(x){x.ack=true;n++;});}
+  else if(gid==="cant"){if(!confirm("Excuse every “I couldn’t do this” request with the reason given?"))return;(S.cantReq||[]).slice().forEach(function(c){if(c&&c.k){statusSet(c.k,"excused",c.r||"","");n++;}});S.cantReq=[];}
+  if(n&&commitOr(snap)){statusShadow=statusSnapshot();render();statusMessage("Done · "+n+" item"+(n===1?"":"s"));}
+}
+function rvPrune(){var s=S.reviewSeen;if(!s)return;var cut=fd(addD(new Date(),-30));Object.keys(s).forEach(function(k){if(k!=="_init"&&s[k]<cut)delete s[k];});}
+document.addEventListener("click",function(e){
+  var n=e.target;while(n&&n!==document&&!(n.getAttribute&&n.getAttribute("data-a")))n=n.parentNode;if(!n||n===document)return;
+  var a=n.getAttribute("data-a");if(a.indexOf("nxrv")!==0)return;
+  e.preventDefault();e.stopPropagation();
+  if(a==="nxrv"){view="review";render();try{window.scrollTo(0,0);}catch(x){}return;}
+  if(!unlocked||devRole()!=="parent")return;
+  if(a==="nxrvall"){rvAll(n.getAttribute("data-g"));return;}
+  if(a==="nxrvgo"){view=n.getAttribute("data-v");render();return;}
+  var snap=JSON.stringify(S),k=n.getAttribute("data-k");
+  if(a==="nxrvok"&&S.itemStatus&&S.itemStatus[k]){S.itemStatus[k].seen=true;}
+  else if(a==="nxrvlook"){S.reviewSeen=S.reviewSeen||{};S.reviewSeen[k]=today();rvPrune();}
+  else return;
+  if(commitOr(snap))render();
+},true);
+(function(){var css=document.createElement("style");css.textContent=
+  ".rv-home{display:flex;align-items:center;gap:10px;width:100%;margin:0 0 12px;padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:20px;font-weight:bold;cursor:pointer;text-align:left;min-height:60px}"+
+  ".rv-home.hot{border:2px solid #d9822b}.rv-n{margin-left:auto;min-width:34px;height:34px;padding:0 10px;border-radius:17px;background:#d63939;color:#fff;line-height:34px;text-align:center;font-size:18px}.rv-ok{font-weight:normal;color:var(--mute);font-size:16px}"+
+  ".rv-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:space-between}.rv-head h2{margin:0;font-size:20px}.rv-head .btn{margin:0;min-height:44px}.rv-body{margin-top:6px}.rv-body h2{display:none}";
   document.head.appendChild(css);})();
 window.FH_READY=true;
 </script>
