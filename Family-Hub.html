@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v39.2";
+var FH_BUILD="v39.2.1";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -7362,23 +7362,57 @@ function acctAdopt(user){
   sync.viaGoogle=true;sync.gname=user.displayName||"";
   return sync.adapter.adopt({refresh:user.refreshToken,uid:user.uid,email:user.email||""});
 }
+/* v39.2.1: Google sign-in by a plain same-tab redirect to Google, then handing Google's answer to Firebase.
+   This works in iPhone home-screen apps, where Firebase's pop-up never reports back.
+   GOOGLE_CLIENT_ID is the public "Web client ID" from Firebase > Authentication > Google > Web SDK configuration
+   (not a secret, like the Firebase web config above). */
+var GOOGLE_CLIENT_ID="387756198863-nvim1tbarfus81vsqoc2iekb7ufmkqss.apps.googleusercontent.com";
+function acctRand(){var a=new Uint8Array(16);(window.crypto||window.msCrypto).getRandomValues(a);return Array.prototype.map.call(a,function(x){return ("0"+x.toString(16)).slice(-2);}).join("");}
+function acctReturnUrl(){return location.origin+location.pathname;}
 function acctGoogle(){
   if(acctTabletLike()){alert("Google sign-in is for parent phones. The wall tablet signs in with its own email and password.");return;}
-  if(!acctSyncOn()){return;}
+  if(!acctSyncOn())return;
+  if(GOOGLE_CLIENT_ID){
+    var st={state:acctRand(),nonce:acctRand(),t:Date.now()};
+    try{localStorage.setItem("familyhub-goauth",JSON.stringify(st));}catch(e){alert("This browser cannot store the sign-in. Turn off private browsing and try again.");return;}
+    acct.msg="Opening Google sign-in…";render();
+    location.href="https://accounts.google.com/o/oauth2/v2/auth?"+["client_id="+encodeURIComponent(GOOGLE_CLIENT_ID),"redirect_uri="+encodeURIComponent(acctReturnUrl()),"response_type=id_token","scope="+encodeURIComponent("openid email profile"),"nonce="+st.nonce,"state="+st.state,"prompt=select_account"].join("&");
+    return;
+  }
+  acctGooglePopup();
+}
+/* the reply from Google comes back in the address after "#" */
+function acctGoogleReturn(){
+  var h=String(location.hash||"");if(h.indexOf("id_token=")<0&&h.indexOf("error=")<0)return;
+  var q={};h.replace(/^#/,"").split("&").forEach(function(kv){var i=kv.indexOf("=");if(i>0)q[decodeURIComponent(kv.slice(0,i))]=decodeURIComponent(kv.slice(i+1).replace(/\+/g," "));});
+  try{history.replaceState(null,"",location.pathname+location.search);}catch(e){location.hash="";}
+  var st=null;try{st=JSON.parse(localStorage.getItem("familyhub-goauth")||"null");localStorage.removeItem("familyhub-goauth");}catch(e){}
+  view="par";
+  if(q.error){acct.msg=q.error==="access_denied"?"Sign-in was cancelled.":"Google sign-in did not work ("+q.error+"). If it says redirect_uri_mismatch, the app address must be added in Google Cloud (see the setup steps).";return;}
+  if(!st||st.state!==q.state||Date.now()-st.t>600000){acct.msg="That sign-in could not be checked. Please tap Sign in with Google again.";return;}
+  var tok=q.id_token,pl=null;try{pl=JSON.parse(decodeURIComponent(escape(atob(tok.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")))));}catch(e){}
+  if(!pl||pl.nonce!==st.nonce){acct.msg="That sign-in could not be checked. Please tap Sign in with Google again.";return;}
+  acct.msg="Finishing sign-in…";
+  if(!acctSyncOn())return;
+  fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key="+FH_CLOUD_CONFIG.apiKey,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({postBody:"id_token="+encodeURIComponent(tok)+"&providerId=google.com",requestUri:acctReturnUrl(),returnSecureToken:true,returnIdpCredential:true})})
+  .then(function(r){return r.json().then(function(j){
+    if(r.status!==200||!j.refreshToken){var m=(j.error&&j.error.message)||("status "+r.status);throw new Error(/OPERATION_NOT_ALLOWED/.test(m)?"Google sign-in is turned off in Firebase (Authentication › Sign-in method › Google).":/INVALID_IDP_RESPONSE|audience/i.test(m)?"Firebase did not accept the Google sign-in. Check the Web client ID in the app matches Firebase › Authentication › Google › Web SDK configuration.":"Firebase said: "+m);}
+    sync.viaGoogle=true;sync.gname=j.displayName||pl.name||"";
+    return sync.adapter.adopt({refresh:j.refreshToken,uid:j.localId,email:j.email||pl.email||""});
+  });}).then(function(){acct.msg="";render();},function(e){acct.msg="Google sign-in did not finish: "+((e&&e.message)||e);render();});
+}
+/* older pop-up sign-in, used only until the Web client ID is filled in; it now gives up after 25 seconds */
+function acctGooglePopup(){
   acct.msg="Opening Google sign-in…";render();
+  var done=false,tm=setTimeout(function(){if(done)return;done=true;acct.msg=(navigator.standalone||(window.matchMedia&&matchMedia("(display-mode: standalone)").matches))?"Google sign-in cannot open from a home-screen app yet. A parent needs to finish the one-time Google setup (Web client ID).":"Google sign-in did not open. Allow pop-ups for this site and try again.";render();},25000);
   acctFb().then(function(){
     var auth=acctFbAuth(),prov=new firebase.auth.GoogleAuthProvider();prov.setCustomParameters({prompt:"select_account"});
-    return auth.setPersistence(firebase.auth.Auth.Persistence.NONE).then(function(){return auth.signInWithPopup(prov);}).then(function(res){return acctAdopt(res.user);},function(e){
-      var c=(e&&e.code)||"";
-      if(c==="auth/popup-blocked"||c==="auth/operation-not-supported-in-this-environment"){
-        try{localStorage.setItem("familyhub-gredirect","1");}catch(x){}
-        return auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).then(function(){return auth.signInWithRedirect(prov);});
-      }
-      throw e;
-    });
-  }).then(function(){acct.msg="";render();},function(e){
-    var c=(e&&e.code)||"";
+    return auth.setPersistence(firebase.auth.Auth.Persistence.NONE).then(function(){return auth.signInWithPopup(prov);}).then(function(res){return acctAdopt(res.user);});
+  }).then(function(){if(done)return;done=true;clearTimeout(tm);acct.msg="";render();},function(e){
+    if(done)return;done=true;clearTimeout(tm);var c=(e&&e.code)||"";
     acct.msg=c==="auth/popup-closed-by-user"||c==="auth/cancelled-popup-request"?"Sign-in was cancelled.":
+      c==="auth/popup-blocked"?"Google sign-in was blocked as a pop-up. Allow pop-ups for this site and try again.":
       c==="auth/unauthorized-domain"?"Google sign-in is not allowed on this web address yet. A parent needs to add it in Firebase › Authentication › Settings › Authorized domains.":
       c==="auth/operation-not-allowed"?"Google sign-in is turned off. A parent needs to turn it on in Firebase › Authentication › Sign-in method.":
       "Google sign-in did not work: "+((e&&e.message)||c||"unknown problem");
@@ -7498,6 +7532,7 @@ function acctAction(a,el){
 document.addEventListener("change",function(e){var t=e.target,pid=t&&t.getAttribute&&t.getAttribute("data-acctrole");if(!pid)return;var p=document.getElementById(pid);if(p)p.innerHTML=acctPeopleOpts(t.value,"");});
 document.addEventListener("click",function(e){var n=e.target;while(n&&n!==document&&!(n.getAttribute&&n.getAttribute("data-a")))n=n.parentNode;if(!n||n===document)return;var a=n.getAttribute("data-a");if(a&&a.indexOf("nxacct")===0){if(acctAction(a,n)){e.preventDefault();e.stopPropagation();}}},true);
 if(sync.user&&typeof acctOnAuth==="function"&&acctUid())acctOnAuth({uid:acctUid(),email:sync.user});
+try{if(/[#&](id_token|error)=/.test(location.hash||"")){acctGoogleReturn();render();}}catch(e){}
 
 (function(){
   var pl=pinLockScreen;pinLockScreen=function(){return pl.apply(this,arguments)+acctSignInHtml();};

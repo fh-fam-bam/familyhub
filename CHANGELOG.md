@@ -28,3 +28,8 @@
 - **"I couldn't do this":** requests can now be stored. The buttons come in Stage 4.
 - **Deletions:** a deleted shared item no longer keeps a copy of its old content.
 - **Rules:** new database rules, 62 emulator tests, and an end-to-end migration test. A database index for future kid accounts is in `firestore.indexes.json`.
+
+### v39.2.1 – Google sign-in that works from the home-screen icon
+- **Home-screen fix:** "Sign in with Google" now goes to Google in the same window and comes back to the app, then hands Google's answer to Firebase. This works in iPhone home-screen apps, where Firebase's pop-up sign-in never reported back and the app stayed on "Opening Google sign-in…".
+- **One public setting:** the Web client ID from Firebase > Authentication > Google > Web SDK configuration is now set in the app (`GOOGLE_CLIENT_ID`). The app address is allowed in Google Cloud > Google Auth Platform > Clients.
+- **No more hanging:** the pop-up sign-in gives up after 25 seconds with a clear message.
