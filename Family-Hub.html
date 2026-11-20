@@ -547,7 +547,7 @@ function st(p,t){return S.done[today()+"|"+p+"|"+t]||""}
 function nav(){var v=[["home","🏠","Home"],["cal","📅","Calendar"],["hw","📚","Homework"],["chores","🧹","Chores"],["groc","🛒","Groceries"],["meals","🍽️","Meals"],["house","🏡","Household"],["care","💊","Care"],["goal","🎯","Goal"],["spin","🎲","Spin"],["photos","🖼️","Photos"],["par","🔒","Parent"]];
 if(devRole()!=="parent")v=v.filter(function(x){return x[0]!=="par";});document.getElementById("side").innerHTML=v.map(function(x){var on=view===x[0]||((view==="person"||view==="routine"||view==="mgr"||view==="pets")&&x[0]==="chores");return '<button data-a="'+(x[0]==="photos"?"pfnow":"go")+'" data-v="'+x[0]+'" class="'+(on?"on":"")+'"><i>'+x[1]+'</i><span>'+x[2]+"</span></button>"}).join("")}
 function render(){statCache=null;nav();applyTheme();var h="";
-if(view==="home")h=home();else if(view==="house")h=household();else if(view==="person")h=pers();else if(view==="cal")h=cal();else if(view==="hw")h=(typeof hwHtml==="function"?hwHtml():"");else if(view==="groc")h=groc();else if(view==="meals")h=meals();else if(view==="spin")h=spin();else if(view==="routine"&&rt)h=routine();else if(view==="mgr")h=mgrHtml();else if(view==="pets")h=pcHtml();else if(view==="care")h=careHtml();else if(view==="review")h=rvHtml();else if(view==="goal")h=goal();else if(view==="chores")h=chores();else h=parent();
+if(view==="home")h=home();else if(view==="house")h=household();else if(view==="person")h=pers();else if(view==="cal")h=cal();else if(view==="hw")h=(typeof hwHtml==="function"?hwHtml():"");else if(view==="groc")h=groc();else if(view==="meals")h=meals();else if(view==="spin")h=spin();else if(view==="routine"&&rt)h=routine();else if(view==="mgr")h=mgrHtml();else if(view==="pets")h=pcHtml();else if(view==="care")h=careHtml();else if(view==="review")h=rvHtml();else if(view==="khist")h=psHistHtml();else if(view==="goal")h=goal();else if(view==="chores")h=chores();else h=parent();
 h+=aiPanelHtml();document.getElementById("app").innerHTML=h;aiBtnSync();
 if(view==="spin")drawWheel();else if(wheelBusy)cancelWheel();
 showKidNews();uiAfterRender();wxRefresh();fitMonth();}
@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v39.7";
+var FH_BUILD="v39.8";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -8332,7 +8332,7 @@ document.addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target&&e.
 SYNC_BLOBS.push("progressCfg");
 function prCfg(){var c=S.progressCfg||{};return {plant:c.plant!==false};}
 function prZone(pct){if(pct===null)return null;return pct>=0.85?"great":pct>=0.6?"ontrack":"push";}
-var PR_ZONE={great:["🌟","Great week"],ontrack:["👍","On track"],push:["💪","Needs a push"]};
+var PR_ZONE={great:["🌟","Great week"],ontrack:["👍","On track"],push:["💪","Needs a push"]},PR_DAYZ={great:["🌟","Great day"],ontrack:["👍","On track"],push:["💪","Needs a push"]};
 function prKeys(pid,d){
   var out=dueTasks(pid,d).map(function(t){return d+"|"+pid+"|"+t.id;});
   try{if(typeof pcCfg==="function"&&pcCfg())pcItems(d).forEach(function(it){if(it.kid===pid)out.push(d+"|pc|"+it.id);});}catch(e){}
@@ -8374,8 +8374,8 @@ function prHtml(p){
   h+="</div><div class='pr-row'><div class='pr-left'>";
   h+="<div class='pr-meter' role='meter' aria-valuemin='0' aria-valuemax='100' aria-valuenow='"+pct+"' aria-label='Done this week'><i style='transform:scaleX("+(pct/100)+")'></i><span class='pr-mark pr-m60'></span><span class='pr-mark pr-m85'></span></div>";
   h+="<div class='pr-zone'>"+(z?"<b>"+z[0]+" "+z[1]+"</b> · "+pct+"%":"<b>🌱 Your week starts here</b>")+"<span class='note'> · "+w.done+" done"+(w.missed?" · "+w.missed+" missed":"")+"</span></div>";
-  if(td)h+="<div class='pr-today note'>Today: "+(td.total?(td.final&&td.zone?esc(PR_ZONE[td.zone][1])+" · "+Math.round(td.pct*100)+"%":td.done+" done"+(td.pending?" · "+td.pending+" to go":"")+(td.excused?" · "+td.excused+" excused":"")):"no chores")+"</div>";
-  h+="<div class='pr-dots' role='list' aria-label='Each day this week'>"+w.days.map(function(r){var n=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][(localDate(r.d).getDay()+6)%7],cls=r.future?"future":!r.total?"none":r.zone&&r.final?r.zone:r.final?"none":"open",t=r.future?"later":!r.total?"no chores":r.zone&&r.final?PR_ZONE[r.zone][1]+" ("+Math.round(r.pct*100)+"%)":r.final?"not counted":"in progress";
+  if(td)h+="<div class='pr-today note'>Today: "+(td.total?(td.final&&td.zone?esc(PR_DAYZ[td.zone][1])+" · "+Math.round(td.pct*100)+"%":td.done+" done"+(td.pending?" · "+td.pending+" to go":"")+(td.excused?" · "+td.excused+" excused":"")):"no chores")+"</div>";
+  h+="<div class='pr-dots' role='list' aria-label='Each day this week'>"+w.days.map(function(r){var n=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][(localDate(r.d).getDay()+6)%7],cls=r.future?"future":!r.total?"none":r.zone&&r.final?r.zone:r.final?"none":"open",t=r.future?"later":!r.total?"no chores":r.zone&&r.final?PR_DAYZ[r.zone][1]+" ("+Math.round(r.pct*100)+"%)":r.final?"not counted":"in progress";
     return "<span class='pr-dot "+cls+(r.d===today()?" today":"")+"' role='listitem' aria-label='"+n+": "+esc(t)+"'><i></i><small>"+n.slice(0,2)+"</small></span>";}).join("")+"</div>";
   h+="</div>";
   if(prCfg().plant)h+="<div class='pr-right'>"+prPlant(w,p.c)+"<div class='note pr-pl'>"+(w.good?w.good+" good day"+(w.good===1?"":"s"):"Grows on every On-track day")+"</div></div>";
@@ -8427,6 +8427,74 @@ document.addEventListener("click",function(e){
   ".pr-dip{animation:prdip .6s ease}@keyframes prdip{0%{transform:translateY(0)}40%{transform:translateY(4px)}100%{transform:translateY(0)}}"+
   ".pr-pop{animation:prpop .7s ease}@keyframes prpop{0%{transform:scale(.85)}60%{transform:scale(1.06)}100%{transform:scale(1)}}"+
   "@media (prefers-reduced-motion:reduce){.pr-meter i,.pr-grow{transition:none}.pr-star,.pr-dip,.pr-pop{animation:none}}";
+  document.head.appendChild(css);})();
+/* ---- v39.8 ---- */
+/* ===== v39.8 (Stage 8): parents' summary =====
+   On parent phones the Home screen shows a small card per child under "To review": this week's percentage
+   and zone, how many were missed and excused. Tapping a card opens that child's history: the week day by day
+   (each item's status and reason) and the latest status changes with who made them. */
+var psPid="";
+function psWeekCounts(pid,ws){var w=prWeek(pid,ws),ex=0;w.days.forEach(function(r){ex+=r.excused;});w.excused=ex;return w;}
+function psCardsHtml(){
+  if(devRole()!=="parent")return "";
+  var kids=(S.members||P).filter(function(p){return p.kid&&!p.archived&&!p.pet;});if(!kids.length)return "";
+  var ws=weekStartOf(today());
+  return "<section class='ps-row' aria-label='Kids this week'>"+kids.map(function(p){
+    var w=psWeekCounts(p.id,ws),z=w.zone?PR_ZONE[w.zone]:null,pct=w.pct===null?null:Math.round(w.pct*100);
+    return "<button class='ps-card' style='--kc:"+p.c+"' data-a='nxpsopen' data-p='"+esc(p.id)+"' aria-label='"+esc(p.n)+": "+(pct===null?"nothing counted yet":pct+" percent, "+z[1])+", "+w.missed+" missed, "+w.excused+" excused. Open history'>"+
+      "<span class='ps-top'><span class='ps-av' aria-hidden='true'>"+esc(p.e)+"</span><b>"+esc(p.n)+"</b><span class='ps-pct'>"+(pct===null?"–":pct+"%")+"</span></span>"+
+      "<span class='ps-bar'><i style='transform:scaleX("+(pct===null?0:pct/100)+")'></i></span>"+
+      "<span class='ps-sub'>"+(z?z[0]+" "+z[1]:"🌱 Week just started")+"</span>"+
+      "<span class='ps-sub note'>"+w.missed+" missed · "+w.excused+" excused</span></button>";}).join("")+"</section>";
+}
+(function(){var rb=rvHomeBtn;rvHomeBtn=function(){return rb.apply(this,arguments)+psCardsHtml();};})();
+/* ---- one child's history ---- */
+function psLabel(k){
+  var q=k.split("|"),ch=statusChore(k);if(ch)return (ch.t.e?ch.t.e+" ":"")+ch.t.t;
+  if(q[1]==="pc"){var it=(typeof pcItems==="function"?pcItems(q[0]):[]).filter(function(i){return i.id===q[2];})[0];return "🐾 "+(it?it.label:"Pet care");}
+  return q[2];
+}
+var PS_ST={done:["✅","Done"],missed:["⏭️","Missed"],excused:["🟦","Excused"],madeup:["↩️","Made up"],pending:["⬜","To do"]};
+function psHistHtml(){
+  var p=person(psPid);if(!p||devRole()!=="parent")return "<h1>History</h1><div class='card'><p class='note'>This is on parents’ phones.</p></div>";
+  var off=prOffset[p.id]||0,ws=fd(addD(localDate(weekStartOf(today())),off*7));
+  var h="<div class='personal-switch'><button class='btn n' data-a='go' data-v='home'>← Home</button><button class='btn n' data-a='who' data-p='"+esc(p.id)+"'>Open "+esc(p.n)+"’s page</button></div><h1>"+esc(p.e)+" "+esc(p.n)+" · history</h1>";
+  h+=prHtml(p);
+  for(var i=6;i>=0;i--){
+    var d=fd(addD(localDate(ws),i));if(d>today())continue;
+    var keys=prKeys(p.id,d);if(!keys.length)continue;
+    var r=prDay(p.id,d);
+    h+="<div class='card ps-day'><h2>"+esc(d===today()?"Today":niceDate(d))+(r.zone&&r.final?" <span class='note'>· "+PR_DAYZ[r.zone][0]+" "+esc(PR_DAYZ[r.zone][1])+" "+Math.round(r.pct*100)+"%</span>":"")+"</h2>";
+    keys.forEach(function(k){
+      var raw=statusOf(k),st=raw==="pending"?prState(k):raw,o=S.itemStatus&&S.itemStatus[k],lab=PS_ST[st]||[" ",st],extra="";
+      if(st==="pending"&&d<today())lab=["·","Not counted (before tracking started)"];
+      if(st==="excused"&&o&&o.r)extra=" · "+EXCUSE_REASONS[o.r];
+      if(st==="missed"&&(!o||o.auto))extra=" · not done by the end of the day";
+      if(o&&o.by&&person(o.by))extra+=" · by "+person(o.by).n;
+      if(S.done&&S.done[k]==="p")extra+=" · waiting for approval";
+      h+="<div class='row'><span class='ps-st' aria-hidden='true'>"+lab[0]+"</span><span class='t'>"+esc(psLabel(k))+"<div class='note'>"+esc(lab[1]+extra)+"</div></span><button type='button' class='st-more' data-a='nxstmenu' data-k='"+esc(k)+"' aria-label='Change'>⋯</button></div>";
+    });
+    h+="</div>";
+  }
+  var log=(S.statusLog||[]).filter(function(e){var q=String(e.k||"").split("|");return q[1]===p.id&&e.k.slice(0,10)>=ws&&e.k.slice(0,10)<=fd(addD(localDate(ws),6));}).slice(-25).reverse();
+  h+="<h2>Changes this week</h2><div class='card'>"+(log.length?log.map(function(e){var w=person(e.by);
+    return "<div class='row'><span class='t'><b>"+esc(psLabel(e.k))+"</b> <span class='note'>"+esc(niceDate(e.k.slice(0,10)))+"</span><div class='note'>"+esc((STATUS_NAMES[e.from]||e.from)+" → "+(STATUS_NAMES[e.to]||(e.to==="couldnt"?"Couldn’t do it":e.to)))+(e.r?" ("+esc(EXCUSE_REASONS[e.r]||e.r)+")":"")+" · "+esc(e.src==="auto"?"end of day":w?w.n:String(e.by||"").replace("device:","")+" device")+" · "+esc(new Date(e.at).toLocaleString([],{weekday:"short",hour:"numeric",minute:"2-digit"}))+"</div></span></div>";}).join(""):"<p class='note'>No changes recorded this week yet.</p>")+"</div>";
+  return h;
+}
+(function(){
+  var r0=render;render=function(){if(view==="khist"&&devRole()!=="parent")view="home";return r0.apply(this,arguments);};
+})();
+document.addEventListener("click",function(e){
+  var n=e.target;while(n&&n!==document&&!(n.getAttribute&&n.getAttribute("data-a")))n=n.parentNode;if(!n||n===document)return;
+  if(n.getAttribute("data-a")!=="nxpsopen")return;e.preventDefault();e.stopPropagation();
+  psPid=n.getAttribute("data-p");prOffset[psPid]=0;view="khist";render();try{window.scrollTo(0,0);}catch(x){}
+},true);
+(function(){var css=document.createElement("style");css.textContent=
+  ".ps-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:0 0 12px}"+
+  ".ps-card{display:flex;flex-direction:column;gap:5px;text-align:left;background:var(--card);color:var(--ink);border:1px solid var(--line);border-left:6px solid var(--kc);border-radius:14px;padding:10px 12px;font:inherit;cursor:pointer;min-height:96px}"+
+  ".ps-top{display:flex;align-items:center;gap:6px}.ps-av{font-size:22px}.ps-top b{font-size:18px}.ps-pct{margin-left:auto;font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}"+
+  ".ps-bar{display:block;height:8px;border-radius:4px;background:var(--line);overflow:hidden}.ps-bar i{display:block;height:100%;background:var(--kc);transform-origin:left center}"+
+  ".ps-sub{font-size:15px}.ps-day h2{margin:0 0 4px;font-size:19px}.ps-st{font-size:20px;width:30px;text-align:center}";
   document.head.appendChild(css);})();
 window.FH_READY=true;
 </script>

@@ -82,3 +82,12 @@
 - **Plant:** it grows a little on each day the kid was On track or better, blooms after 5 good days, and droops slightly after a Needs-a-push day. Parents can turn it off in Parent > Family sync > Kids' progress pages.
 - **Weekly reset:** the week starts fresh every Monday. On parent phones, ◀ ▶ shows earlier weeks (up to 8 back, from what that phone has saved). Days before the family's start date show as "not counted".
 - **Fix (from Stage 4):** marking an already-approved chore as Missed no longer turns it into "Made up". Only a make-up the kid actually sent in becomes Made up.
+
+### v39.8 – Stage 8: parents' summary
+- **Summary cards:** on parent phones, the Home screen shows a small card per child under "To review", in the child's colour: this week's percentage, its zone, and how many were missed and excused.
+- **History:** tapping a card opens that child's history:
+  - the This week meter, with ◀ ▶ for earlier weeks
+  - each day with every item's status and reason ("Excused · Sick · by Monica", "Missed · not done by the end of the day", "waiting for approval"), with a ⋯ button to change it
+  - "Changes this week": old → new status, who made the change and when
+- **Wording:** single days now read "Great day" instead of "Great week". Days before tracking started read "Not counted".
+- **Tablet:** the wall tablet shows no summary cards and can't open the history.
