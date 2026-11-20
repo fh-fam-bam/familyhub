@@ -132,3 +132,10 @@
 - **Idle screen:** the clock, date and info pills always have a dark backing, so bright photos never wash out the text.
 - **Kid pages:** on phones the person switcher is one row that scrolls sideways, and there's a one-line legend under the 7-day dots.
 - **Not used from Gemini's code:** its separate theme-switch script (it would have fought the existing per-person theme settings), and its plain dark-mode selector (it would have broken Pastel on phones set to dark mode).
+
+### v40.1 – easier Google sign-in for the second parent
+- **Google button in Family sync:** "Sign in with Google" now also shows in Family sync (📱 This phone) whenever a parent phone isn't signed in, not only on the locked Parent screen.
+- **One-tap switch:** a parent phone still on the old shared family login shows **"Use my own Google account"**, both on the locked Parent screen and in Family sync. It switches that phone to the person's own Google account. Nothing saved on the phone is lost.
+- **Safeguard:** if the Google account picked has the same email as the shared login, the app stops before contacting Firebase and changes nothing. Signing in with Google using the shared login's address could otherwise remove that login's password.
+- **Tidier forms:** the tablet-account and sign-in forms have their labels above the boxes.
+- **Fix:** "Sign out" on the 📱 This phone screen did sign out, but the screen didn't update, so it looked like nothing happened. The screen now refreshes straight away.
