@@ -152,3 +152,7 @@
 - **Automatic option:** "Mark likely doctor visits automatically (don't ask)".
 - Pet-only events (vet visits) and past one-off events are left out. The matching runs on the device; nothing is sent to the AI service.
 - **Who sees an appointment:** a Doctor appointment now shows on the wall tablet and kids' devices when it includes a child, is for the whole family (nobody picked) or is only for the pets. Only appointments for grown-ups with no children stay in the parents-only folder. Parent devices still see everything. The wall and kids' Care page gets a 👪 Whole family box. Medicines are unchanged, and the database rules don't change.
+
+### v40.5 – smaller doctor-visit finder
+- The top of Care shows nothing when there are no visits to check. When there are, it shows one small line ("🩺 2 calendar events may be doctor visits · Review") that opens the list.
+- The automatic switch and the note about who sees visits are in a closed **🩺 Doctor visit settings** box at the bottom of Care.

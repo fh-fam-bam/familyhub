@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v40.4";
+var FH_BUILD="v40.5";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -8992,6 +8992,28 @@ function careApptAud(e){
   return i>=0?h.slice(0,i)+box+h.slice(i):h+box;};})();
 (function(){var t0=careTodayLines;careTodayLines=function(){var l=t0.apply(this,arguments);
   careAppts(1).filter(function(e){return e.d===today()&&!attendees(e).length;}).forEach(function(e){l.push("<div class='li'>👪 <b>Family</b> · 🩺 "+esc(e.t)+(e.m?" · "+esc(niceTime(e.m)):"")+"</div>");});return l;};})();
+
+/* ===== v40.5: the doctor-visit finder takes less room in Care =====
+   Top of Care: nothing when there is nothing to check; otherwise one small line that opens the list.
+   The automatic switch and the note about who sees visits move to a closed "Doctor visit settings" box at the bottom. */
+var drOpen=false;
+drCardHtml=function(){
+  var l=drCandidates();if(!l.length)return "";
+  if(!drOpen)return "<p><button class='btn n dr-pill' data-dr='open' aria-expanded='false'>🩺 "+l.length+" calendar event"+(l.length===1?"":"s")+" may be doctor visits · Review</button></p>";
+  var h="<div class='cd care-person dr-box'><div class='ch' style='background:var(--bar);color:var(--barink)'>🩺 Doctor visits to check ("+l.length+")</div><div class='cb'><p class='note'>Tap Yes to put a visit in Care. Your answer is remembered for imported calendars too.</p>";
+  h+=l.slice(0,12).map(function(o){return "<div class='li dr-row'><div><b>"+esc(o.t)+"</b><br><span class='note'>"+esc(niceDate(o.d))+(o.n>1?" · "+o.n+" on the calendar":"")+(o.src&&drSrcName(o.src)?" · from "+esc(drSrcName(o.src)):"")+"</span></div><div class='dr-b'><button class='btn g' data-dr='yes' data-k='"+esc(o.k)+"'>🩺 Yes</button><button class='btn n' data-dr='no' data-k='"+esc(o.k)+"'>Not a doctor visit</button></div></div>";}).join("");
+  if(l.length>12)h+="<p class='note'>+"+(l.length-12)+" more after these.</p>";
+  h+="<p>"+(l.length>1?"<button class='btn g' data-dr='allyes'>🩺 Yes to all "+l.length+"</button> ":"")+"<button class='btn n' data-dr='close'>Close</button></p></div></div>";
+  return h;
+};
+function drSettingsHtml(){
+  return "<details class='dr-set'><summary>🩺 Doctor visit settings</summary><label class='day-choice' style='min-height:48px'><input type='checkbox' data-dr='auto'"+(drAuto()?" checked":"")+"> Mark likely doctor visits automatically (don’t ask)</label><p class='note'>Calendar events that look like doctor or dentist visits, including ones from Google, Apple or other calendars, are found on this device (nothing is sent to the AI). Visits that include a child, or are for the whole family, show on the wall tablet and kids’ devices. Visits only for grown-ups stay on parent devices.</p></details>";
+}
+(function(){var c2=careHtml;careHtml=function(){var h=c2.apply(this,arguments);if(devRole()!=="parent")return h;var i=h.lastIndexOf("</div>");return h+drSettingsHtml();};})();
+document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e.target.closest("button[data-dr='open'],button[data-dr='close']"):null;if(!b)return;e.preventDefault();drOpen=b.getAttribute("data-dr")==="open";render();});
+/* the list closes once everything is answered */
+(function(){var d0=drDecide;drDecide=function(){var r=d0.apply(this,arguments);if(!drCandidates().length)drOpen=false;return r;};})();
+(function(){var st=document.createElement("style");st.textContent=".dr-pill{min-height:44px;font-size:15px;padding:8px 14px;opacity:.9}.dr-set{margin:14px 0 6px;color:var(--ink)}.dr-set summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-size:15px;opacity:.75}.dr-set[open] summary{opacity:1}";document.head.appendChild(st);})();
 
 window.FH_READY=true;
 </script>
