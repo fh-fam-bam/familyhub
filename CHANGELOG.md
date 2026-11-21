@@ -145,3 +145,10 @@
 - **Safeguard:** if the Google account picked has the same email as the shared login, the app stops before contacting Firebase and changes nothing. Signing in with Google using the shared login's address could otherwise remove that login's password.
 - **Tidier forms:** the tablet-account and sign-in forms have their labels above the boxes.
 - **Fix:** "Sign out" on the 📱 This phone screen did sign out, but the screen didn't update, so it looked like nothing happened. The screen now refreshes straight away.
+
+### v40.4 – doctor visits found on the calendar
+- **Care (parents): "Doctor visits to check".** Calendar events that look like doctor, dentist, eye, orthodontist, checkup, therapy and similar visits are listed, including events from imported Google, Apple and other calendars. Tap **Yes**, **Not a doctor visit** or **Yes to all**. A Yes sets the event's type to Doctor, so it shows in Care.
+- **Remembered answers:** answers are saved by event title in a new shared setting (`kindRules`) and applied every time an imported calendar refreshes, so marked visits stay marked.
+- **Automatic option:** "Mark likely doctor visits automatically (don't ask)".
+- Pet-only events (vet visits) and past one-off events are left out. The matching runs on the device; nothing is sent to the AI service.
+- **Who sees an appointment:** a Doctor appointment now shows on the wall tablet and kids' devices when it includes a child, is for the whole family (nobody picked) or is only for the pets. Only appointments for grown-ups with no children stay in the parents-only folder. Parent devices still see everything. The wall and kids' Care page gets a 👪 Whole family box. Medicines are unchanged, and the database rules don't change.
