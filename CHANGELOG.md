@@ -167,3 +167,11 @@
 - Each person's page now has its own **Up next** card, styled like the one on Home, at the top above their name card. It replaces v40.6's "Your plans" strip.
 - It shows only that person's events over the next two weeks: ones they're picked for in the calendar, and ones that name them in the title (like "J altar serve"). It shows what's happening now or next, how long until it starts, and what comes after. Tap it to open their calendar.
 - Events named in the title show the named people instead of "Whole family", here and on Home's Up next.
+
+### v40.8 – jump to tasks
+- On everyone's page, tap the "0 / 2 tasks done" box (it now says "Go to tasks ›") to scroll straight down to that person's tasks. The tasks heading flashes briefly so it's easy to spot.
+
+### v40.9 – shorter personal pages
+- **Make-up limit:** only chores missed **yesterday** can be made up, at most **2 a day**. Older misses no longer pile up in the list.
+- **Groups fold:** only the group for the time of day is open (Morning until 11 am, After school until 5 pm, then Evening). Other time groups, weekly chores and finished groups show as one line, such as "Evening · 1 left" or "✓ all done". Tap a line to open or close it. Your choice is remembered on that device for the rest of the day. Groups without a time in the name, like "Daily chores", stay open.
+- **Compact rows:** the ⋯ button moves to the right, and the line under each task is short ("1 pt" instead of "To do · 1 point available").
