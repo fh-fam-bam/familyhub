@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v40.7";
+var FH_BUILD="v40.9";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -9101,6 +9101,98 @@ calMineHtml=function(){return "";};
   var i=h.indexOf("<section class=\"personal-hero");if(i<0)return h;return h.slice(0,i)+personNextHtml(p)+h.slice(i);};})();
 setInterval(function(){try{if(view!=="person")return;var el=document.getElementById("nnhero-p"),p=person(pid);if(!el||!p)return;var a=document.activeElement;if(a&&a!==document.body&&a.tagName!=="BUTTON")return;var t=document.createElement("div");t.innerHTML=personNextHtml(p);if(t.firstChild)el.parentNode.replaceChild(t.firstChild,el);}catch(x){}},30000);
 (function(){var css=document.createElement("style");css.textContent="#nnhero-p{margin:0 0 14px}#nnhero-p.nn-empty{padding:12px 18px}";document.head.appendChild(css);})();
+/* ---- v40.8: tap the "0 / 2 tasks done" box on anyone's page to jump to their tasks ---- */
+(function(){var pe=pers;pers=function(){return pe.apply(this,arguments).replace('<div class="personal-progress">','<div class="personal-progress fh-jump" role="button" tabindex="0" aria-label="Go to my tasks">');};})();
+function fhJumpTasks(){var t=document.getElementById("my-tasks");if(!t)return;
+  var top=t.getBoundingClientRect().top+window.pageYOffset-12;window.scrollTo(0,top);
+  t.classList.remove("fh-flash");void t.offsetWidth;t.classList.add("fh-flash");}
+document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e.target.closest(".personal-progress.fh-jump"):null;if(!b)return;e.preventDefault();fhJumpTasks();});
+document.addEventListener("keydown",function(e){if((e.key==="Enter"||e.key===" ")&&e.target&&e.target.classList&&e.target.classList.contains("fh-jump")){e.preventDefault();fhJumpTasks();}});
+(function(){var css=document.createElement("style");css.textContent=
+  ".personal-progress.fh-jump{cursor:pointer;-webkit-tap-highlight-color:transparent}.personal-progress.fh-jump:active{opacity:.8}"+
+  ".personal-progress.fh-jump:after{content:'Go to tasks ›';display:block;margin-top:8px;font-size:15px;font-weight:600;opacity:.75}"+
+  "@keyframes fhFlash{0%{background:rgba(59,91,219,.28)}100%{background:transparent}}#my-tasks.fh-flash{animation:fhFlash 1.2s ease-out;border-radius:8px}";
+  document.head.appendChild(css);})();
+/* ===== v40.9: shorter personal pages =====
+   1. Make-up: only chores missed YESTERDAY can be made up, at most 2 a day.
+   2. Compact task rows: the ⋯ button sits at the right, and the line under each task is short ("1 pt").
+   3. Groups fold: only the group for now (Morning / After school / Evening) is open; other time groups,
+      weekly chores and finished groups show as one tappable line ("Evening · 1 left"). A tap opens or
+      closes a group, and the choice is remembered on this device for the rest of the day. */
+var MU_MAX=2;
+function muYesterday(){return fd(addD(localDate(today()),-1));}
+function muUsed(pid){var y=muYesterday(),n=0;Object.keys(S.submissions||{}).forEach(function(k){var q=k.split("|");if(q[0]===y&&q[1]===pid&&S.submissions[k]&&S.submissions[k].makeup&&S.done&&S.done[k])n++;});return n;}
+statusMakeupList=function(pid){
+  var y=muYesterday(),out=[];
+  dueTasks(pid,y).forEach(function(tk){var k=y+"|"+pid+"|"+tk.id;if(statusEff(k)==="missed")out.push({k:k,d:y,t:tk});});
+  return out;
+};
+(function(){
+  var ms=statusMakeupSend;statusMakeupSend=function(k){
+    var q=String(k).split("|");if(q[0]!==muYesterday())return;
+    if(muUsed(q[1])>=MU_MAX){statusMessage("You’ve used your "+MU_MAX+" make-ups for today.");return;}
+    return ms.apply(this,arguments);};
+  statusMakeupHtml=function(pid){
+    var p=person(pid);if(!p||!p.kid)return "";var l=statusMakeupList(pid),w=S.done||{};if(!l.length)return "";
+    var used=muUsed(pid),left=Math.max(0,MU_MAX-used),sent=l.filter(function(x){return w[x.k];}),open=l.filter(function(x){return !w[x.k];});
+    if(!left&&!sent.length)return "";
+    var h="<div class='card st-makeup'><h2 style='margin-top:0'>↩️ Make up a missed chore</h2><p class='note'>Missed yesterday? Do it now for half points. "+(left?"You can make up "+left+" more today.":"You’ve used your "+MU_MAX+" make-ups for today.")+" A parent checks it.</p>";
+    h+=sent.map(function(x){return "<div class='row'><span class='t'>"+esc(x.t.e||"")+" "+esc(x.t.t)+"</span><span class='note'>"+(w[x.k]==="p"?"⏳ Waiting for a parent":"✅ Made up")+"</span></div>";}).join("");
+    if(left)h+=open.map(function(x){return "<div class='row'><span class='t'>"+esc(x.t.e||"")+" "+esc(x.t.t)+"</span><button class='btn g' data-a='nxstmk' data-k='"+esc(x.k)+"'>Make up · ½ ⭐</button></div>";}).join("");
+    return h+"</div>";};
+})();
+/* ---- folding groups ---- */
+var fhFold={};try{var _ff=JSON.parse(localStorage.getItem("familyhub-fold")||"{}");if(_ff&&_ff.d===today())fhFold=_ff.m||{};}catch(e){}
+function fhFoldSave(){try{localStorage.setItem("familyhub-fold",JSON.stringify({d:today(),m:fhFold}));}catch(e){}}
+function fhGroupKind(g){g=String(g||"").toLowerCase();
+  if(/week/.test(g))return "weekly";
+  if(/morning|breakfast|wake/.test(g))return "morning";
+  if(/after ?school|afternoon|lunch/.test(g))return "after";
+  if(/evening|night|bed|dinner/.test(g))return "evening";
+  return "";}
+function fhNowKind(){var h=new Date().getHours();return h<11?"morning":h<17?"after":"evening";}
+function fhCompactTasks(){
+  if(view!=="person")return;var top=document.getElementById("my-tasks");if(!top)return;
+  var n=top.nextElementSibling,now=fhNowKind();
+  while(n&&n.tagName==="H2"&&n.querySelector("[data-a='rstart']")){
+    var card=n.nextElementSibling;if(!card||!card.classList.contains("card"))break;
+    var btn=n.querySelector("[data-a='rstart']"),g=btn.getAttribute("data-g"),who=btn.getAttribute("data-p");
+    card.classList.add("fh-tasks");
+    var rows=card.querySelectorAll(".row"),left=0;
+    [].forEach.call(rows,function(r){var c=r.querySelector(".chk");if(c&&!c.classList.contains("a")&&!c.classList.contains("p"))left++;
+      var more=r.querySelector(".st-more");if(more)r.appendChild(more);
+      var nt=r.querySelector(".t .note");if(nt&&!nt.getAttribute("data-fhs")){nt.setAttribute("data-fhs","1");
+        nt.textContent=nt.textContent.replace(/^To do( · )?/,"").replace(/(\d+(?:\.\d+)?) points? available/,function(a,x){return x+(x==="1"?" pt":" pts");}).replace(/^ · /,"")||"To do";}});
+    var kind=fhGroupKind(g),key=who+"|"+g,def;
+    if(!left)def=false;else if(kind==="weekly")def=false;else if(kind&&kind!==now)def=false;else def=true;
+    var open=Object.prototype.hasOwnProperty.call(fhFold,key)?fhFold[key]:def;
+    if(!n.querySelector(".fh-fold")){
+      var t=document.createElement("button");t.type="button";t.className="fh-fold";t.setAttribute("data-fk",key);
+      t.innerHTML="<span class='fh-chev' aria-hidden='true'>›</span><span class='fh-gn'></span><span class='fh-left'></span>";
+      t.querySelector(".fh-gn").textContent=g;
+      [].slice.call(n.childNodes).forEach(function(c){if(c.nodeType===3)c.textContent="";});
+      n.insertBefore(t,n.firstChild);n.classList.add("fh-grp");}
+    var fb=n.querySelector(".fh-fold");fb.querySelector(".fh-left").textContent=left?left+" left":"✓ all done";
+    fb.setAttribute("aria-expanded",open?"true":"false");n.classList.toggle("fh-open",open);
+    card.hidden=!open;btn.style.display=(open&&left)?"":"none";if(btn.textContent.indexOf("Start routine")>=0){btn.textContent="▶ Start";btn.setAttribute("aria-label","Start "+g+" routine");}
+    n=card.nextElementSibling;
+  }
+}
+(function(){var r0=render;render=function(){var v=r0.apply(this,arguments);try{fhCompactTasks();}catch(e){}return v;};})();
+document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e.target.closest(".fh-fold"):null;if(!b)return;e.preventDefault();e.stopPropagation();
+  var k=b.getAttribute("data-fk"),open=b.getAttribute("aria-expanded")!=="true";fhFold[k]=open;fhFoldSave();
+  var h=b.parentNode,card=h.nextElementSibling,rs=h.querySelector("[data-a='rstart']");if(card)card.hidden=!open;b.setAttribute("aria-expanded",open?"true":"false");h.classList.toggle("fh-open",open);
+  if(rs)rs.style.display=(open&&!/all done/.test(b.textContent))?"":"none";},true);
+(function(){var css=document.createElement("style");css.textContent=
+  "h2.fh-grp{display:flex;align-items:center;gap:10px;margin:10px 0 6px}"+
+  ".fh-fold{flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:52px;text-align:left;font:inherit;font-size:20px;font-weight:700;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:14px;padding:6px 14px;cursor:pointer}"+
+  ".fh-chev{display:inline-block;font-size:26px;line-height:1;transition:transform .15s ease}h2.fh-open .fh-chev{transform:rotate(90deg)}"+
+  ".fh-left{margin-left:auto;font-size:16px;font-weight:600;color:var(--mute);white-space:nowrap}"+
+  "h2.fh-grp [data-a='rstart']{flex:none;font-size:16px;min-height:44px;padding:6px 12px;margin:0;white-space:nowrap}"+
+  ".fh-tasks{padding-top:4px;padding-bottom:4px}.fh-tasks .row{padding:6px 0;min-height:0;flex-wrap:nowrap!important;align-items:center}"+
+  ".fh-tasks .row .t{flex:1;min-width:0}.fh-tasks .row .t .note{font-size:15px}"+
+  ".fh-tasks .st-more{margin-left:8px;min-width:40px;min-height:40px}";
+  document.head.appendChild(css);})();
 window.FH_READY=true;
 </script>
 
