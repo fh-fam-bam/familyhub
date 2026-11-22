@@ -156,3 +156,9 @@
 ### v40.5 – smaller doctor-visit finder
 - The top of Care shows nothing when there are no visits to check. When there are, it shows one small line ("🩺 2 calendar events may be doctor visits · Review") that opens the list.
 - The automatic switch and the note about who sees visits are in a closed **🩺 Doctor visit settings** box at the bottom of Care.
+
+### v40.6 – events that name someone go to the top of their page
+- **Names in event titles:** calendar events that say who they're for now count for that person. "J soccer" and "Julian piano" count for Julian, "E dentist" for Emilio, and "J & E" for both. "Carlos", "Daddy" or "Dad" count for Dad, and "Monica", "Mommy" or "Mom" for Monica.
+- **Your plans strip:** today's and tomorrow's events that name the person show in a strip near the top of their page. Tap one to open it.
+- **Less clutter:** an event with no people picked but a name in its title now only shows on the named people's pages. Events with no names still show for everyone.
+- **Editable:** a parent can change each person's list of names in that person's ⚙ Customize panel, under "Names in calendar events".
