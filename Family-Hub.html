@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v40.6";
+var FH_BUILD="v40.7";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -9078,6 +9078,29 @@ document.addEventListener("change",function(e){
   ".cal-mine-ev{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;font:inherit;color:inherit;background:transparent;border:0;border-left:5px solid var(--kc);border-radius:6px;padding:6px 10px;margin:6px 0 0;cursor:pointer;min-height:48px}"+
   ".cal-mine-ev b{font-size:18px}.cm-when{font-size:15px;color:var(--mute)}";
   document.head.appendChild(css);})();
+/* ---- v40.7: each person's page gets its own "Up next" card, like the one on Home ----
+   It replaces v40.6's "Your plans" strip and sits at the top, above the name card. It shows the events that are
+   for this person (picked in the calendar, or named in the title like "J altar serve") over the next two weeks:
+   what's happening now or next, how long until it starts, and what comes after. Tap it to open their calendar. */
+var nnFor="";
+(function(){
+  var ea=eventsAhead;eventsAhead=function(){var a=ea.apply(this,arguments);if(!nnFor)return a;var id=nnFor;
+    return a.filter(function(e){var at=attendees(e);return at.indexOf(id)>=0||e.driver===id||(!at.length&&calNamed(e.t).indexOf(id)>=0);});};
+  var en=eventNames;eventNames=function(e){if(!attendees(e).length){var nm=calNamed(e&&e.t);if(nm.length)return nm.map(function(i){return person(i)?person(i).n:i;}).join(" & ");}return en.apply(this,arguments);};
+  var na=nnAvatars;nnAvatars=function(e){if(!attendees(e).length){var s="";calNamed(e&&e.t).slice(0,4).forEach(function(i){var p=person(i);if(p)s+='<i class="nn-av" aria-hidden="true">'+esc(p.e)+'</i>';});return s;}return na.apply(this,arguments);};
+})();
+function personNextHtml(p){
+  if(!p||p.pet)return "";
+  var h;nnFor=p.id;try{h=nowNextHero(false);}finally{nnFor="";}
+  h=h.replace(" id='nnhero' data-a='go' data-v='cal'"," id='nnhero-p' data-a='nxpersonalcal' data-p='"+esc(p.id)+"' style='--kc:"+p.c+"'");
+  if(h.indexOf("nn-empty")>=0)h=h.replace("A free stretch — enjoy it!","Nothing on the calendar for "+esc(p.n)+" in the next two weeks").replace("Tap to open the calendar","Tap to open "+esc(p.n)+"’s calendar");
+  return h;
+}
+calMineHtml=function(){return "";};
+(function(){var pe=pers;pers=function(){var h=pe.apply(this,arguments),p=person(pid);if(!p||p.pet)return h;
+  var i=h.indexOf("<section class=\"personal-hero");if(i<0)return h;return h.slice(0,i)+personNextHtml(p)+h.slice(i);};})();
+setInterval(function(){try{if(view!=="person")return;var el=document.getElementById("nnhero-p"),p=person(pid);if(!el||!p)return;var a=document.activeElement;if(a&&a!==document.body&&a.tagName!=="BUTTON")return;var t=document.createElement("div");t.innerHTML=personNextHtml(p);if(t.firstChild)el.parentNode.replaceChild(t.firstChild,el);}catch(x){}},30000);
+(function(){var css=document.createElement("style");css.textContent="#nnhero-p{margin:0 0 14px}#nnhero-p.nn-empty{padding:12px 18px}";document.head.appendChild(css);})();
 window.FH_READY=true;
 </script>
 

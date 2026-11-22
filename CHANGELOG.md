@@ -162,3 +162,8 @@
 - **Your plans strip:** today's and tomorrow's events that name the person show in a strip near the top of their page. Tap one to open it.
 - **Less clutter:** an event with no people picked but a name in its title now only shows on the named people's pages. Events with no names still show for everyone.
 - **Editable:** a parent can change each person's list of names in that person's ⚙ Customize panel, under "Names in calendar events".
+
+### v40.7 – "Up next" on each person's page
+- Each person's page now has its own **Up next** card, styled like the one on Home, at the top above their name card. It replaces v40.6's "Your plans" strip.
+- It shows only that person's events over the next two weeks: ones they're picked for in the calendar, and ones that name them in the title (like "J altar serve"). It shows what's happening now or next, how long until it starts, and what comes after. Tap it to open their calendar.
+- Events named in the title show the named people instead of "Whole family", here and on Home's Up next.
