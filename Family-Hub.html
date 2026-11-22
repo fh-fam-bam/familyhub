@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v40.3";
+var FH_BUILD="v40.4";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -8898,6 +8898,69 @@ document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e
 (function(){var css=document.createElement("style");css.textContent=
   ".timedchk{white-space:normal;max-width:100%;box-sizing:border-box}.timedchk input{flex:0 0 auto}"+
   "label.timedchk[style*='display:block'] input{vertical-align:middle}";
+  document.head.appendChild(css);})();
+/* ---- v40.4: calendar events that name someone show at the top of that person's page ----
+   Event titles often say who they're for: "J soccer", "J & E dentist", "Emilio party", "Daddy work trip",
+   "Monica lunch". Each person has a list of names that count (kids: name and first letter; Dad: Carlos,
+   Daddy, Dad; Monica: Monica, Mommy, Mom). A parent can change the list in that person's Customize panel.
+   - An event with no people picked in the calendar but a name in its title now belongs to the people named,
+     so "E dentist" shows on Emilio's page and not on Julian's. Events with no names stay whole-family.
+   - Today's and tomorrow's events that name the person show in a "Your plans" strip near the top of the page. */
+var CAL_NICK_DEF={dad:["Carlos","Daddy","Dad"],monica:["Monica","Mommy","Mom"]};
+function calNickDefault(id){
+  var p=person(id);if(!p||p.pet)return [];
+  var a=[p.n].concat(CAL_NICK_DEF[id]||[]);
+  if(p.kid&&p.n){var L=p.n.charAt(0).toUpperCase(),clash=(S.members||P).some(function(x){return x.id!==id&&x.kid&&!x.archived&&x.n&&x.n.charAt(0).toUpperCase()===L;});if(!clash)a.push(L);}
+  var seen={};return a.filter(function(x){var k=String(x||"").toLowerCase();if(!k||seen[k])return false;seen[k]=1;return true;});
+}
+function calNicks(id){var pr=(S.prefs||{})[id]||{};if(typeof pr.nick==="string")return pr.nick.split(",").map(function(x){return x.trim();}).filter(Boolean).slice(0,12);return calNickDefault(id);}
+function calReEsc(x){return x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");}
+var calNamedCache={key:"",map:{}};
+function calNamed(title){
+  title=String(title||"");if(!title)return [];
+  var people=(S.members||P).filter(function(x){return !x.pet&&!x.archived;}),key=people.map(function(x){return x.id+":"+calNicks(x.id).join(",");}).join("|");
+  if(calNamedCache.key!==key)calNamedCache={key:key,map:{}};
+  if(calNamedCache.map[title])return calNamedCache.map[title];
+  var out=people.filter(function(x){return calNicks(x.id).some(function(n){
+    if(n.length===1){/* a single capital letter on its own: "J soccer", "J & E", "J/E", "(J)" */
+      return new RegExp("(^|[\\s&/+,:;(\\-])"+calReEsc(n.toUpperCase())+"(?=$|[\\s&/+,:;).\\-'’])").test(title);}
+    return new RegExp("(^|[^A-Za-z0-9À-ÿ])"+calReEsc(n)+"(?=$|[^A-Za-z0-9À-ÿ])","i").test(title);
+  });}).map(function(x){return x.id;});
+  calNamedCache.map[title]=out;return out;
+}
+personalEvents=function(id,days){return eventsAhead(today(),days).filter(function(e){
+  var a=attendees(e);if(a.length)return a.indexOf(id)>=0||e.driver===id;
+  var nm=calNamed(e.t);return !nm.length||nm.indexOf(id)>=0||e.driver===id;});};
+function calMineHtml(p){
+  if(!p||p.pet)return "";
+  var t=today(),now=new Date(),time=p2(now.getHours())+":"+p2(now.getMinutes());
+  var list=eventsAhead(t,2).filter(function(e){var a=attendees(e);return (a.length?a.indexOf(p.id)>=0:false)||calNamed(e.t).indexOf(p.id)>=0;})
+    .filter(function(e){return e.d>t||!e.m||(e.end||e.m)>=time;}).slice(0,4);
+  if(!list.length)return "";
+  return "<section class='cal-mine' style='--kc:"+p.c+"' aria-label='"+esc(p.n)+"’s plans'><h2>📅 "+(p.kid?"Your plans":"Your plans")+"</h2>"+list.map(function(e){
+    return "<button class='cal-mine-ev' data-a='nxpersonalevent' data-id='"+esc(e.series)+"' data-day='"+esc(e.origin||e.d)+"' style='border-left-color:"+(attendees(e).length?eventColor(e):p.c)+"'><span class='cm-when'>"+(e.d===t?"Today":"Tomorrow")+" · "+esc(niceTime(e.m))+(e.end?" – "+esc(niceTime(e.end)):"")+"</span><b>"+kindIcon(e.kind)+esc(e.t)+"</b></button>";}).join("")+"</section>";
+}
+(function(){
+  var pe=pers;pers=function(){var h=pe.apply(this,arguments),p=person(pid);if(!p||p.pet)return h;
+    var m=calMineHtml(p);if(!m)return h;
+    var i=h.indexOf("<section class=\"personal-hero");if(i<0)return h;var j=h.indexOf("</section>",i);if(j<0)return h;j+=10;
+    return h.slice(0,j)+m+h.slice(j);};
+  var ch=custHtml;custHtml=function(p){var h=ch.apply(this,arguments);if(!p||p.pet)return h;
+    var isPar=unlocked&&devRole()==="parent",v=calNicks(p.id).join(", ");
+    var f="<h3>Names in calendar events</h3>"+(isPar?"<label for='cust-nick'>Calendar events with any of these names belong to "+esc(p.n)+". Separate with commas.</label><input id='cust-nick' maxlength='200' value='"+esc(v)+"'><p class='note'>A single capital letter (like J) only counts when it stands on its own, as in “J soccer” or “J &amp; E dentist”. Leave empty and tap away to go back to the usual names.</p>":"<p class='note'>Events that say "+esc(v)+" show at the top of this page. A parent can change these names.</p>");
+    var k=h.lastIndexOf("</section>");return k<0?h+f:h.slice(0,k)+f+h.slice(k);};
+})();
+document.addEventListener("change",function(e){
+  var t=e.target;if(!t||t.id!=="cust-nick")return;if(!(unlocked&&devRole()==="parent")||!person(pid))return;
+  var snap=JSON.stringify(S);S.prefs=S.prefs||{};var pr=S.prefs[pid]=S.prefs[pid]||{theme:"auto",hide:[]};
+  var v=String(t.value||"").slice(0,200).trim();if(v)pr.nick=v;else delete pr.nick;
+  if(commitOr(snap))render();
+},true);
+(function(){var css=document.createElement("style");css.textContent=
+  ".cal-mine{background:var(--card);color:var(--ink);border:1px solid var(--line);border-top:5px solid var(--kc);border-radius:16px;padding:10px 14px 12px;margin:0 0 14px}"+
+  ".cal-mine h2{margin:0 0 6px;font-size:20px}"+
+  ".cal-mine-ev{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;font:inherit;color:inherit;background:transparent;border:0;border-left:5px solid var(--kc);border-radius:6px;padding:6px 10px;margin:6px 0 0;cursor:pointer;min-height:48px}"+
+  ".cal-mine-ev b{font-size:18px}.cm-when{font-size:15px;color:var(--mute)}";
   document.head.appendChild(css);})();
 window.FH_READY=true;
 </script>
