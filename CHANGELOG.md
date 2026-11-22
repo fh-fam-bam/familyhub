@@ -133,12 +133,6 @@
 - **Kid pages:** on phones the person switcher is one row that scrolls sideways, and there's a one-line legend under the 7-day dots.
 - **Not used from Gemini's code:** its separate theme-switch script (it would have fought the existing per-person theme settings), and its plain dark-mode selector (it would have broken Pastel on phones set to dark mode).
 
-### v40.4 – events that name someone go to the top of their page
-- **Names in event titles:** calendar events that say who they're for now count for that person. "J soccer" and "Julian piano" count for Julian, "E dentist" for Emilio, and "J & E" for both. "Carlos", "Daddy" or "Dad" count for Dad, and "Monica", "Mommy" or "Mom" for Monica.
-- **Your plans strip:** today's and tomorrow's events that name the person show in a strip near the top of their page. Tap one to open it.
-- **Less clutter:** an event with no people picked but a name in its title now only shows on the named people's pages. Events with no names still show for everyone.
-- **Editable:** a parent can change each person's list of names in that person's ⚙ Customize panel, under "Names in calendar events".
-
 ### v40.3 – Spin page fits the phone
 - **Fix:** on iPhone the Spin page was zoomed out, with the page squeezed to one side. The long "No repeats" checkbox line couldn't wrap, which made the page wider than the screen. Checkbox lines now wrap on every page.
 
@@ -151,3 +145,20 @@
 - **Safeguard:** if the Google account picked has the same email as the shared login, the app stops before contacting Firebase and changes nothing. Signing in with Google using the shared login's address could otherwise remove that login's password.
 - **Tidier forms:** the tablet-account and sign-in forms have their labels above the boxes.
 - **Fix:** "Sign out" on the 📱 This phone screen did sign out, but the screen didn't update, so it looked like nothing happened. The screen now refreshes straight away.
+
+### v40.4 – doctor visits found on the calendar
+- **Care (parents): "Doctor visits to check".** Calendar events that look like doctor, dentist, eye, orthodontist, checkup, therapy and similar visits are listed, including events from imported Google, Apple and other calendars. Tap **Yes**, **Not a doctor visit** or **Yes to all**. A Yes sets the event's type to Doctor, so it shows in Care.
+- **Remembered answers:** answers are saved by event title in a new shared setting (`kindRules`) and applied every time an imported calendar refreshes, so marked visits stay marked.
+- **Automatic option:** "Mark likely doctor visits automatically (don't ask)".
+- Pet-only events (vet visits) and past one-off events are left out. The matching runs on the device; nothing is sent to the AI service.
+- **Who sees an appointment:** a Doctor appointment now shows on the wall tablet and kids' devices when it includes a child, is for the whole family (nobody picked) or is only for the pets. Only appointments for grown-ups with no children stay in the parents-only folder. Parent devices still see everything. The wall and kids' Care page gets a 👪 Whole family box. Medicines are unchanged, and the database rules don't change.
+
+### v40.5 – smaller doctor-visit finder
+- The top of Care shows nothing when there are no visits to check. When there are, it shows one small line ("🩺 2 calendar events may be doctor visits · Review") that opens the list.
+- The automatic switch and the note about who sees visits are in a closed **🩺 Doctor visit settings** box at the bottom of Care.
+
+### v40.6 – events that name someone go to the top of their page
+- **Names in event titles:** calendar events that say who they're for now count for that person. "J soccer" and "Julian piano" count for Julian, "E dentist" for Emilio, and "J & E" for both. "Carlos", "Daddy" or "Dad" count for Dad, and "Monica", "Mommy" or "Mom" for Monica.
+- **Your plans strip:** today's and tomorrow's events that name the person show in a strip near the top of their page. Tap one to open it.
+- **Less clutter:** an event with no people picked but a name in its title now only shows on the named people's pages. Events with no names still show for everyone.
+- **Editable:** a parent can change each person's list of names in that person's ⚙ Customize panel, under "Names in calendar events".

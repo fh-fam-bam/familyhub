@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v40.4";
+var FH_BUILD="v40.6";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -1649,7 +1649,7 @@ function syncDoneKey(id){var a=String(id).split("__");return a.length===3&&a[0]&
 function syncInWindow(c,id){if(c==="done")return String(id).slice(0,10)>=syncCut(-14);if(c==="meals")return id>=syncCut(-14)&&id<=syncCut(120);return true;}
 var SYNC_MAX=90000,SYNC_KID_COLLS=["done","eventRequests","req","groc","boardreq","hw","careK","slog","cant"];
 var SYNC_AUX=[["pp","pendingPoints"],["sb","submissions"],["pc","petClaims"],["db","doneBy"],["bo","bonus"],["at","approvalTag"]];
-var SYNC_BLOBS=["prefs","team","challenge","spin","awards","parentNotes","fridgeNotes","bounties","packed","mealIngredients","foodPrefs","rewardTargets","returnNotes","household","pointNews","petLog","approvalReversals","kidsAccount","recipes","cosmetics","trial","walletLog","petCare","coach"];
+var SYNC_BLOBS=["prefs","team","challenge","spin","awards","parentNotes","fridgeNotes","bounties","packed","mealIngredients","foodPrefs","rewardTargets","returnNotes","household","pointNews","petLog","approvalReversals","kidsAccount","recipes","cosmetics","trial","walletLog","petCare","coach","kindRules"];
 var SYNC_ID_RE=/^[A-Za-z0-9_-]{1,120}$/;
 function syncEnsureIds(){var ch=false;[S.groc,S.req].forEach(function(l){(l||[]).forEach(function(it){if(it&&typeof it==="object"&&typeof it.id!=="string"){it.id=syncNewId();ch=true;}});});return ch;}
 function syncList(c){
@@ -8899,7 +8899,123 @@ document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e
   ".timedchk{white-space:normal;max-width:100%;box-sizing:border-box}.timedchk input{flex:0 0 auto}"+
   "label.timedchk[style*='display:block'] input{vertical-align:middle}";
   document.head.appendChild(css);})();
-/* ---- v40.4: calendar events that name someone show at the top of that person's page ----
+/* ===== v40.4: find doctor visits on the calendar (imported Google/Apple calendars too) and ask before marking them =====
+   Runs on this device with word matching; nothing is sent to the AI service. A parent's answer is remembered by event
+   title (S.kindRules, shared between parent devices), so the same event from an imported calendar is sorted the same
+   way after every refresh. "__auto":"1" marks likely visits without asking. */
+var DR_RX=/\b(dr|drs|doctors?|dentists?|dental|orthodont\w*|pediatric\w*|paediatric\w*|optometr\w*|ophthalm\w*|eye (exam|doctor|appt|appointment)s?|check-?ups?|check up|physical|well (child|visit|check)|wellness (visit|check|exam)|clinic|urgent care|hospital|therapy|therapist|counsel+ing|counsel+or|psychiatr\w*|psycholog\w*|dermatolog\w*|allergist|allergy (shots?|appt|appointment)|cardiolog\w*|chiropract\w*|physio\w*|vaccin\w*|immuni[sz]ation\w*|flu shot|lab work|blood (work|test|draw)|x-?rays?|mri|ultrasound|surgery|surgeon|podiatr\w*|audiolog\w*|hearing test|ob-?gyn|gyn\w*|urolog\w*|neurolog\w*|endocrin\w*|gastro\w*|orthop\w*|speech therapy|occupational therapy)\b/i;
+function drKey(t){return String(t||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim().slice(0,80);}
+function drRules(){var r=S.kindRules;return r&&typeof r==="object"&&!Array.isArray(r)?r:{};}
+function drAuto(){return drRules().__auto==="1";}
+function drLikely(e){
+  if(!e||e.kind||typeof e.t!=="string")return false;
+  if(!DR_RX.test([e.t,e.loc||"",e.notes||""].join(" ")))return false;
+  var at=attendees(e);if(at.length&&at.every(function(id){var p=person(id);return p&&p.pet;}))return false; /* vet visits stay on the pet pages */
+  return true;
+}
+/* what the saved answers say for an event that has no type yet */
+function drWant(e){
+  if(!e||e.kind)return "";var r=drRules()[drKey(e.t)];
+  if(r==="doctor")return "doctor";if(r==="none")return "";
+  return (drAuto()&&drLikely(e))?"doctor":"";
+}
+/* imported calendars: apply the answers every time a calendar refreshes */
+(function(){var f0=feedEvent;feedEvent=function(){var e=f0.apply(this,arguments);try{if(drWant(e)==="doctor")e.kind="doctor";}catch(x){}return e;};})();
+/* events to ask about: no type, look like a visit, not answered yet, still to come (or repeating) */
+function drCandidates(){
+  var t=today(),r=drRules(),g={},out=[];
+  (S.events||[]).forEach(function(e){
+    if(!drLikely(e))return;var k=drKey(e.t);if(!k||r[k])return;
+    var rep=e.repeat&&e.repeat!=="none";if(!rep&&(e.through||e.d)<t)return;
+    var o=g[k];if(!o){o=g[k]={k:k,t:e.t,n:0,d:e.d,src:""};out.push(o);}
+    o.n++;if(e.d>=t&&(o.d<t||e.d<o.d))o.d=e.d;if(e.src&&!o.src)o.src=e.src;
+  });
+  out.sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:0;});
+  return out;
+}
+function drApplyAll(){var n=0;(S.events||[]).forEach(function(e){if(drWant(e)==="doctor"){e.kind="doctor";n++;}});return n;}
+function drDecide(keys,val){
+  if(devRole()!=="parent"||!keys.length)return;
+  var snap=JSON.stringify(S),r={},old=drRules();Object.keys(old).forEach(function(k){r[k]=old[k];});
+  keys.forEach(function(k){if(k)r[k]=val;});
+  var names=Object.keys(r).filter(function(k){return k!=="__auto";});if(names.length>400)names.slice(0,names.length-400).forEach(function(k){delete r[k];});
+  S.kindRules=r;var n=drApplyAll();
+  if(!commitOr(snap))return;render();
+  statusMessage(val==="doctor"?"🩺 Marked as a doctor visit"+(n>1?" ("+n+" events)":"")+". It now shows in Care.":"OK, that one stays a normal event.");
+}
+function drSetAuto(on){
+  if(devRole()!=="parent")return;
+  var snap=JSON.stringify(S),r={},old=drRules();Object.keys(old).forEach(function(k){r[k]=old[k];});
+  if(on)r.__auto="1";else delete r.__auto;S.kindRules=r;var n=on?drApplyAll():0;
+  if(!commitOr(snap))return;render();
+  statusMessage(on?"Likely doctor visits are now marked automatically"+(n?" ("+n+" marked now)":"")+".":"Doctor visits will be asked about again.");
+}
+function drSrcName(id){var f=(S.feeds||[]).filter(function(x){return x.id===id;})[0];return f?f.name:"";}
+function drCardHtml(){
+  var l=drCandidates(),h="<div class='cd care-person dr-box'><div class='ch' style='background:var(--bar);color:var(--barink)'>🩺 Doctor visits to check"+(l.length?" ("+l.length+")":"")+"</div><div class='cb'>";
+  if(l.length){
+    h+="<p class='note'>These calendar events look like doctor or dentist visits, including ones from Google, Apple or other calendars. Tap Yes to put them in Care. Your answer is remembered, so the same event is sorted the same way after every calendar refresh.</p>";
+    h+=l.slice(0,12).map(function(o){return "<div class='li dr-row'><div><b>"+esc(o.t)+"</b><br><span class='note'>"+esc(niceDate(o.d))+(o.n>1?" · "+o.n+" on the calendar":"")+(o.src&&drSrcName(o.src)?" · from "+esc(drSrcName(o.src)):"")+"</span></div><div class='dr-b'><button class='btn g' data-dr='yes' data-k='"+esc(o.k)+"'>🩺 Yes</button><button class='btn n' data-dr='no' data-k='"+esc(o.k)+"'>Not a doctor visit</button></div></div>";}).join("");
+    if(l.length>12)h+="<p class='note'>+"+(l.length-12)+" more after these.</p>";
+    if(l.length>1)h+="<p><button class='btn g' data-dr='allyes'>🩺 Yes to all "+l.length+"</button></p>";
+  }else h+="<p class='note'>"+(drAuto()?"Likely doctor visits are marked automatically.":"No new doctor visits to check.")+" Events marked as doctor visits show here in Care.</p>";
+  h+="<label class='day-choice' style='min-height:48px'><input type='checkbox' data-dr='auto'"+(drAuto()?" checked":"")+"> Mark likely doctor visits automatically (don’t ask)</label>";
+  h+="<p class='note'>Visits that include a child, or are for the whole family, show on the wall tablet and kids’ devices. Visits only for grown-ups stay on parent devices.</p></div></div>";
+  return h;
+}
+(function(){var c0=careHtml;careHtml=function(){var h=c0.apply(this,arguments);if(devRole()!=="parent")return h;var i=h.indexOf("data-a='nxcareappt'"),j=i>=0?h.indexOf("</p>",i):-1;return j>=0?h.slice(0,j+4)+drCardHtml()+h.slice(j+4):h+drCardHtml();};})();
+document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e.target.closest("button[data-dr]"):null;if(!b)return;e.preventDefault();
+  var a=b.getAttribute("data-dr");
+  if(a==="yes")drDecide([b.getAttribute("data-k")],"doctor");
+  else if(a==="no")drDecide([b.getAttribute("data-k")],"none");
+  else if(a==="allyes")drDecide(drCandidates().map(function(o){return o.k;}),"doctor");});
+document.addEventListener("change",function(e){var t=e.target;if(t&&t.getAttribute&&t.getAttribute("data-dr")==="auto")drSetAuto(!!t.checked);});
+(function(){var st=document.createElement("style");st.textContent=".dr-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}.dr-b{display:flex;gap:6px;flex-wrap:wrap}.dr-b .btn{min-height:48px;margin:0}";document.head.appendChild(st);})();
+/* parent devices keep the answers applied to events that arrive by sync or are added later */
+setInterval(function(){try{if(syncRole()==="parent"&&!sync.applying&&drApplyAll()){save();if(view==="care"||view==="cal")render();}}catch(e){}},60000);
+/* v40.4: who sees an appointment. It shows on the wall tablet and kids' devices when it includes a child, is for the
+   whole family (nobody picked) or only for the pets. Only appointments for grown-ups and no children stay in the
+   parents-only folder. Parent devices see everything, as before. Medicines are unchanged. */
+function careApptAud(e){
+  var ppl=attendees(e).filter(function(id){return !!person(id);});
+  if(!ppl.length)return {aud:"kid",own:"family"};
+  var kids=ppl.filter(function(id){var p=person(id);return p&&p.kid&&!p.pet;});
+  if(kids.length)return {aud:"kid",own:kids[0]};
+  if(ppl.every(function(id){var p=person(id);return p&&p.pet;}))return {aud:"kid",own:ppl[0]};
+  return {aud:"parent",own:ppl[0]};
+}
+(function(){var ci=careItems;careItems=function(){return ci.apply(this,arguments).map(function(o){if(o.kind!=="appt"||!o.v)return o;var a=careApptAud(o.v);o.aud=a.aud;o.own=a.own;return o;});};})();
+/* the wall and kids' Care page also lists whole-family appointments (parents already see them under "Not assigned") */
+(function(){var c1=careHtml;careHtml=function(){var h=c1.apply(this,arguments);if(devRole()==="parent")return h;
+  var fam=careAppts(30).filter(function(e){return !attendees(e).length;});if(!fam.length)return h;
+  var box="<div class='cd care-person'><div class='ch' style='background:var(--bar);color:var(--barink)'>👪 Whole family</div><div class='cb'><p class='note' style='margin:0'><b>Next 30 days</b></p>"+fam.map(careApptRow).join("")+"</div></div>",i=h.lastIndexOf("<p class='note'>");
+  return i>=0?h.slice(0,i)+box+h.slice(i):h+box;};})();
+(function(){var t0=careTodayLines;careTodayLines=function(){var l=t0.apply(this,arguments);
+  careAppts(1).filter(function(e){return e.d===today()&&!attendees(e).length;}).forEach(function(e){l.push("<div class='li'>👪 <b>Family</b> · 🩺 "+esc(e.t)+(e.m?" · "+esc(niceTime(e.m)):"")+"</div>");});return l;};})();
+
+/* ===== v40.5: the doctor-visit finder takes less room in Care =====
+   Top of Care: nothing when there is nothing to check; otherwise one small line that opens the list.
+   The automatic switch and the note about who sees visits move to a closed "Doctor visit settings" box at the bottom. */
+var drOpen=false;
+drCardHtml=function(){
+  var l=drCandidates();if(!l.length)return "";
+  if(!drOpen)return "<p><button class='btn n dr-pill' data-dr='open' aria-expanded='false'>🩺 "+l.length+" calendar event"+(l.length===1?"":"s")+" may be doctor visits · Review</button></p>";
+  var h="<div class='cd care-person dr-box'><div class='ch' style='background:var(--bar);color:var(--barink)'>🩺 Doctor visits to check ("+l.length+")</div><div class='cb'><p class='note'>Tap Yes to put a visit in Care. Your answer is remembered for imported calendars too.</p>";
+  h+=l.slice(0,12).map(function(o){return "<div class='li dr-row'><div><b>"+esc(o.t)+"</b><br><span class='note'>"+esc(niceDate(o.d))+(o.n>1?" · "+o.n+" on the calendar":"")+(o.src&&drSrcName(o.src)?" · from "+esc(drSrcName(o.src)):"")+"</span></div><div class='dr-b'><button class='btn g' data-dr='yes' data-k='"+esc(o.k)+"'>🩺 Yes</button><button class='btn n' data-dr='no' data-k='"+esc(o.k)+"'>Not a doctor visit</button></div></div>";}).join("");
+  if(l.length>12)h+="<p class='note'>+"+(l.length-12)+" more after these.</p>";
+  h+="<p>"+(l.length>1?"<button class='btn g' data-dr='allyes'>🩺 Yes to all "+l.length+"</button> ":"")+"<button class='btn n' data-dr='close'>Close</button></p></div></div>";
+  return h;
+};
+function drSettingsHtml(){
+  return "<details class='dr-set'><summary>🩺 Doctor visit settings</summary><label class='day-choice' style='min-height:48px'><input type='checkbox' data-dr='auto'"+(drAuto()?" checked":"")+"> Mark likely doctor visits automatically (don’t ask)</label><p class='note'>Calendar events that look like doctor or dentist visits, including ones from Google, Apple or other calendars, are found on this device (nothing is sent to the AI). Visits that include a child, or are for the whole family, show on the wall tablet and kids’ devices. Visits only for grown-ups stay on parent devices.</p></details>";
+}
+(function(){var c2=careHtml;careHtml=function(){var h=c2.apply(this,arguments);if(devRole()!=="parent")return h;var i=h.lastIndexOf("</div>");return h+drSettingsHtml();};})();
+document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e.target.closest("button[data-dr='open'],button[data-dr='close']"):null;if(!b)return;e.preventDefault();drOpen=b.getAttribute("data-dr")==="open";render();});
+/* the list closes once everything is answered */
+(function(){var d0=drDecide;drDecide=function(){var r=d0.apply(this,arguments);if(!drCandidates().length)drOpen=false;return r;};})();
+(function(){var st=document.createElement("style");st.textContent=".dr-pill{min-height:44px;font-size:15px;padding:8px 14px;opacity:.9}.dr-set{margin:14px 0 6px;color:var(--ink)}.dr-set summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-size:15px;opacity:.75}.dr-set[open] summary{opacity:1}";document.head.appendChild(st);})();
+
+/* ---- v40.6: calendar events that name someone show at the top of that person's page ----
    Event titles often say who they're for: "J soccer", "J & E dentist", "Emilio party", "Daddy work trip",
    "Monica lunch". Each person has a list of names that count (kids: name and first letter; Dad: Carlos,
    Daddy, Dad; Monica: Monica, Mommy, Mom). A parent can change the list in that person's Customize panel.
