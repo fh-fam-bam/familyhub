@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v40.9";
+var FH_BUILD="v40.10";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -9193,6 +9193,48 @@ document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e
   ".fh-tasks .row .t{flex:1;min-width:0}.fh-tasks .row .t .note{font-size:15px}"+
   ".fh-tasks .st-more{margin-left:8px;min-width:40px;min-height:40px}";
   document.head.appendChild(css);})();
+/* ---- v40.10: sync can no longer get stuck sending the same thing over and over ----
+   1. If the database answers "someone else changed this" but this device can't use that copy (for example it
+      doesn't pass this device's checks), the device now notes the database's version number, so its next send
+      goes through instead of being refused again forever.
+   2. Safety net: if the same item is sent 6 times within 5 minutes, it is paused for 15 minutes, everything
+      else keeps syncing, and Family sync shows which item it was (with a "Try again" button). */
+var syncLoop={sent:{},stuck:{},notes:[]};
+function syncLoopNote(t){syncLoop.notes.push(new Date().toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})+" "+t);if(syncLoop.notes.length>8)syncLoop.notes.shift();}
+function syncLoopCount(c,id){
+  var k=c+"/"+id,now=Date.now(),e=syncLoop.sent[k];
+  if(!e||now-e.first>300000)e=syncLoop.sent[k]={n:0,first:now};
+  e.n++;
+  if(e.n>=6&&!syncLoop.stuck[k]){syncLoop.stuck[k]={until:now+900000,n:e.n};syncLoopNote("paused "+k+" (sent "+e.n+" times in "+Math.max(1,Math.round((now-e.first)/60000))+" min)");try{syncRefreshAdmin();}catch(x){}}
+}
+function syncLoopWrap(){
+  var ad=sync.adapter;if(!ad||ad.__fhLoop)return;ad.__fhLoop=true;var put=ad.put;
+  ad.put=function(c,id){
+    syncLoopCount(c,id);
+    return put.apply(this,arguments).then(function(r){
+      if(r&&!r.ok&&r.remote&&typeof r.remote.rev==="number")setTimeout(function(){
+        var kn=sync.known[c]&&sync.known[c][id];
+        if(sync.known[c]&&(!kn||kn.rev<r.remote.rev)){
+          sync.known[c][id]={rev:r.remote.rev,json:r.remote.deleted?null:(typeof r.remote.json==="string"?r.remote.json:null),deleted:!!r.remote.deleted,st:r.remote.st};
+          syncLoopNote("took the database's version number for "+c+"/"+id);syncStore();syncSchedule(1500);
+        }},0);
+      return r;});
+  };
+}
+(function(){
+  var sp=syncPush;syncPush=function(){syncLoopWrap();return sp.apply(this,arguments);};
+  var sd=syncDiff;syncDiff=function(){var jobs=sd.apply(this,arguments),now=Date.now();
+    Object.keys(syncLoop.stuck).forEach(function(k){if(syncLoop.stuck[k].until<now){delete syncLoop.stuck[k];delete syncLoop.sent[k];}});
+    return jobs.filter(function(j){return !syncLoop.stuck[j.c+"/"+j.id];});};
+  var sb=syncBoxInner;syncBoxInner=function(){var h=sb.apply(this,arguments),ks=Object.keys(syncLoop.stuck);
+    if(!ks.length&&!syncLoop.notes.length)return h;
+    var x="<div class='fh-syncloop'>"+(ks.length?"<p><b>⚠️ "+ks.length+" item"+(ks.length===1?"":"s")+" kept failing to send and "+(ks.length===1?"is":"are")+" paused for 15 minutes.</b> Everything else keeps syncing.</p><p class='note'>"+ks.map(esc).join("<br>")+"</p><button class='btn n' data-a='nxsyncloopretry'>Try again now</button>":"")+
+      (syncLoop.notes.length?"<details><summary>Sync notes</summary><p class='note'>"+syncLoop.notes.map(esc).join("<br>")+"</p></details>":"")+"</div>";
+    return x+h;};
+})();
+document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e.target.closest("[data-a='nxsyncloopretry']"):null;if(!b)return;e.preventDefault();e.stopPropagation();
+  syncLoop.stuck={};syncLoop.sent={};syncLoopNote("retry asked");syncSchedule(10);try{syncRefreshAdmin();}catch(x){}},true);
+(function(){var css=document.createElement("style");css.textContent=".fh-syncloop{border:2px solid #c77700;border-radius:12px;padding:8px 12px;margin:0 0 10px}.fh-syncloop p{margin:4px 0}";document.head.appendChild(css);})();
 window.FH_READY=true;
 </script>
 
