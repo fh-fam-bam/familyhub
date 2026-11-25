@@ -1449,7 +1449,7 @@ function saveAllTaskSettings(){
 document.addEventListener('input',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('minutes-')===0||id.indexOf('points-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 document.addEventListener('change',function(e){var id=(e.target&&e.target.id)||'';if(id.indexOf('timed-')===0||id.indexOf('rp-')===0){var d=document.getElementById('taskdirty');if(d)d.textContent='Unsaved changes. Press Save all changes.';}});
 /* ===== Device role, kiosk helpers and individual parent PINs ===== */
-var FH_BUILD="v40.10";
+var FH_BUILD="v40.11";
 var DEV_KEY="familyhub-device",unlockedBy="";
 function devLoad(){try{var r=JSON.parse(localStorage.getItem(DEV_KEY)||"null");if(r&&typeof r==="object")var tm=/^\d\d:\d\d$/;return {role:["parent","kids","wall"].indexOf(r.role)>=0?r.role:"parent",wake:r.wake!==false,home:r.home!==false,idleMin:[0,1,2,5,10,30].indexOf(r.idleMin)>=0?r.idleMin:2,dimOn:r.dimOn===true,dimFrom:tm.test(r.dimFrom||"")?r.dimFrom:"21:00",dimTo:tm.test(r.dimTo||"")?r.dimTo:"06:30",dimLvl:[30,50,65,80].indexOf(r.dimLvl)>=0?r.dimLvl:65};}catch(e){}return {role:"parent",wake:true,home:true,idleMin:2,dimOn:false,dimFrom:"21:00",dimTo:"06:30",dimLvl:65};}
 var dev=devLoad();
@@ -9235,6 +9235,57 @@ function syncLoopWrap(){
 document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e.target.closest("[data-a='nxsyncloopretry']"):null;if(!b)return;e.preventDefault();e.stopPropagation();
   syncLoop.stuck={};syncLoop.sent={};syncLoopNote("retry asked");syncSchedule(10);try{syncRefreshAdmin();}catch(x){}},true);
 (function(){var css=document.createElement("style");css.textContent=".fh-syncloop{border:2px solid #c77700;border-radius:12px;padding:8px 12px;margin:0 0 10px}.fh-syncloop p{margin:4px 0}";document.head.appendChild(css);})();
+/* ---- v40.11: an event's people are shown the same way everywhere, and parents-only events get their own colour ----
+   If nobody is picked in the event but its title names people ("Mommy & Daddy dinner"), the event card, the
+   details pop-up, the colour bar and the person filter on the calendar now all use the named people, the same
+   way the personal pages already do. Events for both parents (and no kids) use a purple "parents" colour. */
+var FH_PARENTS_COLOR="#7a3fb0";
+function evWho(e){var a=attendees(e);if(a.length)return a;try{return calNamed(e&&e.t);}catch(x){return [];}}
+function evIsParentsOnly(ids){
+  var adults=(S.members||P).filter(function(p){return !p.kid&&!p.pet&&!p.archived;}).map(function(p){return p.id;});
+  return ids.length>=2&&adults.length>=2&&ids.every(function(id){return adults.indexOf(id)>=0;});
+}
+eventColor=function(e){var ids=evWho(e);if(evIsParentsOnly(ids))return FH_PARENTS_COLOR;return ids.length===1&&person(ids[0])?person(ids[0]).c:'#976000';};
+personBadges=function(e){var ids=evWho(e),pc=evIsParentsOnly(ids);
+  return '<div class="calendar-people">'+(ids.length?(pc?'<span class="person-badge" style="border-left-color:'+FH_PARENTS_COLOR+'">💜 Parents</span>':'')+ids.map(function(id){var p=person(id);return p?'<span class="person-badge" style="border-left-color:'+p.c+'">'+esc(p.e)+' '+esc(p.n)+'</span>':'';}).join(''):'<span class="person-badge" style="border-left-color:#976000">Whole family</span>')+'</div>';};
+calendarMatches=function(e){if(!calP)return true;var ids=evWho(e);return ids.length===0||ids.indexOf(calP)>=0||e.driver===calP;};
+/* ---- v40.11: editing an event that came from a linked Google/Apple calendar ----
+   Before: the edit was saved as a separate event with the SAME id, and the next calendar refresh added the
+   original back. Two events then shared one id: the pop-up showed one, the editor the other, and sync kept
+   sending them back and forth ("Sending changes…" forever).
+   Now: the edited copy keeps its link to the calendar and is marked edited, so refreshes keep your version;
+   and any existing duplicates are merged (your edited version wins). */
+function evDedupe(){
+  var by={},order=[],ch=false;
+  (S.events||[]).forEach(function(e){if(!e||!e.id){order.push(e);return;}if(!by[e.id]){by[e.id]=[];order.push(e.id);}by[e.id].push(e);});
+  var out=[];
+  order.forEach(function(k){
+    if(typeof k!=="string"){out.push(k);return;}
+    var g=by[k];if(g.length===1){out.push(g[0]);return;}
+    ch=true;
+    var keep=g.filter(function(e){return e.edited;})[0]||g.filter(function(e){return !e.src;})[0]||g[g.length-1];
+    var wasLocal=!keep.src,src=keep.src||(g.filter(function(e){return e.src;})[0]||{}).src;
+    if(src){keep.src=src;if(wasLocal)keep.edited=true;}
+    out.push(keep);
+  });
+  if(ch)S.events=out;
+  return ch;
+}
+(function(){
+  var ae=applyEventChange;applyEventChange=function(c){
+    var src="";if(c&&c.sourceId)(S.events||[]).forEach(function(x){if(x&&x.id===c.sourceId&&x.src&&!src)src=x.src;});
+    var r=ae.apply(this,arguments);
+    if(r!==false&&src&&c.kind!=="delete")(S.events||[]).forEach(function(x){if(x&&x.id===c.sourceId){x.src=src;x.edited=true;}});
+    evDedupe();return r;};
+  var fa=feedApply;feedApply=function(feed){
+    evDedupe();
+    var ed={};(S.events||[]).forEach(function(e){if(e&&e.src===feed.id&&e.edited)ed[e.id]=e;});
+    var r=fa.apply(this,arguments);
+    if(Object.keys(ed).length){S.events=(S.events||[]).filter(function(e){return !(e&&ed[e.id]);}).concat(Object.keys(ed).map(function(k){return ed[k];}));}
+    evDedupe();return r;};
+  var ar=syncAfterRemote;syncAfterRemote=function(){try{evDedupe();}catch(e){}return ar.apply(this,arguments);};
+})();
+setTimeout(function(){try{if(evDedupe()){save();render();}}catch(e){}},1500);
 window.FH_READY=true;
 </script>
 
