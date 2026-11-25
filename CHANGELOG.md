@@ -179,3 +179,8 @@
 ### v40.10 – sync can't get stuck re-sending
 - **Fix:** after many approvals, a phone could keep flipping between "Family data synced" and "Sending changes…". If the database says another device changed an item, but this device can't use that copy, the device now takes the database's version number. Its next send then goes through instead of being refused again forever.
 - **Safety net:** if the same item is sent 6 times within 5 minutes, it's paused for 15 minutes and everything else keeps syncing. Family sync (📱 This phone) shows which item it was, with a **Try again now** button and a short "Sync notes" list.
+
+### v40.11 – event people shown the same everywhere; a colour for parents-only events
+- **Fix:** an event with nobody picked but names in its title (like "Mommy & Daddy dinner") showed "Whole family" on the calendar and in the event pop-up. It now shows the named people there too, as the personal pages already did. The calendar's person filter and colour bar follow the same rule.
+- **Fix:** editing an event that came from a linked Google or Apple calendar saved the change as a second event with the same ID. The next calendar refresh brought the original back. The pop-up showed one version and the editor the other, and sync could keep sending the pair back and forth ("Sending changes…" forever). Edited imported events now keep their link and are marked as edited, so refreshes keep your version. Existing duplicates are merged automatically, and your edited version wins.
+- **New:** events just for the two parents (no kids) have their own purple colour and a "💜 Parents" tag, whether the parents are picked in the event or named in the title.
