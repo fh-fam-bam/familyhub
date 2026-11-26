@@ -37,8 +37,8 @@
 ### v39.3 – Stage 3: Care section by role
 - **New Care section** (💊 in the menu): each person's medicines, today's dose and the next 30 days of Doctor appointments.
 - **Parent phones:** Care shows everyone. "+ Add medicine", "+ Add appointment" and Edit open the existing Household and Calendar editors, with the type already chosen. Parents can mark a dose Taken or Skip it.
-- **Wall tablet and kids' devices:** Care shows only Julian and Emilio, with no add or edit buttons.
-- **Kids marking doses:** a child taps "I took it" on the tablet. The dose counts at once, with no waiting for approval, and is saved as kid-marked, needing review. Parents see "Julian marked it on the tablet · needs review" and can tap **Looks good**. The parent phone then moves the medicine on to its next date.
+- **Wall tablet and kids' devices:** Care shows only Kid 1 and Kid 2, with no add or edit buttons.
+- **Kids marking doses:** a child taps "I took it" on the tablet. The dose counts at once, with no waiting for approval, and is saved as kid-marked, needing review. Parents see "Kid 1 marked it on the tablet · needs review" and can tap **Looks good**. The parent phone then moves the medicine on to its next date.
 - **"Care today" cards:** on the Home screen and the wall display. The wall shows the kids only.
 
 ### v39.4 – Stage 4: statuses everywhere and automatic end of day
@@ -87,7 +87,7 @@
 - **Summary cards:** on parent phones, the Home screen shows a small card per child under "To review", in the child's colour: this week's percentage, its zone, and how many were missed and excused.
 - **History:** tapping a card opens that child's history:
   - the This week meter, with ◀ ▶ for earlier weeks
-  - each day with every item's status and reason ("Excused · Sick · by Monica", "Missed · not done by the end of the day", "waiting for approval"), with a ⋯ button to change it
+  - each day with every item's status and reason ("Excused · Sick · by Mom", "Missed · not done by the end of the day", "waiting for approval"), with a ⋯ button to change it
   - "Changes this week": old → new status, who made the change and when
 - **Wording:** single days now read "Great day" instead of "Great week". Days before tracking started read "Not counted".
 - **Tablet:** the wall tablet shows no summary cards and can't open the history.
@@ -158,7 +158,7 @@
 - The automatic switch and the note about who sees visits are in a closed **🩺 Doctor visit settings** box at the bottom of Care.
 
 ### v40.6 – events that name someone go to the top of their page
-- **Names in event titles:** calendar events that say who they're for now count for that person. "J soccer" and "Julian piano" count for Julian, "E dentist" for Emilio, and "J & E" for both. "Carlos", "Daddy" or "Dad" count for Dad, and "Monica", "Mommy" or "Mom" for Monica.
+- **Names in event titles:** calendar events that say who they're for now count for that person. "J soccer" and "Kid 1 piano" count for Kid 1, "E dentist" for Kid 2, and "J & E" for both. "Daddy" or "Dad" count for Dad, and "Mommy" or "Mom" for Mom.
 - **Your plans strip:** today's and tomorrow's events that name the person show in a strip near the top of their page. Tap one to open it.
 - **Less clutter:** an event with no people picked but a name in its title now only shows on the named people's pages. Events with no names still show for everyone.
 - **Editable:** a parent can change each person's list of names in that person's ⚙ Customize panel, under "Names in calendar events".

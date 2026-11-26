@@ -518,7 +518,7 @@ html:not(.lite) .card,html:not(.lite) .cd{box-shadow:0 1px 2px rgba(25,35,70,.06
 </script>
 <script>
 var KEY="familyhub-v1", KEY2="familyhub-photos", view="home", pid=null, unlocked=false, cv="week", cd=new Date(), calP="";
-var P=[{id:"dad",n:"Dad",e:"🧔",c:"#3b5bdb",kid:0},{id:"monica",n:"Monica",e:"👩",c:"#c2427a",kid:0},{id:"julian",n:"Julian",e:"🎮",c:"#117562",kid:1},{id:"emilio",n:"Emilio",e:"⚽",c:"#a85a05",kid:1}];
+var P=[{id:"dad",n:"Dad",e:"🧔",c:"#3b5bdb",kid:0},{id:"monica",n:"Mom",e:"👩",c:"#c2427a",kid:0},{id:"julian",n:"Kid 1",e:"🎮",c:"#117562",kid:1},{id:"emilio",n:"Kid 2",e:"⚽",c:"#a85a05",kid:1}];
 var defaultMembers=JSON.parse(JSON.stringify(P));
 function T(g,t,e){return {id:Math.random().toString(36).slice(2,8),g:g,t:t,e:e||""}}
 var initialDataProblem=false;var S=load();S.rewards=S.rewards||[{id:"r1",e:"📱",n:"20 extra minutes of screen time",c:5},{id:"r2",e:"🍦",n:"Ice cream outing",c:10},{id:"r3",e:"🍕",n:"Pick dinner",c:15},{id:"r4",e:"🎢",n:"Special family outing",c:30}];S.req=S.req||[];S.idle=S.idle||5;
@@ -1011,7 +1011,7 @@ function pcHtml(){
 }
 function pcSettingsHtml(c){
   var kids=pcKids(),h="<details class='card pc-set' open><summary>⚙️ Pet care settings</summary>";
-  h+="<h3>Weekly rotation</h3><p class='note'>Julian and Emilio trade morning and evening shifts every Monday. Use these to swap a week.</p><button class='btn n' data-a='pcswap' data-w='this'>⇄ Swap this week</button><button class='btn n' data-a='pcswap' data-w='next'>⇄ Swap next week</button>";
+  h+="<h3>Weekly rotation</h3><p class='note'>The kids trade morning and evening shifts every Monday. Use these to swap a week.</p><button class='btn n' data-a='pcswap' data-w='this'>⇄ Swap this week</button><button class='btn n' data-a='pcswap' data-w='next'>⇄ Swap next week</button>";
   h+="<h3>Midday feeding days</h3><p class='note'>Leave all unchecked if Bowser has no midday meal.</p><div>"+PC_DN.map(function(n,i){return "<label class='day-choice'><input type='checkbox' id='pcs-mid-"+i+"'"+((c.mid||[]).indexOf(i)>=0?' checked':'')+"> "+n+"</label>";}).join('')+"</div>";
   h+="<h3>Points for each job</h3><p class='note'>Care is required either way. Only one child is credited per job per day. Untick “Earns points” for jobs that should earn nothing.</p>";
   PC_DEFS.forEach(function(x){h+="<div class='row' style='flex-wrap:wrap'><span class='t'>"+esc(x[3])+' '+esc(x[2])+"</span><input id='pcs-pts-"+x[0]+"' type='number' min='0' max='1000' step='1' value='"+pcPts(x[0])+"' aria-label='Points for "+esc(x[2])+"' style='width:80px;min-height:44px'><label class='day-choice'><input type='checkbox' id='pcs-rp-"+x[0]+"'"+(pcRp(x[0])?' checked':'')+"> Earns points</label></div>";});
@@ -5484,7 +5484,7 @@ function sfStartVoice(){
   r.onresult=function(ev){var t='';for(var i=0;i<ev.results.length;i++){t+=ev.results[i][0].transcript+' ';}finalText=t.replace(/\s+/g,' ').trim();sfSay('Heard: “'+finalText+'”'+(window.FHNative?' · Keep talking, or tap the 🎤 when you are done.':''));};
   r.onerror=function(ev){var er=ev&&ev.error;sfSetMic(false);sfSay((er==='not-allowed'||er==='service-not-allowed')?'The microphone is blocked. Allow microphone access for this page in the browser settings, then try again.':er==='no-speech'?'I did not hear anything. Tap the microphone and try again.':'Voice input did not work here. You can still type the event.');};
   r.onend=function(){sfRec=null;sfSetMic(false);if(finalText)sfApplyVoice(finalText);};
-  sfRec=r;sfSetMic(true);sfSay('Listening… say something like “Soccer practice tomorrow at 4 pm for Julian”.');
+  sfRec=r;sfSetMic(true);sfSay('Listening… say something like “Soccer practice tomorrow at 4 pm for Alex”.');
   try{r.start();}catch(e){sfRec=null;sfSetMic(false);sfSay('Voice input could not start.');}
 }
 document.addEventListener('click',function(e){
@@ -5747,7 +5747,7 @@ function hwListen(onText,btn){
   r.onresult=function(ev){var t="";for(var i=0;i<ev.results.length;i++)t+=ev.results[i][0].transcript+" ";txt=t.replace(/\s+/g," ").trim();say("Heard: “"+txt+"”"+(window.FHNative?" · Keep talking, or tap Done.":""));};
   r.onerror=function(ev){var er=ev&&ev.error;say(er==="no-speech"?"I did not hear anything. Try again.":(er==="not-allowed"||er==="service-not-allowed")?"The microphone is blocked. Allow it in Settings.":"Voice input did not work. You can type instead.");};
   r.onend=function(){hwUI.rec=null;hwLiveClose(!!txt);if(txt)onText(txt);};
-  say("Listening… say something like “Julian math worksheet page 42 due Thursday”.");
+  say("Listening… say something like “Alex math worksheet page 42 due Thursday”.");
   try{r.start();}catch(e){hwUI.rec=null;hwLiveClose(false);}}
 function hwLiveBox(){hwCss();hwLiveClose(true);var o=document.createElement("div");o.className="hw-ov";o.id="hwlivebox";
   o.innerHTML="<div class='rv'><h2>🎤 Listening</h2><p id='hwlive' class='hw-msg' role='status'></p><div class='rv-btns'><button type='button' style='background:#207544' data-hw='lstop'>✔ Done</button><button type='button' style='background:#53657a' data-hw='lcancel'>Cancel</button></div></div>";
@@ -7286,8 +7286,8 @@ function fhDictate(title,example,onText){
 }
 (function(){var st=document.createElement("style");st.textContent=".fhd-ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:flex-start;justify-content:center;padding:max(16px,env(safe-area-inset-top)) 16px 16px}.fhd{background:var(--bg);color:var(--ink);border-radius:18px;padding:16px;width:min(100%,520px);box-shadow:0 18px 50px #0006}.fhd h2{margin:0 0 6px}.fhd textarea{width:100%;font-size:18px;box-sizing:border-box}.fhd-b{display:flex;gap:8px;margin-top:10px}.fhd-b .btn{flex:1;min-height:48px}";document.head.appendChild(st);})();
 function fhVoiceAny(){return true;}
-(function(){var v0=sfStartVoice;sfStartVoice=function(){if(sfSpeechCtor())return v0.apply(this,arguments);fhDictate("Say the event","Soccer practice tomorrow at 4 pm for Julian",function(t){sfSay("Heard: “"+t+"”");sfApplyVoice(t);});};})();
-(function(){var h0=hwListen;hwListen=function(onText){if(sfSpeechCtor())return h0.apply(this,arguments);fhDictate("Say the homework","Julian math worksheet page 42 due Thursday",onText);};})();
+(function(){var v0=sfStartVoice;sfStartVoice=function(){if(sfSpeechCtor())return v0.apply(this,arguments);fhDictate("Say the event","Soccer practice tomorrow at 4 pm for Alex",function(t){sfSay("Heard: “"+t+"”");sfApplyVoice(t);});};})();
+(function(){var h0=hwListen;hwListen=function(onText){if(sfSpeechCtor())return h0.apply(this,arguments);fhDictate("Say the homework","Alex math worksheet page 42 due Thursday",onText);};})();
 (function(){var a0=aiListen;aiListen=function(){if(sfSpeechCtor())return a0.apply(this,arguments);var ta=document.getElementById("aitext");if(ta){try{ta.focus();}catch(e){}}aiSay("Tap the 🎤 on your keyboard and talk, then tap Ask the helper. (No keyboard 🎤? Turn on Dictation in Settings › General › Keyboard.)");};})();
 /* ---- v39.1 ---- */
 /* ===== v39.1 (Stage 1): accounts and roles =====
@@ -9016,13 +9016,13 @@ document.addEventListener("click",function(e){var b=e.target&&e.target.closest?e
 (function(){var st=document.createElement("style");st.textContent=".dr-pill{min-height:44px;font-size:15px;padding:8px 14px;opacity:.9}.dr-set{margin:14px 0 6px;color:var(--ink)}.dr-set summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-size:15px;opacity:.75}.dr-set[open] summary{opacity:1}";document.head.appendChild(st);})();
 
 /* ---- v40.6: calendar events that name someone show at the top of that person's page ----
-   Event titles often say who they're for: "J soccer", "J & E dentist", "Emilio party", "Daddy work trip",
-   "Monica lunch". Each person has a list of names that count (kids: name and first letter; Dad: Carlos,
-   Daddy, Dad; Monica: Monica, Mommy, Mom). A parent can change the list in that person's Customize panel.
+   Event titles often say who they're for: "J soccer", "J & E dentist", "Alex party", "Daddy work trip",
+   "Mom lunch". Each person has a list of names that count (kids: name and first letter; Dad: Daddy, Dad;
+   Mom: her name, Mommy, Mom). A parent can change the list in that person's Customize panel.
    - An event with no people picked in the calendar but a name in its title now belongs to the people named,
-     so "E dentist" shows on Emilio's page and not on Julian's. Events with no names stay whole-family.
+     so "E dentist" shows on the E kid's page and not the J kid's. Events with no names stay whole-family.
    - Today's and tomorrow's events that name the person show in a "Your plans" strip near the top of the page. */
-var CAL_NICK_DEF={dad:["Carlos","Daddy","Dad"],monica:["Monica","Mommy","Mom"]};
+var CAL_NICK_DEF={dad:["Daddy","Dad"],monica:["Mommy","Mom"]};
 function calNickDefault(id){
   var p=person(id);if(!p||p.pet)return [];
   var a=[p.n].concat(CAL_NICK_DEF[id]||[]);

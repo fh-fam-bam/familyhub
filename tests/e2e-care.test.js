@@ -25,10 +25,10 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  let A=await ctxFor(b),pa=await page(A,OLD);
  await pa.evaluate(()=>{var ds=today();
    S.household=[{id:'mdad',type:'medicine',title:'Dad blood pressure pill',date:ds,time:'08:00',repeat:'daily',people:['dad'],notes:'PRIVATE parent note'},
-                {id:'mjul',type:'medicine',title:'Julian allergy spray',date:ds,repeat:'daily',people:['julian']},
+                {id:'mjul',type:'medicine',title:'Kid 1 allergy spray',date:ds,repeat:'daily',people:['julian']},
                 {id:'bill1',type:'bill',title:'Electric bill',date:ds,amount:'80'}];
-   S.events.push({id:'e1',d:ds,m:'10:00',end:'',t:'Monica therapist',repeat:'none',days:[],people:['monica'],p:'monica',kind:'doctor'});
-   S.events.push({id:'e2',d:ds,m:'15:00',end:'',t:'Emilio dentist',repeat:'none',days:[],people:['emilio'],p:'emilio',kind:'doctor'});
+   S.events.push({id:'e1',d:ds,m:'10:00',end:'',t:'Mom therapist',repeat:'none',days:[],people:['monica'],p:'monica',kind:'doctor'});
+   S.events.push({id:'e2',d:ds,m:'15:00',end:'',t:'Kid 2 dentist',repeat:'none',days:[],people:['emilio'],p:'emilio',kind:'doctor'});
    S.events.push({id:'e3',d:ds,m:'16:00',end:'',t:'Soccer',repeat:'none',days:[],people:['julian'],p:'julian',kind:'sports'});
    S.reminderLog={};S.reminderLog['mdad|'+ds]={at:new Date().toISOString()};save();});
  await signIn(pa,'parent@fam');await pa.evaluate(()=>syncSchedule(10));await pa.waitForTimeout(3000);
@@ -53,7 +53,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  console.log('4) Tablet updates to v39.2');
  T=await ctxFor(b,tState);pt=await page(T,NEW);await pt.waitForTimeout(6000);
  console.log('   tablet role:',await pt.evaluate(()=>devRole()),'| parent medicine gone:',await pt.evaluate(()=>!JSON.stringify(S.household).includes('blood pressure')),'| therapist gone:',await pt.evaluate(()=>!JSON.stringify(S.events).includes('therapist')),
-   '| Julian med kept:',await pt.evaluate(()=>JSON.stringify(S.household).includes('allergy')),'| Emilio dentist kept:',await pt.evaluate(()=>JSON.stringify(S.events).includes('dentist')),'| soccer kept:',await pt.evaluate(()=>JSON.stringify(S.events).includes('Soccer')));
+   '| Kid 1 med kept:',await pt.evaluate(()=>JSON.stringify(S.household).includes('allergy')),'| Kid 2 dentist kept:',await pt.evaluate(()=>JSON.stringify(S.events).includes('dentist')),'| soccer kept:',await pt.evaluate(()=>JSON.stringify(S.events).includes('Soccer')));
  console.log('   saved copy on the tablet mentions parent care:',await pt.evaluate(()=>{var r=localStorage.getItem('familyhub-v1');return /blood pressure|therapist|PRIVATE/.test(r);}));
  const probe=async(pg)=>pg.evaluate(()=>sync.adapter.token().then(t=>Promise.all([
    fetch(FS_ROOT+'/households/family/careParent/med_mdad',{headers:{Authorization:'Bearer '+t}}).then(r=>r.status),
@@ -63,7 +63,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  console.log('   console probe (old kids login): careParent doc/list/query, careKid list =',(await probe(pt)).join(' / '));
  console.log('5) New wall display account on v39.2');
  let W=await ctxFor(b),pw=await page(W,NEW);await signIn(pw,'wall@fam');await pw.waitForTimeout(3000);
- console.log('   role:',await pw.evaluate(()=>devRole()),'| parent medicine:',await pw.evaluate(()=>JSON.stringify(S.household).includes('blood pressure')),'| therapist:',await pw.evaluate(()=>JSON.stringify(S.events).includes('therapist')),'| Julian med:',await pw.evaluate(()=>JSON.stringify(S.household).includes('allergy')));
+ console.log('   role:',await pw.evaluate(()=>devRole()),'| parent medicine:',await pw.evaluate(()=>JSON.stringify(S.household).includes('blood pressure')),'| therapist:',await pw.evaluate(()=>JSON.stringify(S.events).includes('therapist')),'| Kid 1 med:',await pw.evaluate(()=>JSON.stringify(S.household).includes('allergy')));
  console.log('   console probe (display): careParent doc/list/query, careKid list =',(await probe(pw)).join(' / '));
  console.log('6) Status history');
  const k=await pw.evaluate(()=>{var t=S.tasks.julian[0];var k=today()+'|julian|'+t.id;S.done[k]='p';save();return k;});await pw.waitForTimeout(2500);
@@ -82,7 +82,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  console.log('   tablet shows it as taken at once:',await pt.evaluate(()=>/Taken/.test(document.querySelector('.care-person').textContent)));
  await pp.waitForTimeout(3500);await pp.evaluate(()=>{view='care';render();});
  console.log('   Dad\'s phone Care shows:',await pp.evaluate(()=>[...document.querySelectorAll('.care-person .ch')].map(x=>x.textContent.trim()).join(', ')));
- console.log('   Julian row on Dad\'s phone:',await pp.evaluate(()=>{var r=[...document.querySelectorAll('.care-row')].find(x=>/allergy/i.test(x.textContent));return r?r.textContent.replace(/\s+/g,' ').trim():'(none)';}));
+ console.log('   Kid 1 row on Dad\'s phone:',await pp.evaluate(()=>{var r=[...document.querySelectorAll('.care-row')].find(x=>/allergy/i.test(x.textContent));return r?r.textContent.replace(/\s+/g,' ').trim():'(none)';}));
  console.log('   medicine moved on to:',await pp.evaluate(()=>S.household.find(x=>x.id==='mjul').date),'(today',await pp.evaluate(()=>today()),')');
  await pp.screenshot({path:'care-parent.png',fullPage:true});
  await pp.evaluate(()=>{var b=document.querySelector('[data-a=nxcarereview]');if(b)b.click();});await pp.waitForTimeout(3000);
@@ -116,7 +116,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  await pw.evaluate(k=>{var b=document.querySelector('[data-a=appr][data-k="'+k+'"]');if(!b)throw new Error('no approve button on tablet');b.click();},wk);await pw.waitForTimeout(4000);
  const wdk=(await list('items')).find(d=>d.id==='done__'+wk.split('|').join('__'));
  console.log('   approved on tablet -> database st:',wdk&&wdk.st,'| ledger docs:',(await list('items')).filter(d=>d.id.startsWith('ledger__')).length);
- await pp.waitForTimeout(4000);console.log('   Dad\'s phone: Julian points',wst0,'->',await pp.evaluate(()=>S.stars.julian||0),'| chore approved:',await pp.evaluate(k=>S.done[k],wk));
+ await pp.waitForTimeout(4000);console.log('   Dad\'s phone: Kid 1 points',wst0,'->',await pp.evaluate(()=>S.stars.julian||0),'| chore approved:',await pp.evaluate(k=>S.done[k],wk));
  console.log('   tablet can still not read parent care:',await pw.evaluate(()=>sync.adapter.token().then(t=>fetch(FS_ROOT+'/households/family/careParent?pageSize=1',{headers:{Authorization:'Bearer '+t}}).then(r=>r.status))));
  await pw.evaluate(()=>{WS.until=Date.now()-1;});await pw.waitForTimeout(1500);
  console.log('   after 5 minutes: parent mode',await pw.evaluate(()=>wsOn()),'| screen',await pw.evaluate(()=>view),'| role',await pw.evaluate(()=>devRole()),'| bar gone',await pw.evaluate(()=>!document.getElementById('wsbar')));
